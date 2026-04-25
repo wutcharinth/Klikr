@@ -203,3 +203,63 @@
     box-shadow: 0 0 0 0 rgba(41, 151, 255, 0.55);
   }
 }
+
+/* ---------- Motion utilities ---------- */
+@layer utilities {
+  .anim-fade-up { animation: fadeUp 0.7s cubic-bezier(0.2, 0.8, 0.2, 1) forwards; opacity: 0; transform: translateY(20px); }
+  .anim-fade-in { animation: fadeIn 0.5s ease forwards; opacity: 0; }
+  .anim-scale-in { animation: scaleIn 0.5s cubic-bezier(0.2, 0.8, 0.2, 1) forwards; opacity: 0; transform: scale(0.95); }
+  .anim-pop { animation: popIn 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards; opacity: 0; transform: scale(0.6); }
+  .delay-100 { animation-delay: 0.1s; }
+  .delay-200 { animation-delay: 0.2s; }
+  .delay-300 { animation-delay: 0.3s; }
+  .delay-400 { animation-delay: 0.4s; }
+  .delay-500 { animation-delay: 0.5s; }
+  .delay-700 { animation-delay: 0.7s; }
+}
+@keyframes fadeUp {
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes fadeIn { to { opacity: 1; } }
+@keyframes scaleIn {
+  to { opacity: 1; transform: scale(1); }
+}
+@keyframes popIn {
+  to { opacity: 1; transform: scale(1); }
+}
+@keyframes shimmer {
+  0%, 100% { background-position: -200% 0; }
+  50% { background-position: 200% 0; }
+}
+
+/* Gradient orbs for hero */
+.orb {
+  position: absolute; pointer-events: none; border-radius: 999px;
+  filter: blur(60px); opacity: 0.6;
+  animation: drift 18s ease-in-out infinite alternate;
+}
+.orb-1 { width: 50vw; height: 50vw; max-width: 700px; max-height: 700px; background: radial-gradient(closest-side, rgba(41,151,255,0.55), transparent 65%); top: -10%; right: -10%; }
+.orb-2 { width: 60vw; height: 60vw; max-width: 800px; max-height: 800px; background: radial-gradient(closest-side, rgba(124,138,255,0.40), transparent 65%); bottom: -20%; left: -15%; animation-delay: -6s; animation-duration: 24s; }
+@keyframes drift {
+  0% { transform: translate(0,0) scale(1); }
+  100% { transform: translate(-6%, 6%) scale(1.08); }
+}
+
+/* Word reveal */
+.reveal-word { display: inline-block; opacity: 0; transform: translateY(28px); animation: rise 0.85s cubic-bezier(0.2, 0.8, 0.2, 1) forwards; }
+@keyframes rise { to { opacity: 1; transform: translateY(0); } }
+
+/* Tap-press */
+.press { transition: transform 0.12s ease; }
+.press:active { transform: scale(0.97); }
+
+/* Smooth bar fill */
+.bar-fill { transition: width 0.9s cubic-bezier(0.2, 0.8, 0.2, 1); }
+
+/* Slide cross-fade */
+.slide-enter { animation: slideIn 0.55s cubic-bezier(0.2, 0.8, 0.2, 1) forwards; }
+@keyframes slideIn {
+  from { opacity: 0; transform: translateY(16px) scale(0.99); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+

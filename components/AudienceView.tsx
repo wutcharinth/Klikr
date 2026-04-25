@@ -97,31 +97,31 @@ export function AudienceView({
 
   return (
     <Stage>
-      <p className="text-[10px] uppercase tracking-[0.18em] muted-text">{currentSlide.type}</p>
-      <h2 className="mt-1 text-2xl font-semibold tracking-tight">{currentSlide.question}</h2>
-
-      {currentSlide.image_url && (
-        <img
-          src={currentSlide.image_url}
-          alt=""
-          className="mt-4 w-full max-h-56 object-cover rounded-xl"
-          style={{ border: "1px solid var(--line)" }}
-        />
-      )}
-
-      <div className="mt-6">
-        {currentSlide.type === "mcq" && (
-          <MCQ slide={currentSlide} participantId={participant.id} />
-        )}
-        {currentSlide.type === "quiz" && (
-          <Quiz slide={currentSlide} participantId={participant.id} startedAt={slideStartedAt} />
-        )}
-        {currentSlide.type === "wordcloud" && (
-          <WordCloudInput slide={currentSlide} participantId={participant.id} />
-        )}
-        {currentSlide.type === "open" && (
-          <OpenInput slide={currentSlide} participantId={participant.id} />
-        )}
+      <div key={currentSlide.id} className="slide-enter">
+        <p className="text-[10px] uppercase tracking-[0.18em] muted-text">{currentSlide.type}</p>
+        <h2 className="mt-1 text-2xl font-semibold tracking-tight">{currentSlide.question}</h2>
+        {currentSlide.image_url ? (
+          <img
+            src={currentSlide.image_url}
+            alt=""
+            className="anim-fade-up mt-4 w-full max-h-56 object-cover rounded-xl"
+            style={{ border: "1px solid var(--line)" }}
+          />
+        ) : null}
+        <div className="mt-6">
+          {currentSlide.type === "mcq" ? (
+            <MCQ slide={currentSlide} participantId={participant.id} />
+          ) : null}
+          {currentSlide.type === "quiz" ? (
+            <Quiz slide={currentSlide} participantId={participant.id} startedAt={slideStartedAt} />
+          ) : null}
+          {currentSlide.type === "wordcloud" ? (
+            <WordCloudInput slide={currentSlide} participantId={participant.id} />
+          ) : null}
+          {currentSlide.type === "open" ? (
+            <OpenInput slide={currentSlide} participantId={participant.id} />
+          ) : null}
+        </div>
       </div>
     </Stage>
   );
@@ -160,15 +160,13 @@ function NicknameForm({ onJoin }: { onJoin: (n: string) => Promise<void> }) {
           maxLength={32}
           value={name}
           onChange={(e) => setName(e.target.value)}
-          className="w-full rounded-md border border-slate-300 bg-white px-3 py-3 text-lg text-slate-900 outline-none focus:border-brand-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+          className="input"
+          style={{ height: 52, fontSize: 17 }}
           placeholder="Your nickname"
           required
         />
-        <button
-          disabled={busy}
-          className="w-full rounded-md bg-brand-600 py-3 font-semibold text-white hover:bg-brand-700 disabled:opacity-50"
-        >
-          Join
+        <button disabled={busy} className="btn-primary press w-full" style={{ height: 48 }}>
+          {busy ? "Joining…" : "Join"}
         </button>
       </form>
     </Stage>
@@ -189,17 +187,38 @@ function MCQ({ slide, participantId }: { slide: Slide; participantId: string }) 
             await submitResponse({ slideId: slide.id, participantId, valueIndex: i });
           }}
           className={
-            "w-full rounded-md border px-4 py-3 text-left text-base " +
-            (picked === i
-              ? "border-brand-600 bg-brand-100 text-brand-700"
-              : "border-slate-300 hover:bg-slate-50 disabled:opacity-50 dark:border-slate-700 dark:hover:bg-slate-800")
+            "press anim-fade-up w-full rounded-xl px-4 py-4 text-left text-base transition-all duration-200 "
           }
+          style={{
+            animationDelay: `${i * 60}ms`,
+            border: "1px solid var(--line)",
+            background: picked === i ? "rgba(0, 113, 227, 0.10)" : "rgba(255, 255, 255, 0.02)",
+            borderColor: picked === i ? "var(--blue)" : "var(--line)",
+            color: picked === i ? "var(--blue)" : "var(--fg)",
+            opacity: picked !== null && picked !== i ? 0.4 : 1,
+          }}
         >
+          <span className="mono mr-3 muted-text" style={{ fontSize: 12 }}>
+            {String.fromCharCode(65 + i)}
+          </span>
           {opt}
         </button>
       ))}
-      {picked !== null && <p className="text-sm text-slate-500">Answer locked in.</p>}
+      {picked !== null && (
+        <div className="anim-pop mt-4 flex items-center justify-center gap-2 text-sm" style={{ color: "var(--blue)" }}>
+          <CheckBadge /> Answer locked in
+        </div>
+      )}
     </div>
+  );
+}
+
+function CheckBadge() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="10" fill="currentColor" stroke="none" opacity="0.15" />
+      <path d="M9 12l2 2 4-4" />
+    </svg>
   );
 }
 
@@ -223,11 +242,24 @@ function Quiz({
   const remainingMs = Math.max(0, cfg.time_limit_s * 1000 - elapsedMs);
   const expired = remainingMs <= 0;
 
+  const pct = (remainingMs / (cfg.time_limit_s * 1000)) * 100;
   return (
     <div className="space-y-2">
-      <p className="text-right font-mono text-sm text-slate-500">
-        {Math.ceil(remainingMs / 1000)}s
-      </p>
+      <div className="mb-3 flex items-center justify-end gap-2">
+        <div className="relative h-1.5 flex-1 overflow-hidden rounded-full" style={{ background: "rgba(0,0,0,0.06)" }}>
+          <div
+            className="absolute inset-y-0 left-0 transition-all"
+            style={{
+              width: `${pct}%`,
+              background: pct < 30 ? "var(--danger, #fca5a5)" : "var(--blue)",
+              transition: "width 250ms linear, background 300ms ease",
+            }}
+          />
+        </div>
+        <span className="mono text-sm muted-text" style={{ fontVariantNumeric: "tabular-nums", minWidth: 36, textAlign: "right" }}>
+          {Math.ceil(remainingMs / 1000)}s
+        </span>
+      </div>
       {cfg.options.map((opt, i) => (
         <button
           key={i}
@@ -241,17 +273,30 @@ function Quiz({
               responseMs: elapsedMs,
             });
           }}
-          className={
-            "w-full rounded-md border px-4 py-3 text-left text-base " +
-            (picked === i
-              ? "border-brand-600 bg-brand-100 text-brand-700"
-              : "border-slate-300 hover:bg-slate-50 disabled:opacity-50 dark:border-slate-700 dark:hover:bg-slate-800")
-          }
+          className="press anim-fade-up w-full rounded-xl px-4 py-4 text-left text-base transition-all duration-200"
+          style={{
+            animationDelay: `${i * 60}ms`,
+            border: "1px solid var(--line)",
+            background: picked === i ? "rgba(0, 113, 227, 0.10)" : "rgba(255, 255, 255, 0.02)",
+            borderColor: picked === i ? "var(--blue)" : "var(--line)",
+            color: picked === i ? "var(--blue)" : "var(--fg)",
+            opacity: (picked !== null && picked !== i) || expired ? 0.45 : 1,
+          }}
         >
+          <span className="mono mr-3 muted-text" style={{ fontSize: 12 }}>
+            {String.fromCharCode(65 + i)}
+          </span>
           {opt}
         </button>
       ))}
-      {expired && picked === null && <p className="text-sm text-red-600">Time's up.</p>}
+      {picked !== null && (
+        <div className="anim-pop mt-4 flex items-center justify-center gap-2 text-sm" style={{ color: "var(--blue)" }}>
+          <CheckBadge /> Submitted in {(elapsedMs / 1000).toFixed(1)}s
+        </div>
+      )}
+      {expired && picked === null && (
+        <p className="anim-fade-in mt-3 text-center text-sm" style={{ color: "var(--danger, #fca5a5)" }}>Time's up.</p>
+      )}
     </div>
   );
 }
@@ -287,28 +332,37 @@ function WordCloudInput({ slide, participantId }: { slide: Slide; participantId:
           placeholder="Type a word…"
           maxLength={32}
           disabled={words.length >= max}
-          className="flex-1 rounded-md border border-slate-300 bg-white px-3 py-3 text-slate-900 outline-none focus:border-brand-500 disabled:opacity-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+          className="input flex-1"
         />
-        <button
-          disabled={!text.trim() || words.length >= max}
-          className="rounded-md bg-brand-600 px-4 font-semibold text-white hover:bg-brand-700 disabled:opacity-50"
-        >
+        <button disabled={!text.trim() || words.length >= max} className="btn-primary press">
           Add
         </button>
       </form>
       <ul className="flex flex-wrap gap-2">
         {words.map((w, i) => (
           <li
-            key={i}
-            className="rounded-full bg-brand-100 px-3 py-1 text-sm text-brand-700"
+            key={`${i}-${w}`}
+            className="anim-pop rounded-full px-3 py-1.5 text-sm"
+            style={{
+              background: "rgba(0, 113, 227, 0.10)",
+              border: "1px solid rgba(0, 113, 227, 0.3)",
+              color: "var(--blue)",
+              animationDelay: `${i * 70}ms`,
+            }}
           >
             {w}
           </li>
         ))}
       </ul>
-      <p className="text-xs text-slate-500">
-        {words.length}/{max} submitted
-      </p>
+      <div className="flex items-center gap-2 text-xs muted-text">
+        <div className="h-1 flex-1 overflow-hidden rounded-full" style={{ background: "rgba(0,0,0,0.06)" }}>
+          <div
+            className="h-full transition-all"
+            style={{ width: `${(words.length / max) * 100}%`, background: "var(--blue)", transitionDuration: "400ms" }}
+          />
+        </div>
+        <span className="mono">{words.length}/{max}</span>
+      </div>
     </div>
   );
 }
@@ -332,13 +386,11 @@ function OpenInput({ slide, participantId }: { slide: Slide; participantId: stri
         rows={4}
         maxLength={500}
         disabled={sent}
-        className="w-full rounded-md border border-slate-300 bg-white px-3 py-3 text-slate-900 outline-none focus:border-brand-500 disabled:opacity-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+        className="input resize-none w-full"
+        style={{ height: "auto", minHeight: 120, padding: "12px" }}
         placeholder="Your response…"
       />
-      <button
-        disabled={!text.trim() || sent}
-        className="w-full rounded-md bg-brand-600 py-3 font-semibold text-white hover:bg-brand-700 disabled:opacity-50"
-      >
+      <button disabled={!text.trim() || sent} className="btn-primary press w-full" style={{ height: 48 }}>
         {sent ? "Sent" : "Submit"}
       </button>
     </form>

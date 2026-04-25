@@ -166,12 +166,22 @@ async function setSlide(id) {
 
 // --- Screenshots
 const browser = await chromium.launch();
-const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 }, deviceScaleFactor: 2 });
+const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, deviceScaleFactor: 2 });
 const desk = await ctx.newPage();
 const phone = await ctx.newPage();
-await phone.setViewportSize({ width: 390, height: 844 });
+await phone.setViewportSize({ width: 430, height: 932 });
+
+const HIDE_DEV_INDICATOR = `
+  nextjs-portal, [data-nextjs-toolbar], #__next-build-watcher,
+  [data-next-mark-loading], #nextjs__container_build_error_label,
+  div[style*="position:fixed"][style*="bottom"][style*="left"] { display: none !important; }
+`;
+async function preparePage(page) {
+  try { await page.addStyleTag({ content: HIDE_DEV_INDICATOR }); } catch {}
+}
 
 async function shoot(page, name, opts = {}) {
+  await preparePage(page);
   const file = path.join(OUT, `${name}.png`);
   await page.screenshot({ path: file, fullPage: opts.fullPage });
   console.log("→", name);

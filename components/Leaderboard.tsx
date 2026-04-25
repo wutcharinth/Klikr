@@ -5,21 +5,46 @@ import type { Participant } from "@/lib/types";
 export function Leaderboard({ participants }: { participants: Participant[] }) {
   const sorted = [...participants].sort((a, b) => b.score - a.score).slice(0, 10);
   return (
-    <div className="rounded-lg border border-slate-200 bg-white p-6 dark:border-slate-800 dark:bg-slate-900">
-      <h3 className="text-sm font-semibold uppercase tracking-wider text-slate-500">Leaderboard</h3>
+    <div className="panel p-6">
+      <div className="flex items-center justify-between">
+        <h3 className="text-[10px] uppercase tracking-[0.18em] muted-text">Leaderboard</h3>
+        <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-[0.18em] muted-text">
+          <span className="live-dot" /> live
+        </div>
+      </div>
       {sorted.length === 0 ? (
-        <p className="mt-3 text-sm text-slate-400">No participants yet.</p>
+        <p className="mt-3 text-sm muted-text">No participants yet.</p>
       ) : (
-        <ol className="mt-3 space-y-1.5">
+        <ol className="mt-4 space-y-2">
           {sorted.map((p, i) => (
-            <li key={p.id} className="flex items-center justify-between text-sm">
-              <span>
-                <span className="mr-2 inline-block w-6 text-right font-mono text-slate-400">
-                  {i + 1}.
+            <li
+              key={p.id}
+              className="flex items-center justify-between rounded-lg px-3 py-2.5 text-sm transition-all"
+              style={{
+                background: i === 0
+                  ? "rgba(0, 113, 227, 0.08)"
+                  : "rgba(255, 255, 255, 0.02)",
+                border: "1px solid var(--line)",
+                borderColor: i === 0 ? "rgba(0, 113, 227, 0.3)" : "var(--line)",
+                transitionProperty: "transform, background, border-color",
+                transitionDuration: "400ms",
+              }}
+            >
+              <span className="flex items-center gap-3">
+                <span className="mono muted-text" style={{ width: 22, textAlign: "right", fontVariantNumeric: "tabular-nums" }}>
+                  {String(i + 1).padStart(2, "0")}
                 </span>
-                {p.nickname}
+                <span className="font-medium">{p.nickname}</span>
+                {i === 0 && (
+                  <span className="rounded-full px-2 py-0.5 text-[10px] uppercase tracking-[0.14em]"
+                        style={{ background: "rgba(0,113,227,0.15)", color: "var(--blue)" }}>
+                    1st
+                  </span>
+                )}
               </span>
-              <span className="font-mono font-semibold">{p.score}</span>
+              <span className="mono font-semibold" style={{ fontVariantNumeric: "tabular-nums" }}>
+                {p.score.toLocaleString()}
+              </span>
             </li>
           ))}
         </ol>

@@ -133,20 +133,21 @@ export function PresenterView({
             <span className="live-dot" /> live
           </div>
         </div>
-        <h2 className="mt-3 text-3xl font-semibold tracking-tight">
-          {currentSlide.question || <span className="muted-text">(no question)</span>}
-        </h2>
+        <div key={currentSlide.id} className="slide-enter">
+          <h2 className="mt-3 text-4xl font-semibold tracking-tight">
+            {currentSlide.question || <span className="muted-text">(no question)</span>}
+          </h2>
 
-        {currentSlide.image_url && (
-          <img
-            src={currentSlide.image_url}
-            alt=""
-            className="mt-6 max-h-80 w-full object-contain rounded-xl"
-            style={{ border: "1px solid var(--line)" }}
-          />
-        )}
+          {currentSlide.image_url && (
+            <img
+              src={currentSlide.image_url}
+              alt=""
+              className="anim-fade-up mt-6 max-h-80 w-full object-contain rounded-xl"
+              style={{ border: "1px solid var(--line)", animationDelay: "0.15s" }}
+            />
+          )}
 
-        <div className="mt-8">
+          <div className="anim-fade-up mt-8" style={{ animationDelay: "0.25s" }}>
           {currentSlide.type === "mcq" && (
             <ResultsBarChart slide={currentSlide} responses={responses} />
           )}
@@ -157,8 +158,9 @@ export function PresenterView({
           )}
         </div>
 
-        <div className="mt-5 text-xs muted-text">
-          <span className="mono text-[var(--fg)]">{responses.length}</span> responses
+          <div className="mt-5 text-xs muted-text">
+            <span className="mono text-[var(--fg)]">{responses.length}</span> responses
+          </div>
         </div>
       </div>
 
@@ -202,15 +204,18 @@ function Lobby({
   onStart: () => void;
 }) {
   return (
-    <div className="panel p-14 text-center">
-      <div className="pill"><span className="live-dot" /> Lobby</div>
-      <p className="mt-6 text-sm muted-text">Audience joins at</p>
-      <p className="mt-1 text-base">
+    <div className="relative panel p-14 text-center overflow-hidden">
+      <div className="orb orb-1" style={{ opacity: 0.25 }} />
+      <div className="orb orb-2" style={{ opacity: 0.18 }} />
+      <div className="anim-fade-up pill"><span className="live-dot" /> Lobby</div>
+      <p className="anim-fade-up delay-200 mt-6 text-sm muted-text">Audience joins at</p>
+      <p className="anim-fade-up delay-200 mt-1 text-base">
         <span className="muted-text">{typeof window !== "undefined" ? window.location.host : "klikr.app"} / </span>
         <span className="mono">{presentation.code}</span>
       </p>
 
-      <p className="mono mt-14 text-7xl font-bold tracking-[0.15em]">
+      <p className="anim-pop delay-300 mono mt-14 text-8xl font-bold tracking-[0.18em]"
+         style={{ background: "linear-gradient(120deg, var(--fg) 30%, var(--blue) 100%)", WebkitBackgroundClip: "text", backgroundClip: "text", color: "transparent" }}>
         {presentation.code}
       </p>
 
@@ -219,11 +224,16 @@ function Lobby({
           Joined · {participants.length}
         </p>
         <ul className="mt-4 flex flex-wrap justify-center gap-2">
-          {participants.map((p) => (
+          {participants.map((p, i) => (
             <li
               key={p.id}
-              className="rounded-full px-3 py-1 text-sm"
-              style={{ background: "rgba(124,138,255,.10)", border: "1px solid rgba(124,138,255,.25)" }}
+              className="anim-pop rounded-full px-3 py-1 text-sm"
+              style={{
+                background: "rgba(0, 113, 227, .10)",
+                border: "1px solid rgba(0, 113, 227, .25)",
+                color: "var(--blue)",
+                animationDelay: `${i * 80}ms`,
+              }}
             >
               {p.nickname}
             </li>
