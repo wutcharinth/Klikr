@@ -29,6 +29,7 @@
     "autoprefixer": "latest",
     "eslint": "^9",
     "eslint-config-next": "latest",
+    "playwright": "^1.59.1",
     "postcss": "latest",
     "tailwindcss": "^3",
     "typescript": "latest"

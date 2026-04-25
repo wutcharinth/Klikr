@@ -35,7 +35,7 @@ export async function addSlide(presentationId: string, type: SlideType) {
 export async function updateSlide(
   slideId: string,
   presentationId: string,
-  patch: { question?: string; config?: SlideConfig },
+  patch: { question?: string; config?: SlideConfig; image_url?: string | null },
 ) {
   const supabase = await createClient();
   const { error } = await supabase.from("slides").update(patch).eq("id", slideId);

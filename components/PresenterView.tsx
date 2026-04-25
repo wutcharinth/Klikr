@@ -137,6 +137,15 @@ export function PresenterView({
           {currentSlide.question || <span className="muted-text">(no question)</span>}
         </h2>
 
+        {currentSlide.image_url && (
+          <img
+            src={currentSlide.image_url}
+            alt=""
+            className="mt-6 max-h-80 w-full object-contain rounded-xl"
+            style={{ border: "1px solid var(--line)" }}
+          />
+        )}
+
         <div className="mt-8">
           {currentSlide.type === "mcq" && (
             <ResultsBarChart slide={currentSlide} responses={responses} />

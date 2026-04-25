@@ -97,8 +97,17 @@ export function AudienceView({
 
   return (
     <Stage>
-      <p className="text-xs uppercase tracking-wider text-slate-400">{currentSlide.type}</p>
-      <h2 className="mt-1 text-2xl font-semibold">{currentSlide.question}</h2>
+      <p className="text-[10px] uppercase tracking-[0.18em] muted-text">{currentSlide.type}</p>
+      <h2 className="mt-1 text-2xl font-semibold tracking-tight">{currentSlide.question}</h2>
+
+      {currentSlide.image_url && (
+        <img
+          src={currentSlide.image_url}
+          alt=""
+          className="mt-4 w-full max-h-56 object-cover rounded-xl"
+          style={{ border: "1px solid var(--line)" }}
+        />
+      )}
 
       <div className="mt-6">
         {currentSlide.type === "mcq" && (
@@ -120,11 +129,9 @@ export function AudienceView({
 
 function Stage({ children }: { children: React.ReactNode }) {
   return (
-    <main className="mx-auto max-w-md px-6 py-12">
-      <h1 className="mb-6 text-sm font-bold uppercase tracking-widest text-brand-600">Klikr</h1>
-      <div className="rounded-lg border border-slate-200 bg-white p-6 dark:border-slate-800 dark:bg-slate-900">
-        {children}
-      </div>
+    <main className="mx-auto max-w-md px-5 py-10">
+      <h1 className="mb-6 text-xs font-semibold uppercase tracking-[0.2em]" style={{ color: "var(--blue)" }}>Klikr</h1>
+      <div className="panel p-6">{children}</div>
     </main>
   );
 }

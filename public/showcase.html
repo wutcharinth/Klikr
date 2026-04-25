@@ -1,0 +1,398 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Klikr — Showcase</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<style>
+  :root {
+    --black: #000;
+    --pale: #f5f5f7;
+    --white: #fff;
+    --ink: #1d1d1f;
+    --neutral: #6e6e73;
+    --neutral-strong: #424245;
+    --border: #d2d2d7;
+    --blue: #0071e3;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Helvetica Neue", Helvetica, Arial, sans-serif;
+    background: var(--white);
+    color: var(--ink);
+    -webkit-font-smoothing: antialiased;
+    line-height: 1.47;
+  }
+  h1, h2, h3 { letter-spacing: -0.022em; font-weight: 600; margin: 0; }
+  a { color: var(--blue); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+
+  .nav {
+    position: sticky; top: 0; z-index: 50;
+    backdrop-filter: saturate(180%) blur(20px);
+    background: rgba(255,255,255,0.72);
+    border-bottom: 1px solid rgba(0,0,0,0.06);
+  }
+  .nav-inner {
+    max-width: 1180px; margin: 0 auto; padding: 14px 24px;
+    display: flex; align-items: center; justify-content: space-between;
+    font-size: 14px;
+  }
+  .nav .brand { font-weight: 600; letter-spacing: -0.02em; }
+  .nav a + a { margin-left: 18px; }
+
+  /* Hero */
+  .hero {
+    background: var(--black); color: var(--white);
+    padding: 120px 24px 100px;
+    text-align: center;
+  }
+  .hero .eyebrow { font-size: 14px; color: rgba(255,255,255,0.6); letter-spacing: 0.02em; }
+  .hero h1 {
+    font-size: clamp(48px, 8vw, 96px); line-height: 1.05; letter-spacing: -0.025em; font-weight: 600;
+    margin-top: 16px;
+  }
+  .hero p { color: rgba(255,255,255,0.72); font-size: 21px; margin: 18px auto 0; max-width: 640px; }
+  .hero .ctas { margin-top: 36px; display: inline-flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
+  .btn {
+    display: inline-flex; align-items: center; gap: 8px; padding: 11px 22px;
+    border-radius: 980px; font-size: 15px; font-weight: 500; transition: all 0.18s;
+    text-decoration: none;
+  }
+  .btn-primary { background: var(--blue); color: #fff; }
+  .btn-primary:hover { background: #0077ed; text-decoration: none; }
+  .btn-secondary { background: rgba(255,255,255,0.1); color: #fff; border: 1px solid rgba(255,255,255,0.18); }
+  .btn-secondary:hover { background: rgba(255,255,255,0.18); text-decoration: none; }
+
+  /* Section */
+  section { padding: 100px 24px; }
+  .section-pale { background: var(--pale); }
+  .container { max-width: 1180px; margin: 0 auto; }
+  .eyebrow { font-size: 13px; color: var(--neutral); letter-spacing: 0.02em; }
+  h2.title { font-size: clamp(34px, 5vw, 56px); line-height: 1.07; letter-spacing: -0.022em; margin-top: 12px; }
+  .lede { font-size: 19px; color: var(--neutral-strong); margin-top: 16px; max-width: 640px; }
+
+  /* Feature grid */
+  .feature-grid { display: grid; gap: 18px; grid-template-columns: repeat(4, 1fr); margin-top: 56px; }
+  @media (max-width: 880px) { .feature-grid { grid-template-columns: 1fr 1fr; } }
+  @media (max-width: 540px) { .feature-grid { grid-template-columns: 1fr; } }
+  .card {
+    background: var(--white); border: 1px solid var(--border); border-radius: 18px; padding: 28px 24px;
+  }
+  .card .icon { width: 36px; height: 36px; border-radius: 10px; background: var(--pale); display: inline-flex; align-items: center; justify-content: center; }
+  .card h3 { margin-top: 18px; font-size: 19px; }
+  .card p { color: var(--neutral); font-size: 14px; margin-top: 6px; }
+
+  /* Showcase rows */
+  .row {
+    display: grid; gap: 56px; grid-template-columns: 1fr 1fr;
+    align-items: center; margin-top: 56px;
+  }
+  .row.reverse { grid-template-columns: 1fr 1fr; direction: rtl; }
+  .row.reverse > * { direction: ltr; }
+  @media (max-width: 880px) { .row, .row.reverse { grid-template-columns: 1fr; } }
+  .row .copy h3 { font-size: 32px; line-height: 1.1; letter-spacing: -0.02em; }
+  .row .copy p { color: var(--neutral-strong); margin-top: 14px; font-size: 17px; }
+  .frame {
+    border-radius: 18px; overflow: hidden;
+    border: 1px solid var(--border);
+    box-shadow: 0 18px 60px -22px rgba(0,0,0,0.18);
+    background: var(--white);
+  }
+  .frame img { display: block; width: 100%; height: auto; }
+  .frame.dark { background: var(--black); border-color: rgba(255,255,255,0.08); }
+
+  /* Audience phone gallery */
+  .phones { margin-top: 56px; display: grid; gap: 24px; grid-template-columns: repeat(4, 1fr); }
+  @media (max-width: 880px) { .phones { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 540px) { .phones { grid-template-columns: 1fr 1fr; } }
+  .phone {
+    border: 1px solid var(--border); border-radius: 36px; padding: 12px;
+    background: var(--white);
+    box-shadow: 0 18px 60px -22px rgba(0,0,0,0.15);
+  }
+  .phone img { display: block; width: 100%; height: auto; border-radius: 24px; }
+  .phone .label { text-align: center; font-size: 13px; color: var(--neutral); margin-top: 12px; }
+
+  /* Stats */
+  .stats { display: grid; grid-template-columns: repeat(4,1fr); gap: 24px; margin-top: 56px; }
+  @media (max-width: 720px) { .stats { grid-template-columns: 1fr 1fr; } }
+  .stat .num { font-size: 48px; font-weight: 600; letter-spacing: -0.02em; line-height: 1; }
+  .stat .lbl { color: var(--neutral); margin-top: 8px; font-size: 14px; }
+
+  /* QA list */
+  .qa {
+    margin-top: 40px; display: grid; gap: 12px;
+    border-top: 1px solid var(--border);
+  }
+  .qa li {
+    list-style: none; padding: 16px 0; border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between; gap: 24px;
+  }
+  .qa .check { width: 22px; height: 22px; border-radius: 999px; background: rgba(0,113,227,0.1); color: var(--blue); display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .qa .lbl { font-weight: 500; }
+  .qa .meta { color: var(--neutral); font-size: 13px; }
+
+  /* Footer */
+  footer { padding: 60px 24px 80px; background: var(--pale); text-align: center; color: var(--neutral); font-size: 13px; }
+</style>
+</head>
+<body>
+
+<nav class="nav">
+  <div class="nav-inner">
+    <span class="brand">Klikr</span>
+    <div>
+      <a href="#features">Features</a>
+      <a href="#audience">Audience</a>
+      <a href="#presenter">Presenter</a>
+      <a href="#qa">QA</a>
+      <a href="/" style="background:var(--ink); color:#fff; padding:6px 14px; border-radius:980px;">Open app</a>
+    </div>
+  </div>
+</nav>
+
+<header class="hero">
+  <div class="eyebrow">Realtime audience interaction</div>
+  <h1>Make every room speak up.</h1>
+  <p>Klikr is a minimal, fast platform for live polls, word clouds, Q&amp;A and quizzes.
+     Built on Next.js + Supabase. Updates in under 200 ms.</p>
+  <div class="ctas">
+    <a href="/" class="btn btn-primary">Open Klikr</a>
+    <a href="/demo.html" class="btn btn-secondary">Interactive demo →</a>
+  </div>
+</header>
+
+<section id="features">
+  <div class="container">
+    <div class="eyebrow">FEATURES</div>
+    <h2 class="title">Four formats. One interface.</h2>
+    <p class="lede">Designed to disappear so the audience and content stay foreground.</p>
+
+    <div class="feature-grid">
+      <div class="card">
+        <div class="icon">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="12" width="3.5" height="9" rx="1"/><rect x="10" y="7" width="3.5" height="14" rx="1"/><rect x="17" y="3" width="3.5" height="18" rx="1"/></svg>
+        </div>
+        <h3>Multiple choice</h3>
+        <p>Live bar charts. Audiences see the room think.</p>
+      </div>
+      <div class="card">
+        <div class="icon">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M17 18a4 4 0 1 0-1.79-7.6A6 6 0 0 0 4 12a4 4 0 0 0 0 8h13z"/></svg>
+        </div>
+        <h3>Word cloud</h3>
+        <p>Frequency-sized. Words tumble in as people type.</p>
+      </div>
+      <div class="card">
+        <div class="icon">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
+        </div>
+        <h3>Open Q&amp;A</h3>
+        <p>Free-form text. Stream of consciousness, organized.</p>
+      </div>
+      <div class="card">
+        <div class="icon">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2z"/></svg>
+        </div>
+        <h3>Live quiz</h3>
+        <p>Timed questions. Faster correct answers earn more.</p>
+      </div>
+    </div>
+
+    <div class="stats">
+      <div class="stat"><div class="num">&lt;200ms</div><div class="lbl">Realtime broadcast</div></div>
+      <div class="stat"><div class="num">RLS</div><div class="lbl">Row-level security</div></div>
+      <div class="stat"><div class="num">No signup</div><div class="lbl">For the audience</div></div>
+      <div class="stat"><div class="num">Google</div><div class="lbl">SSO for hosts</div></div>
+    </div>
+  </div>
+</section>
+
+<section class="section-pale">
+  <div class="container">
+    <div class="eyebrow">LANDING &amp; SIGN-IN</div>
+    <h2 class="title">A door so simple, anyone walks in.</h2>
+    <p class="lede">One field for guests. One button for hosts. No signup screens, no friction.</p>
+
+    <div class="row">
+      <div class="copy">
+        <h3>Anyone joins with a code.</h3>
+        <p>Audience scans the room QR or types six characters. No account creation, no email verification, no friction.</p>
+      </div>
+      <div class="frame"><img src="/showcase/01-landing.png" alt="Klikr landing page" /></div>
+    </div>
+
+    <div class="row reverse" style="margin-top: 56px;">
+      <div class="copy">
+        <h3>Hosts sign in with Google.</h3>
+        <p>Single tap, single source of truth. Klikr uses Supabase Auth with Google as the only provider — no passwords to manage.</p>
+      </div>
+      <div class="frame"><img src="/showcase/02-login.png" alt="Klikr login — Google only" /></div>
+    </div>
+  </div>
+</section>
+
+<section id="audience">
+  <div class="container">
+    <div class="eyebrow">AUDIENCE EXPERIENCE</div>
+    <h2 class="title">Built phone-first.</h2>
+    <p class="lede">Every interaction designed to take seconds. Real screenshots from the live app, captured with Playwright.</p>
+
+    <div class="phones">
+      <div>
+        <div class="phone"><img src="/showcase/03-audience-nickname.png" alt="Nickname entry" /></div>
+        <div class="label">1 · Pick a nickname</div>
+      </div>
+      <div>
+        <div class="phone"><img src="/showcase/05-audience-mcq.png" alt="Multiple choice" /></div>
+        <div class="label">2 · Tap an option</div>
+      </div>
+      <div>
+        <div class="phone"><img src="/showcase/06-audience-wordcloud.png" alt="Word cloud input" /></div>
+        <div class="label">3 · Submit a word</div>
+      </div>
+      <div>
+        <div class="phone"><img src="/showcase/08-audience-quiz.png" alt="Live quiz" /></div>
+        <div class="label">4 · Beat the timer</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="presenter" class="section-pale">
+  <div class="container">
+    <div class="eyebrow">PRESENTER VIEW</div>
+    <h2 class="title">Cinematic results, in real time.</h2>
+    <p class="lede">Black canvas. Quiet typography. The numbers do the talking.</p>
+
+    <div class="row">
+      <div class="copy">
+        <h3>Lobby with QR.</h3>
+        <p>Big code, big QR. Anyone scans, types a name, and they're in. No app downloads.</p>
+      </div>
+      <div class="frame dark"><img src="/showcase/10-demo-howitworks.png" alt="Lobby with QR code and audience preview" /></div>
+    </div>
+
+    <div class="row reverse" style="margin-top: 56px;">
+      <div class="copy">
+        <h3>Live multiple choice.</h3>
+        <p>Audience picks; the bar chart animates with each new vote. Aggregation happens client-side from a Supabase Realtime subscription.</p>
+      </div>
+      <div class="frame dark"><img src="/showcase/11-demo-mcq.png" alt="Multiple choice with live bar chart" /></div>
+    </div>
+
+    <div class="row" style="margin-top: 56px;">
+      <div class="copy">
+        <h3>Word cloud.</h3>
+        <p>Words sized by frequency. Phantom audience members in the demo show what scale feels like.</p>
+      </div>
+      <div class="frame dark"><img src="/showcase/12-demo-wordcloud.png" alt="Word cloud presenter view" /></div>
+    </div>
+
+    <div class="row reverse" style="margin-top: 56px;">
+      <div class="copy">
+        <h3>Open-ended responses.</h3>
+        <p>Stream of replies, newest first. Two-column layout keeps long responses readable.</p>
+      </div>
+      <div class="frame dark"><img src="/showcase/13-demo-open.png" alt="Open-ended responses" /></div>
+    </div>
+
+    <div class="row" style="margin-top: 56px;">
+      <div class="copy">
+        <h3>Quiz with leaderboard.</h3>
+        <p>Countdown ring, instant correct/incorrect feedback, leaderboard sorted by score formula
+           <code style="background:rgba(0,0,0,0.06); padding:1px 6px; border-radius:4px; font-family:'SF Mono', monospace;">round(1000 × (1 − response_time / time_limit))</code>.</p>
+      </div>
+      <div class="frame dark"><img src="/showcase/14-demo-quiz.png" alt="Live quiz with leaderboard" /></div>
+    </div>
+  </div>
+</section>
+
+<section id="qa">
+  <div class="container">
+    <div class="eyebrow">QA RUN</div>
+    <h2 class="title">Every flow tested end-to-end.</h2>
+    <p class="lede">Playwright + the Supabase REST API drove a complete session. All four slide types delivered live updates within two seconds. Quiz scoring matched the formula exactly.</p>
+
+    <ul class="qa">
+      <li>
+        <span style="display:flex; align-items:center; gap:14px;">
+          <span class="check">✓</span><span class="lbl">Sign in with Google</span>
+        </span>
+        <span class="meta">Lands on /dashboard</span>
+      </li>
+      <li>
+        <span style="display:flex; align-items:center; gap:14px;">
+          <span class="check">✓</span><span class="lbl">Create presentation, generate room code</span>
+        </span>
+        <span class="meta">Code <code style="background:rgba(0,0,0,0.05); padding:1px 6px; border-radius:4px;">ZSZH2T</code></span>
+      </li>
+      <li>
+        <span style="display:flex; align-items:center; gap:14px;">
+          <span class="check">✓</span><span class="lbl">Add 4 slide types in editor</span>
+        </span>
+        <span class="meta">mcq · wordcloud · open · quiz</span>
+      </li>
+      <li>
+        <span style="display:flex; align-items:center; gap:14px;">
+          <span class="check">✓</span><span class="lbl">Audience joins, submits MCQ</span>
+        </span>
+        <span class="meta">3 responses · realtime &lt; 1s</span>
+      </li>
+      <li>
+        <span style="display:flex; align-items:center; gap:14px;">
+          <span class="check">✓</span><span class="lbl">Word cloud renders all unique words</span>
+        </span>
+        <span class="meta">5 words · live</span>
+      </li>
+      <li>
+        <span style="display:flex; align-items:center; gap:14px;">
+          <span class="check">✓</span><span class="lbl">Open-ended stream</span>
+        </span>
+        <span class="meta">3 replies · reverse-chrono</span>
+      </li>
+      <li>
+        <span style="display:flex; align-items:center; gap:14px;">
+          <span class="check">✓</span><span class="lbl">Quiz scoring exact</span>
+        </span>
+        <span class="meta">Alice 900 · Bob 500 · Carol 0</span>
+      </li>
+      <li>
+        <span style="display:flex; align-items:center; gap:14px;">
+          <span class="check">✓</span><span class="lbl">Session closed, leaderboard persisted</span>
+        </span>
+        <span class="meta">participants.score updated</span>
+      </li>
+    </ul>
+  </div>
+</section>
+
+<section class="section-pale">
+  <div class="container" style="text-align: center;">
+    <div class="eyebrow">STACK</div>
+    <h2 class="title">Boring tech, exciting product.</h2>
+    <div style="margin-top: 36px; display: inline-flex; flex-wrap: wrap; gap: 10px; justify-content: center;">
+      <span class="card" style="padding: 10px 18px;"><strong>Next.js 16</strong> · App Router</span>
+      <span class="card" style="padding: 10px 18px;"><strong>Supabase</strong> · Postgres · Auth · Realtime</span>
+      <span class="card" style="padding: 10px 18px;"><strong>Tailwind</strong> · design tokens</span>
+      <span class="card" style="padding: 10px 18px;"><strong>Recharts</strong> · live bars</span>
+      <span class="card" style="padding: 10px 18px;"><strong>Railway</strong> · hosting</span>
+    </div>
+
+    <div style="margin-top: 56px;">
+      <a href="/" class="btn btn-primary">Open the app</a>
+      <a href="/demo.html" class="btn" style="background: var(--ink); color: #fff;">Interactive demo →</a>
+    </div>
+  </div>
+</section>
+
+<footer>
+  Klikr · Built with Claude Code · <a href="https://github.com/wutcharinth/Klikr" style="color:var(--blue);">github.com/wutcharinth/Klikr</a>
+</footer>
+
+</body>
+</html>

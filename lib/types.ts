@@ -25,6 +25,7 @@ export type Slide = {
   type: SlideType;
   question: string;
   config: SlideConfig;
+  image_url: string | null;
   created_at: string;
 };
 

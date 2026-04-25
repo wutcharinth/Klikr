@@ -15,14 +15,33 @@ export function SlideEditor({
 }) {
   const [question, setQuestion] = useState(slide.question);
   const [config, setConfig] = useState(slide.config);
+  const [imageUrl, setImageUrl] = useState<string | null>(slide.image_url);
   const [pending, startTransition] = useTransition();
   const [savedAt, setSavedAt] = useState<number | null>(null);
 
-  const save = () => {
+  const save = (override?: { image_url?: string | null }) => {
     startTransition(async () => {
-      await updateSlide(slide.id, presentationId, { question, config });
+      await updateSlide(slide.id, presentationId, {
+        question,
+        config,
+        image_url: override?.image_url !== undefined ? override.image_url : imageUrl,
+      });
       setSavedAt(Date.now());
     });
+  };
+
+  const handleFile = (file: File) => {
+    if (file.size > 2 * 1024 * 1024) {
+      alert("Image must be under 2 MB.");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      const dataUrl = String(reader.result);
+      setImageUrl(dataUrl);
+      save({ image_url: dataUrl });
+    };
+    reader.readAsDataURL(file);
   };
 
   return (
@@ -45,11 +64,68 @@ export function SlideEditor({
         <input
           value={question}
           onChange={(e) => setQuestion(e.target.value)}
-          onBlur={save}
+          onBlur={() => save()}
           placeholder="Type your question…"
           className="input"
         />
       </label>
+
+      <div className="mt-4">
+        <span className="mb-2 block text-xs muted-text">Image (optional)</span>
+        {imageUrl ? (
+          <div className="relative">
+            <img
+              src={imageUrl}
+              alt=""
+              className="w-full max-h-64 object-cover rounded-xl"
+              style={{ border: "1px solid var(--line)" }}
+            />
+            <div className="mt-2 flex gap-2">
+              <label className="btn-ghost cursor-pointer text-xs">
+                Replace
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(e) => e.target.files?.[0] && handleFile(e.target.files[0])}
+                />
+              </label>
+              <button
+                type="button"
+                className="btn-ghost text-xs"
+                style={{ color: "var(--blue-link)" }}
+                onClick={() => { setImageUrl(null); save({ image_url: null }); }}
+              >
+                Remove
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            <label className="btn-ghost cursor-pointer text-sm w-full justify-center py-3" style={{ borderStyle: "dashed" }}>
+              + Upload image (PNG, JPG, GIF · ≤ 2 MB)
+              <input
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={(e) => e.target.files?.[0] && handleFile(e.target.files[0])}
+              />
+            </label>
+            <input
+              placeholder="…or paste an image URL"
+              className="input text-sm"
+              onBlur={(e) => {
+                const url = e.target.value.trim();
+                if (url) {
+                  setImageUrl(url);
+                  save({ image_url: url });
+                  e.target.value = "";
+                }
+              }}
+            />
+          </div>
+        )}
+      </div>
 
       <div className="mt-4">
         {slide.type === "mcq" && (
@@ -107,7 +183,7 @@ function McqConfig({
           <input
             value={opt}
             onChange={(e) => setOpt(i, e.target.value)}
-            onBlur={onCommit}
+            onBlur={() => onCommit()}
             className="input flex-1"
           />
           <button
@@ -169,7 +245,7 @@ function QuizConfigEditor({
                 next[i] = e.target.value;
                 onChange({ ...value, options: next });
               }}
-              onBlur={onCommit}
+              onBlur={() => onCommit()}
               className="input flex-1"
             />
             <button
