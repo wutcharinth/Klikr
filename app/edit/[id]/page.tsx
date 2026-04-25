@@ -67,7 +67,7 @@ export default async function EditPage({ params }: { params: Promise<{ id: strin
 
           <div className="mt-6 text-[10px] uppercase tracking-[0.18em] muted-text">Add slide</div>
           <div className="mt-2 space-y-2">
-            {(["mcq", "wordcloud", "open", "quiz"] as SlideType[]).map((t) => (
+            {(["mcq", "wordcloud", "open", "qa", "quiz", "rating"] as SlideType[]).map((t) => (
               <form
                 key={t}
                 action={async () => {
@@ -100,5 +100,12 @@ export default async function EditPage({ params }: { params: Promise<{ id: strin
 }
 
 function labelFor(t: SlideType) {
-  return { mcq: "Multiple choice", wordcloud: "Word cloud", open: "Open-ended", quiz: "Quiz" }[t];
+  return ({
+    mcq: "Multiple choice",
+    wordcloud: "Word cloud",
+    open: "Open-ended",
+    quiz: "Quiz",
+    qa: "Q&A (upvoted)",
+    rating: "Rating / NPS",
+  } as Record<SlideType, string>)[t];
 }

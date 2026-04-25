@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import type { Slide, MCQConfig, QuizConfig, WordCloudConfig } from "@/lib/types";
+import type { Slide, MCQConfig, QuizConfig, WordCloudConfig, QAConfig, RatingConfig } from "@/lib/types";
 import { updateSlide, deleteSlide } from "@/app/edit/[id]/actions";
 
 export function SlideEditor({
@@ -151,6 +151,20 @@ export function SlideEditor({
         )}
         {slide.type === "open" && (
           <p className="text-sm muted-text">No extra config — audience submits free text.</p>
+        )}
+        {slide.type === "qa" && (
+          <QAConfigEditor
+            value={config as QAConfig}
+            onChange={(c) => setConfig(c)}
+            onCommit={() => save()}
+          />
+        )}
+        {slide.type === "rating" && (
+          <RatingConfigEditor
+            value={config as RatingConfig}
+            onChange={(c) => setConfig(c)}
+            onCommit={() => save()}
+          />
         )}
       </div>
 
@@ -315,6 +329,92 @@ function WordCloudConfigEditor({
   );
 }
 
+function QAConfigEditor({
+  value,
+  onChange,
+  onCommit,
+}: {
+  value: QAConfig;
+  onChange: (v: QAConfig) => void;
+  onCommit: () => void;
+}) {
+  return (
+    <label className="flex items-center gap-2 text-sm">
+      <input
+        type="checkbox"
+        checked={value.upvotes ?? true}
+        onChange={(e) => {
+          onChange({ ...value, upvotes: e.target.checked });
+          onCommit();
+        }}
+      />
+      Allow upvotes — top questions float to the top
+    </label>
+  );
+}
+
+function RatingConfigEditor({
+  value,
+  onChange,
+  onCommit,
+}: {
+  value: RatingConfig;
+  onChange: (v: RatingConfig) => void;
+  onCommit: () => void;
+}) {
+  return (
+    <div className="space-y-3">
+      <div>
+        <span className="mb-2 block text-xs muted-text">Scale</span>
+        <div className="flex gap-2">
+          {[5, 10].map((s) => (
+            <button
+              key={s}
+              type="button"
+              className={"btn-ghost text-sm " + (value.scale === s ? "!bg-[rgba(0,113,227,0.12)] !border-[rgba(0,113,227,0.4)]" : "")}
+              onClick={() => {
+                onChange({ ...value, scale: s as 5 | 10 });
+                onCommit();
+              }}
+            >
+              {s === 5 ? "1 – 5 stars" : "0 – 10 NPS"}
+            </button>
+          ))}
+        </div>
+      </div>
+      <div className="grid grid-cols-2 gap-2">
+        <label className="block">
+          <span className="mb-1 block text-xs muted-text">Low label</span>
+          <input
+            value={value.min_label ?? ""}
+            placeholder={value.scale === 5 ? "Poor" : "Not at all"}
+            onChange={(e) => onChange({ ...value, min_label: e.target.value })}
+            onBlur={onCommit}
+            className="input"
+          />
+        </label>
+        <label className="block">
+          <span className="mb-1 block text-xs muted-text">High label</span>
+          <input
+            value={value.max_label ?? ""}
+            placeholder={value.scale === 5 ? "Great" : "Extremely"}
+            onChange={(e) => onChange({ ...value, max_label: e.target.value })}
+            onBlur={onCommit}
+            className="input"
+          />
+        </label>
+      </div>
+    </div>
+  );
+}
+
 function labelFor(t: Slide["type"]) {
-  return { mcq: "Multiple choice", wordcloud: "Word cloud", open: "Open-ended", quiz: "Quiz" }[t];
+  return ({
+    mcq: "Multiple choice",
+    wordcloud: "Word cloud",
+    open: "Open-ended",
+    quiz: "Quiz",
+    qa: "Q&A (upvoted)",
+    rating: "Rating / NPS",
+  } as Record<Slide["type"], string>)[t];
 }

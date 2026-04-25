@@ -1,4 +1,4 @@
-export type SlideType = "mcq" | "wordcloud" | "open" | "quiz";
+export type SlideType = "mcq" | "wordcloud" | "open" | "quiz" | "qa" | "rating";
 
 export type MCQConfig = {
   options: string[];
@@ -16,7 +16,25 @@ export type QuizConfig = {
   time_limit_s: number;
 };
 
-export type SlideConfig = MCQConfig | WordCloudConfig | OpenConfig | QuizConfig;
+export type QAConfig = {
+  /** Allow audience members to upvote each other's questions. */
+  upvotes?: boolean;
+};
+
+export type RatingConfig = {
+  /** 5 (1–5 stars / scale) or 10 (NPS-style 0–10). */
+  scale: 5 | 10;
+  min_label?: string;
+  max_label?: string;
+};
+
+export type SlideConfig =
+  | MCQConfig
+  | WordCloudConfig
+  | OpenConfig
+  | QuizConfig
+  | QAConfig
+  | RatingConfig;
 
 export type Slide = {
   id: string;

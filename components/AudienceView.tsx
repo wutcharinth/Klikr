@@ -2,8 +2,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import type { Presentation, Slide, MCQConfig, QuizConfig, WordCloudConfig } from "@/lib/types";
-import { joinSession, submitResponse } from "@/app/play/[code]/actions";
+import type { Presentation, Slide, MCQConfig, QuizConfig, WordCloudConfig, QAConfig, RatingConfig, ResponseRow } from "@/lib/types";
+import { joinSession, submitResponse, sendReaction, toggleQuestionVote, submitQuestion } from "@/app/play/[code]/actions";
 
 type LocalParticipant = { id: string; nickname: string; presentationId: string };
 
@@ -121,8 +121,15 @@ export function AudienceView({
           {currentSlide.type === "open" ? (
             <OpenInput slide={currentSlide} participantId={participant.id} />
           ) : null}
+          {currentSlide.type === "qa" ? (
+            <QAInput slide={currentSlide} participantId={participant.id} supabase={supabase} />
+          ) : null}
+          {currentSlide.type === "rating" ? (
+            <RatingInput slide={currentSlide} participantId={participant.id} />
+          ) : null}
         </div>
       </div>
+      <ReactionsBar presentationId={presentation.id} participantId={participant.id} />
     </Stage>
   );
 }
@@ -394,5 +401,212 @@ function OpenInput({ slide, participantId }: { slide: Slide; participantId: stri
         {sent ? "Sent" : "Submit"}
       </button>
     </form>
+  );
+}
+
+// ----------------- Q&A with upvotes -----------------
+function QAInput({
+  slide,
+  participantId,
+  supabase,
+}: {
+  slide: Slide;
+  participantId: string;
+  supabase: ReturnType<typeof createClient>;
+}) {
+  const cfg = slide.config as QAConfig;
+  const [text, setText] = useState("");
+  const [questions, setQuestions] = useState<ResponseRow[]>([]);
+  const [voteCounts, setVoteCounts] = useState<Map<string, number>>(new Map());
+  const [myVotes, setMyVotes] = useState<Set<string>>(new Set());
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    const load = async () => {
+      const { data: q } = await supabase
+        .from("responses").select("*").eq("slide_id", slide.id)
+        .order("created_at", { ascending: true });
+      if (!cancelled && q) setQuestions(q as ResponseRow[]);
+      const { data: votes } = await supabase
+        .from("question_votes").select("response_id, participant_id")
+        .in("response_id", (q ?? []).map((x) => x.id));
+      if (!cancelled && votes) {
+        const counts = new Map<string, number>();
+        const mine = new Set<string>();
+        for (const v of votes) {
+          counts.set(v.response_id, (counts.get(v.response_id) ?? 0) + 1);
+          if (v.participant_id === participantId) mine.add(v.response_id);
+        }
+        setVoteCounts(counts);
+        setMyVotes(mine);
+      }
+    };
+    load();
+    const channel = supabase
+      .channel(`qa-${slide.id}`)
+      .on("postgres_changes",
+        { event: "INSERT", schema: "public", table: "responses", filter: `slide_id=eq.${slide.id}` },
+        (p) => setQuestions((prev) => [...prev, p.new as ResponseRow]))
+      .on("postgres_changes",
+        { event: "*", schema: "public", table: "question_votes" },
+        () => load())
+      .subscribe();
+    return () => { cancelled = true; supabase.removeChannel(channel); };
+  }, [supabase, slide.id, participantId]);
+
+  const sortedQs = [...questions].sort((a, b) => {
+    const va = voteCounts.get(a.id) ?? 0;
+    const vb = voteCounts.get(b.id) ?? 0;
+    if (vb !== va) return vb - va;
+    return a.created_at < b.created_at ? -1 : 1;
+  });
+
+  return (
+    <div className="space-y-4">
+      <form
+        onSubmit={async (e) => {
+          e.preventDefault();
+          const t = text.trim();
+          if (!t || busy) return;
+          setBusy(true);
+          try {
+            await submitQuestion({ slideId: slide.id, participantId, text: t });
+            setText("");
+          } finally { setBusy(false); }
+        }}
+        className="space-y-2"
+      >
+        <textarea
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          maxLength={280}
+          placeholder="Ask a question…"
+          rows={3}
+          className="input resize-none w-full"
+          style={{ height: "auto", minHeight: 84, padding: "12px" }}
+        />
+        <button disabled={!text.trim() || busy} className="btn-primary press w-full" style={{ height: 44 }}>
+          {busy ? "Sending…" : "Ask"}
+        </button>
+      </form>
+
+      <div className="space-y-2">
+        {sortedQs.length === 0 ? (
+          <p className="text-center text-sm muted-text">Be the first to ask.</p>
+        ) : sortedQs.map((q) => {
+          const votes = voteCounts.get(q.id) ?? 0;
+          const mine = myVotes.has(q.id);
+          return (
+            <div key={q.id} className="anim-fade-up flex gap-3 rounded-xl p-3" style={{ border: "1px solid var(--line)", background: "rgba(255,255,255,0.02)" }}>
+              <div className="flex-1 text-sm leading-snug">{q.value_text}</div>
+              {(cfg.upvotes ?? true) && (
+                <button
+                  type="button"
+                  onClick={async () => {
+                    setMyVotes((prev) => { const n = new Set(prev); n.has(q.id) ? n.delete(q.id) : n.add(q.id); return n; });
+                    setVoteCounts((prev) => { const n = new Map(prev); n.set(q.id, (n.get(q.id) ?? 0) + (mine ? -1 : 1)); return n; });
+                    await toggleQuestionVote({ responseId: q.id, participantId });
+                  }}
+                  className="press flex flex-col items-center justify-center rounded-lg px-3 py-1 text-xs"
+                  style={{
+                    background: mine ? "rgba(0,113,227,0.12)" : "rgba(255,255,255,0.04)",
+                    border: "1px solid " + (mine ? "rgba(0,113,227,0.4)" : "var(--line)"),
+                    color: mine ? "var(--blue)" : "var(--fg)",
+                    minWidth: 44,
+                  }}
+                  aria-label="Upvote"
+                >
+                  <span style={{ fontSize: 14, lineHeight: 1 }}>▲</span>
+                  <span className="mono" style={{ fontVariantNumeric: "tabular-nums" }}>{votes}</span>
+                </button>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ----------------- Rating slide -----------------
+function RatingInput({ slide, participantId }: { slide: Slide; participantId: string }) {
+  const cfg = slide.config as RatingConfig;
+  const [picked, setPicked] = useState<number | null>(null);
+  const range = cfg.scale === 5 ? [1, 2, 3, 4, 5] : [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+  return (
+    <div className="space-y-4">
+      <div className="grid gap-2" style={{ gridTemplateColumns: `repeat(${range.length}, minmax(0, 1fr))` }}>
+        {range.map((n, i) => (
+          <button
+            key={n}
+            disabled={picked !== null}
+            onClick={async () => {
+              setPicked(n);
+              await submitResponse({ slideId: slide.id, participantId, valueIndex: n });
+            }}
+            className="press anim-fade-up rounded-lg text-base font-semibold transition-all"
+            style={{
+              animationDelay: `${i * 30}ms`,
+              height: cfg.scale === 5 ? 56 : 44,
+              border: "1px solid " + (picked === n ? "var(--blue)" : "var(--line)"),
+              background: picked === n ? "rgba(0,113,227,0.10)" : "rgba(255,255,255,0.02)",
+              color: picked === n ? "var(--blue)" : "var(--fg)",
+              opacity: picked !== null && picked !== n ? 0.4 : 1,
+            }}
+          >
+            {n}
+          </button>
+        ))}
+      </div>
+      <div className="flex items-center justify-between text-xs muted-text">
+        <span>{cfg.min_label ?? (cfg.scale === 5 ? "Poor" : "Not at all")}</span>
+        <span>{cfg.max_label ?? (cfg.scale === 5 ? "Great" : "Extremely")}</span>
+      </div>
+      {picked !== null && (
+        <div className="anim-pop flex items-center justify-center gap-2 text-sm" style={{ color: "var(--blue)" }}>
+          <CheckBadge /> Thanks for rating
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ----------------- Reactions bar -----------------
+const REACTION_EMOJI = ["👏", "❤️", "🎉", "😂", "🔥", "💡"];
+
+function ReactionsBar({ presentationId, participantId }: { presentationId: string; participantId: string }) {
+  const [pulses, setPulses] = useState<{ id: number; emoji: string }[]>([]);
+  const send = (e: string) => {
+    const id = Date.now() + Math.random();
+    setPulses((p) => [...p, { id, emoji: e }]);
+    setTimeout(() => setPulses((p) => p.filter((x) => x.id !== id)), 800);
+    void sendReaction({ presentationId, participantId, emoji: e });
+  };
+  return (
+    <div className="relative mt-6">
+      <div className="flex items-center justify-center gap-2 rounded-full panel p-2">
+        {REACTION_EMOJI.map((e) => (
+          <button
+            key={e}
+            onClick={() => send(e)}
+            className="press rounded-full text-2xl transition-transform hover:scale-110"
+            style={{ width: 40, height: 40 }}
+            aria-label={`React ${e}`}
+          >
+            {e}
+          </button>
+        ))}
+      </div>
+      <div className="pointer-events-none absolute inset-0 -z-10">
+        {pulses.map((p) => (
+          <span key={p.id} className="absolute left-1/2 top-1/2 text-3xl"
+            style={{ animation: "rxFloat 0.8s ease-out forwards", transform: `translate(-50%, -50%)` }}>
+            {p.emoji}
+          </span>
+        ))}
+      </div>
+      <style>{`@keyframes rxFloat { 0% { transform: translate(-50%, -50%) scale(0.6); opacity: 1; } 100% { transform: translate(-50%, -160%) scale(1.6); opacity: 0; } }`}</style>
+    </div>
   );
 }

@@ -8,6 +8,9 @@ import { ResultsBarChart } from "./ResultsBarChart";
 import { WordCloudView } from "./WordCloudView";
 import { OpenResponses } from "./OpenResponses";
 import { Leaderboard } from "./Leaderboard";
+import { QAStream } from "./QAStream";
+import { RatingDistribution } from "./RatingDistribution";
+import { ReactionOverlay } from "./ReactionOverlay";
 
 export function PresenterView({
   presentation: initialPresentation,
@@ -156,6 +159,12 @@ export function PresenterView({
           {currentSlide.type === "quiz" && (
             <ResultsBarChart slide={currentSlide} responses={responses} highlightCorrect />
           )}
+          {currentSlide.type === "qa" && (
+            <QAStream slide={currentSlide} responses={responses} />
+          )}
+          {currentSlide.type === "rating" && (
+            <RatingDistribution slide={currentSlide} responses={responses} />
+          )}
         </div>
 
           <div className="mt-5 text-xs muted-text">
@@ -188,6 +197,8 @@ export function PresenterView({
       </div>
 
       {slides.some((s) => s.type === "quiz") && <Leaderboard participants={participants} />}
+
+      <ReactionOverlay presentationId={presentation.id} />
     </div>
   );
 }

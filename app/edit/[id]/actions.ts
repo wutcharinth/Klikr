@@ -9,6 +9,8 @@ const DEFAULT_CONFIG: Record<SlideType, SlideConfig> = {
   wordcloud: { max_words_per_participant: 3 },
   open: {},
   quiz: { options: ["Right", "Wrong"], correct_index: 0, time_limit_s: 20 },
+  qa: { upvotes: true },
+  rating: { scale: 5, min_label: "Poor", max_label: "Great" },
 };
 
 export async function addSlide(presentationId: string, type: SlideType) {

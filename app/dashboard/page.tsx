@@ -63,6 +63,14 @@ export default async function Dashboard() {
               <Link href={`/present/${p.id}`} className="btn-primary">
                 Present
               </Link>
+              <a
+                href={`/api/export/${p.id}`}
+                download
+                className="btn-ghost text-xs muted-text"
+                title="Export results as CSV"
+              >
+                CSV
+              </a>
               <form
                 action={async () => {
                   "use server";
