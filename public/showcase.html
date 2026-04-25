@@ -3,9 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>Klikr — Showcase</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<title>Klikr · Real-time audience interaction</title>
 <style>
   :root {
     --black: #000;
@@ -16,128 +14,330 @@
     --neutral-strong: #424245;
     --border: #d2d2d7;
     --blue: #0071e3;
+    --blue-bright: #2997ff;
   }
-  * { box-sizing: border-box; }
+  *, *::before, *::after { box-sizing: border-box; }
   html, body { margin: 0; padding: 0; }
   body {
     font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Helvetica Neue", Helvetica, Arial, sans-serif;
-    background: var(--white);
-    color: var(--ink);
-    -webkit-font-smoothing: antialiased;
-    line-height: 1.47;
+    background: var(--white); color: var(--ink);
+    -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale;
+    line-height: 1.47; overflow-x: hidden;
   }
   h1, h2, h3 { letter-spacing: -0.022em; font-weight: 600; margin: 0; }
   a { color: var(--blue); text-decoration: none; }
   a:hover { text-decoration: underline; }
+  ::selection { background: rgba(0, 113, 227, 0.18); }
 
+  /* Nav */
   .nav {
-    position: sticky; top: 0; z-index: 50;
+    position: sticky; top: 0; z-index: 100;
     backdrop-filter: saturate(180%) blur(20px);
-    background: rgba(255,255,255,0.72);
-    border-bottom: 1px solid rgba(0,0,0,0.06);
+    background: rgba(255, 255, 255, 0.72);
+    border-bottom: 1px solid rgba(0, 0, 0, 0.06);
   }
   .nav-inner {
-    max-width: 1180px; margin: 0 auto; padding: 14px 24px;
+    max-width: 1240px; margin: 0 auto; padding: 14px 24px;
     display: flex; align-items: center; justify-content: space-between;
-    font-size: 14px;
+    font-size: 13px;
   }
-  .nav .brand { font-weight: 600; letter-spacing: -0.02em; }
-  .nav a + a { margin-left: 18px; }
+  .nav .brand { font-weight: 600; letter-spacing: -0.02em; font-size: 18px; }
+  .nav-links a { margin-left: 22px; color: var(--ink); }
+  .nav-links a:hover { color: var(--blue); text-decoration: none; }
+  .nav .cta {
+    background: var(--ink); color: #fff; padding: 7px 16px; border-radius: 980px; margin-left: 22px;
+  }
 
   /* Hero */
   .hero {
-    background: var(--black); color: var(--white);
-    padding: 120px 24px 100px;
-    text-align: center;
+    position: relative; min-height: 100vh; padding: 120px 24px 80px;
+    background: var(--black); color: var(--white); overflow: hidden;
   }
-  .hero .eyebrow { font-size: 14px; color: rgba(255,255,255,0.6); letter-spacing: 0.02em; }
-  .hero h1 {
-    font-size: clamp(48px, 8vw, 96px); line-height: 1.05; letter-spacing: -0.025em; font-weight: 600;
-    margin-top: 16px;
+  .hero::before {
+    content: ""; position: absolute; inset: -10% -10% auto auto;
+    width: 60vw; height: 60vw; max-width: 800px; max-height: 800px;
+    background: radial-gradient(closest-side, rgba(41, 151, 255, 0.30), transparent 70%);
+    pointer-events: none; filter: blur(30px);
+    animation: drift 16s ease-in-out infinite alternate;
   }
-  .hero p { color: rgba(255,255,255,0.72); font-size: 21px; margin: 18px auto 0; max-width: 640px; }
-  .hero .ctas { margin-top: 36px; display: inline-flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
+  .hero::after {
+    content: ""; position: absolute; inset: auto auto -20% -20%;
+    width: 70vw; height: 70vw; max-width: 900px; max-height: 900px;
+    background: radial-gradient(closest-side, rgba(124, 138, 255, 0.18), transparent 70%);
+    pointer-events: none; filter: blur(40px);
+    animation: drift 22s ease-in-out infinite alternate-reverse;
+  }
+  @keyframes drift {
+    0% { transform: translate(0, 0) scale(1); }
+    100% { transform: translate(-6%, 4%) scale(1.06); }
+  }
+  .hero-inner { position: relative; z-index: 1; max-width: 1240px; margin: 0 auto; }
+  .eyebrow {
+    display: inline-flex; align-items: center; gap: 8px;
+    font-size: 12px; color: rgba(255, 255, 255, 0.7); letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+  .live-dot {
+    width: 7px; height: 7px; border-radius: 999px;
+    background: var(--blue-bright);
+    box-shadow: 0 0 0 0 rgba(41, 151, 255, 0.6);
+    animation: pulse 1.6s infinite;
+  }
+  @keyframes pulse {
+    0% { box-shadow: 0 0 0 0 rgba(41, 151, 255, 0.55); }
+    70% { box-shadow: 0 0 0 12px rgba(41, 151, 255, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(41, 151, 255, 0); }
+  }
+  .h1 {
+    font-size: clamp(56px, 10vw, 132px); line-height: 0.96;
+    letter-spacing: -0.03em; font-weight: 600; margin-top: 24px;
+  }
+  .h1 .word {
+    display: inline-block; opacity: 0; transform: translateY(40px);
+    animation: rise 1s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+  }
+  .h1 .word:nth-child(1) { animation-delay: 0.05s; }
+  .h1 .word:nth-child(2) { animation-delay: 0.18s; }
+  .h1 .word:nth-child(3) { animation-delay: 0.30s; }
+  .h1 .word:nth-child(4) { animation-delay: 0.42s; }
+  .h1 .word:nth-child(5) { animation-delay: 0.54s; }
+  @keyframes rise {
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .lede {
+    font-size: clamp(18px, 2vw, 22px); color: rgba(255, 255, 255, 0.78);
+    margin-top: 26px; max-width: 640px; line-height: 1.5;
+  }
+  .ctas { display: inline-flex; gap: 10px; flex-wrap: wrap; margin-top: 36px; }
   .btn {
-    display: inline-flex; align-items: center; gap: 8px; padding: 11px 22px;
-    border-radius: 980px; font-size: 15px; font-weight: 500; transition: all 0.18s;
-    text-decoration: none;
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 11px 22px; border-radius: 980px;
+    font-size: 15px; font-weight: 500; transition: transform 0.15s, background 0.15s;
   }
+  .btn:active { transform: scale(0.98); }
   .btn-primary { background: var(--blue); color: #fff; }
   .btn-primary:hover { background: #0077ed; text-decoration: none; }
-  .btn-secondary { background: rgba(255,255,255,0.1); color: #fff; border: 1px solid rgba(255,255,255,0.18); }
-  .btn-secondary:hover { background: rgba(255,255,255,0.18); text-decoration: none; }
+  .btn-secondary {
+    background: rgba(255, 255, 255, 0.08); color: #fff;
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    backdrop-filter: blur(8px);
+  }
+  .btn-secondary:hover { background: rgba(255, 255, 255, 0.16); text-decoration: none; }
+  .btn-arrow { transition: transform 0.2s; }
+  .btn:hover .btn-arrow { transform: translateX(3px); }
 
-  /* Section */
-  section { padding: 100px 24px; }
+  /* Hero side: live mock */
+  .hero-grid {
+    margin-top: 56px;
+    display: grid; gap: 36px;
+    grid-template-columns: 1.15fr 1fr; align-items: center;
+  }
+  @media (max-width: 880px) { .hero-grid { grid-template-columns: 1fr; } }
+  .live-card {
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.10);
+    border-radius: 24px; padding: 28px;
+    backdrop-filter: blur(12px);
+    box-shadow: 0 30px 80px -20px rgba(0, 0, 0, 0.6);
+    position: relative; overflow: hidden;
+  }
+  .live-card-head {
+    display: flex; align-items: center; justify-content: space-between;
+    color: rgba(255, 255, 255, 0.6); font-size: 12px; letter-spacing: 0.06em;
+  }
+  .live-card .question {
+    font-size: clamp(18px, 1.6vw, 24px); margin-top: 18px; font-weight: 600;
+    letter-spacing: -0.01em;
+  }
+  .bars { margin-top: 24px; display: flex; flex-direction: column; gap: 14px; }
+  .bar-row { display: grid; grid-template-columns: 110px 1fr 40px; align-items: center; gap: 14px; font-size: 14px; }
+  .bar-track { height: 28px; background: rgba(255, 255, 255, 0.06); border-radius: 8px; overflow: hidden; position: relative; }
+  .bar-fill {
+    height: 100%; background: linear-gradient(90deg, var(--blue) 0%, var(--blue-bright) 100%);
+    border-radius: 8px; width: 0;
+    transition: width 1.2s cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+  .bar-num { color: rgba(255, 255, 255, 0.65); font-variant-numeric: tabular-nums; text-align: right; }
+
+  .qr-card {
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.10);
+    border-radius: 24px; padding: 28px;
+    text-align: center; backdrop-filter: blur(12px);
+  }
+  .qr-card .label { font-size: 11px; color: rgba(255, 255, 255, 0.55); letter-spacing: 0.14em; text-transform: uppercase; }
+  .qr-card .code {
+    font-family: "SF Mono", ui-monospace, Menlo, monospace;
+    font-size: clamp(36px, 5vw, 56px); font-weight: 600; letter-spacing: 0.18em; margin-top: 12px;
+    background: linear-gradient(120deg, #fff 30%, var(--blue-bright) 100%);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+  .qr-card .url { color: rgba(255, 255, 255, 0.5); font-size: 13px; margin-top: 6px; }
+  .qr-card .pulse-ring {
+    width: 200px; height: 200px; margin: 24px auto 0; border-radius: 24px;
+    background: rgba(255,255,255,.92);
+    display: flex; align-items: center; justify-content: center;
+    position: relative;
+  }
+  .qr-card .pulse-ring::before {
+    content: ""; position: absolute; inset: -8px; border-radius: 28px;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    animation: ring 2s ease-out infinite;
+  }
+  @keyframes ring {
+    0% { transform: scale(1); opacity: 0.8; }
+    100% { transform: scale(1.15); opacity: 0; }
+  }
+  .qr-card .pulse-ring img { width: 86%; height: 86%; }
+
+  /* General sections */
+  section { padding: 120px 24px; position: relative; }
   .section-pale { background: var(--pale); }
-  .container { max-width: 1180px; margin: 0 auto; }
-  .eyebrow { font-size: 13px; color: var(--neutral); letter-spacing: 0.02em; }
-  h2.title { font-size: clamp(34px, 5vw, 56px); line-height: 1.07; letter-spacing: -0.022em; margin-top: 12px; }
-  .lede { font-size: 19px; color: var(--neutral-strong); margin-top: 16px; max-width: 640px; }
+  .section-dark { background: var(--black); color: var(--white); }
+  .container { max-width: 1240px; margin: 0 auto; }
+  .section-eyebrow {
+    font-size: 12px; color: var(--neutral); letter-spacing: 0.14em; text-transform: uppercase;
+  }
+  .section-dark .section-eyebrow { color: rgba(255, 255, 255, 0.6); }
+  h2.section-title {
+    font-size: clamp(36px, 5vw, 64px); line-height: 1.05; letter-spacing: -0.025em;
+    margin-top: 14px; max-width: 22ch;
+  }
+  .section-lede { font-size: 19px; color: var(--neutral-strong); margin-top: 18px; max-width: 640px; line-height: 1.5; }
+  .section-dark .section-lede { color: rgba(255, 255, 255, 0.7); }
 
-  /* Feature grid */
-  .feature-grid { display: grid; gap: 18px; grid-template-columns: repeat(4, 1fr); margin-top: 56px; }
+  /* Reveal on scroll */
+  .reveal {
+    opacity: 0; transform: translateY(28px);
+    transition: opacity 0.9s cubic-bezier(0.2, 0.8, 0.2, 1), transform 0.9s cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+  .reveal.in { opacity: 1; transform: none; }
+
+  /* Stat strip */
+  .stats {
+    display: grid; grid-template-columns: repeat(4, 1fr); gap: 24px; margin-top: 60px;
+  }
+  @media (max-width: 720px) { .stats { grid-template-columns: 1fr 1fr; } }
+  .stat .num {
+    font-size: clamp(36px, 4.5vw, 56px); font-weight: 600; letter-spacing: -0.02em; line-height: 1;
+    font-variant-numeric: tabular-nums;
+  }
+  .stat .lbl { color: var(--neutral); margin-top: 10px; font-size: 14px; }
+  .section-dark .stat .lbl { color: rgba(255, 255, 255, 0.6); }
+
+  /* Feature cards */
+  .feature-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-top: 60px; }
   @media (max-width: 880px) { .feature-grid { grid-template-columns: 1fr 1fr; } }
   @media (max-width: 540px) { .feature-grid { grid-template-columns: 1fr; } }
   .card {
-    background: var(--white); border: 1px solid var(--border); border-radius: 18px; padding: 28px 24px;
+    background: var(--white); border: 1px solid var(--border); border-radius: 18px;
+    padding: 28px 24px; transition: transform 0.25s, box-shadow 0.25s;
   }
-  .card .icon { width: 36px; height: 36px; border-radius: 10px; background: var(--pale); display: inline-flex; align-items: center; justify-content: center; }
+  .card:hover { transform: translateY(-4px); box-shadow: 0 24px 50px -24px rgba(0, 0, 0, 0.18); }
+  .card .icon-tile {
+    width: 40px; height: 40px; border-radius: 12px; background: var(--pale);
+    display: inline-flex; align-items: center; justify-content: center;
+  }
   .card h3 { margin-top: 18px; font-size: 19px; }
   .card p { color: var(--neutral); font-size: 14px; margin-top: 6px; }
 
-  /* Showcase rows */
+  /* Side-by-side row */
   .row {
-    display: grid; gap: 56px; grid-template-columns: 1fr 1fr;
-    align-items: center; margin-top: 56px;
+    display: grid; gap: 64px; grid-template-columns: 1fr 1fr;
+    align-items: center; margin-top: 80px;
   }
-  .row.reverse { grid-template-columns: 1fr 1fr; direction: rtl; }
-  .row.reverse > * { direction: ltr; }
-  @media (max-width: 880px) { .row, .row.reverse { grid-template-columns: 1fr; } }
-  .row .copy h3 { font-size: 32px; line-height: 1.1; letter-spacing: -0.02em; }
-  .row .copy p { color: var(--neutral-strong); margin-top: 14px; font-size: 17px; }
+  .row.reverse > .copy { order: 2; }
+  @media (max-width: 880px) { .row, .row.reverse { grid-template-columns: 1fr; gap: 32px; } .row.reverse > .copy { order: initial; } }
+  .row .copy h3 {
+    font-size: clamp(28px, 3.4vw, 42px); line-height: 1.08; letter-spacing: -0.02em;
+  }
+  .row .copy p { color: var(--neutral-strong); margin-top: 16px; font-size: 17px; line-height: 1.55; }
+  .section-dark .row .copy p { color: rgba(255, 255, 255, 0.7); }
+  .row .copy .quote {
+    margin-top: 18px; padding: 12px 16px; border-left: 3px solid var(--blue);
+    background: rgba(0, 113, 227, 0.05); border-radius: 6px;
+    font-size: 15px; color: var(--ink);
+  }
+  .section-dark .row .copy .quote { background: rgba(41, 151, 255, 0.08); color: rgba(255, 255, 255, 0.85); }
   .frame {
-    border-radius: 18px; overflow: hidden;
-    border: 1px solid var(--border);
-    box-shadow: 0 18px 60px -22px rgba(0,0,0,0.18);
+    border-radius: 22px; overflow: hidden; border: 1px solid var(--border);
+    box-shadow: 0 30px 80px -25px rgba(0, 0, 0, 0.20);
     background: var(--white);
+    transition: transform 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
   }
+  .frame:hover { transform: scale(1.015); }
   .frame img { display: block; width: 100%; height: auto; }
-  .frame.dark { background: var(--black); border-color: rgba(255,255,255,0.08); }
+  .frame.dark { background: var(--black); border-color: rgba(255, 255, 255, 0.08); }
 
-  /* Audience phone gallery */
-  .phones { margin-top: 56px; display: grid; gap: 24px; grid-template-columns: repeat(4, 1fr); }
+  /* Phone gallery */
+  .phones { display: grid; gap: 24px; grid-template-columns: repeat(4, 1fr); margin-top: 60px; }
   @media (max-width: 880px) { .phones { grid-template-columns: repeat(2, 1fr); } }
-  @media (max-width: 540px) { .phones { grid-template-columns: 1fr 1fr; } }
+  @media (max-width: 540px) { .phones { grid-template-columns: 1fr; } }
   .phone {
     border: 1px solid var(--border); border-radius: 36px; padding: 12px;
     background: var(--white);
-    box-shadow: 0 18px 60px -22px rgba(0,0,0,0.15);
+    box-shadow: 0 24px 60px -22px rgba(0, 0, 0, 0.15);
+    transition: transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
   }
+  .phone:hover { transform: translateY(-6px) rotate(-0.5deg); }
   .phone img { display: block; width: 100%; height: auto; border-radius: 24px; }
-  .phone .label { text-align: center; font-size: 13px; color: var(--neutral); margin-top: 12px; }
+  .phone .caption { text-align: center; font-size: 13px; color: var(--neutral); margin-top: 14px; line-height: 1.4; }
+  .phone .caption strong { display: block; color: var(--ink); font-weight: 600; }
 
-  /* Stats */
-  .stats { display: grid; grid-template-columns: repeat(4,1fr); gap: 24px; margin-top: 56px; }
-  @media (max-width: 720px) { .stats { grid-template-columns: 1fr 1fr; } }
-  .stat .num { font-size: 48px; font-weight: 600; letter-spacing: -0.02em; line-height: 1; }
-  .stat .lbl { color: var(--neutral); margin-top: 8px; font-size: 14px; }
+  /* Live demo embed */
+  .demo-frame {
+    margin-top: 60px; border-radius: 28px; overflow: hidden;
+    border: 1px solid var(--border);
+    box-shadow: 0 40px 100px -30px rgba(0, 0, 0, 0.30);
+    aspect-ratio: 16 / 10; background: var(--black);
+    position: relative;
+  }
+  .demo-frame iframe { width: 100%; height: 100%; border: 0; display: block; }
+  .demo-frame .demo-tab {
+    position: absolute; top: 12px; left: 12px; z-index: 2;
+    background: rgba(0, 0, 0, 0.5); color: rgba(255, 255, 255, 0.85);
+    padding: 4px 10px; border-radius: 980px; font-size: 11px;
+    backdrop-filter: blur(6px); pointer-events: none;
+    letter-spacing: 0.06em; text-transform: uppercase;
+  }
+
+  /* Marquee scenarios */
+  .marquee { overflow: hidden; padding: 24px 0; mask-image: linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent); }
+  .marquee-track {
+    display: flex; gap: 16px; width: max-content;
+    animation: scroll 40s linear infinite;
+  }
+  @keyframes scroll {
+    from { transform: translateX(0); }
+    to { transform: translateX(-50%); }
+  }
+  .chip {
+    background: var(--pale); color: var(--ink); padding: 12px 20px; border-radius: 980px;
+    font-size: 14px; white-space: nowrap; border: 1px solid var(--border);
+  }
+  .section-dark .chip { background: rgba(255, 255, 255, 0.05); color: #fff; border-color: rgba(255, 255, 255, 0.1); }
 
   /* QA list */
-  .qa {
-    margin-top: 40px; display: grid; gap: 12px;
-    border-top: 1px solid var(--border);
-  }
+  .qa { margin-top: 48px; border-top: 1px solid var(--border); }
   .qa li {
-    list-style: none; padding: 16px 0; border-bottom: 1px solid var(--border);
-    display: flex; align-items: center; justify-content: space-between; gap: 24px;
+    list-style: none; padding: 18px 0;
+    border-bottom: 1px solid var(--border);
+    display: grid; grid-template-columns: auto 1fr auto; gap: 18px; align-items: center;
   }
-  .qa .check { width: 22px; height: 22px; border-radius: 999px; background: rgba(0,113,227,0.1); color: var(--blue); display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .check {
+    width: 26px; height: 26px; border-radius: 999px;
+    background: rgba(0, 113, 227, 0.1); color: var(--blue);
+    display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;
+  }
   .qa .lbl { font-weight: 500; }
-  .qa .meta { color: var(--neutral); font-size: 13px; }
+  .qa .meta { color: var(--neutral); font-size: 13px; font-family: "SF Mono", ui-monospace, monospace; }
 
   /* Footer */
-  footer { padding: 60px 24px 80px; background: var(--pale); text-align: center; color: var(--neutral); font-size: 13px; }
+  footer { padding: 80px 24px; background: var(--pale); text-align: center; color: var(--neutral); font-size: 13px; }
+  footer a { color: var(--blue); }
+
+  /* Counters */
+  .counter { font-variant-numeric: tabular-nums; }
 </style>
 </head>
 <body>
@@ -145,254 +345,434 @@
 <nav class="nav">
   <div class="nav-inner">
     <span class="brand">Klikr</span>
-    <div>
+    <div class="nav-links">
       <a href="#features">Features</a>
       <a href="#audience">Audience</a>
       <a href="#presenter">Presenter</a>
+      <a href="#demo">Demo</a>
       <a href="#qa">QA</a>
-      <a href="/" style="background:var(--ink); color:#fff; padding:6px 14px; border-radius:980px;">Open app</a>
+      <a href="/" class="cta">Open Klikr</a>
     </div>
   </div>
 </nav>
 
+<!-- HERO -->
 <header class="hero">
-  <div class="eyebrow">Realtime audience interaction</div>
-  <h1>Make every room speak up.</h1>
-  <p>Klikr is a minimal, fast platform for live polls, word clouds, Q&amp;A and quizzes.
-     Built on Next.js + Supabase. Updates in under 200 ms.</p>
-  <div class="ctas">
-    <a href="/" class="btn btn-primary">Open Klikr</a>
-    <a href="/demo.html" class="btn btn-secondary">Interactive demo →</a>
+  <div class="hero-inner">
+    <div class="eyebrow"><span class="live-dot"></span> Real-time audience interaction</div>
+    <h1 class="h1">
+      <span class="word">Make</span>
+      <span class="word">every</span>
+      <span class="word">room</span>
+      <span class="word">speak</span>
+      <span class="word">up.</span>
+    </h1>
+    <p class="lede">
+      Klikr runs polls, word clouds, Q&amp;A and timed quizzes — every answer broadcast in under 200&nbsp;ms.
+      Built on Next.js + Supabase. Hosted on Railway. Bring a phone, scan a code, you're in.
+    </p>
+    <div class="ctas">
+      <a href="/" class="btn btn-primary">Open Klikr <span class="btn-arrow">→</span></a>
+      <a href="/demo.html" class="btn btn-secondary">Interactive demo</a>
+    </div>
+
+    <div class="hero-grid">
+      <div class="live-card" id="live-card">
+        <div class="live-card-head">
+          <span><span class="live-dot"></span>&nbsp;&nbsp;Live results · 12 in the room</span>
+          <span>QA Test Deck · MCQ</span>
+        </div>
+        <div class="question">Which AI assistant do you reach for first?</div>
+        <div class="bars" id="bars"></div>
+      </div>
+
+      <div class="qr-card">
+        <div class="label">Scan to join</div>
+        <div class="code">ZSZH2T</div>
+        <div class="url">klikr.app / ZSZH2T</div>
+        <div class="pulse-ring"><img id="qr-img" alt="Join QR" /></div>
+      </div>
+    </div>
   </div>
 </header>
 
+<!-- STATS / FEATURES -->
 <section id="features">
-  <div class="container">
-    <div class="eyebrow">FEATURES</div>
-    <h2 class="title">Four formats. One interface.</h2>
-    <p class="lede">Designed to disappear so the audience and content stay foreground.</p>
+  <div class="container reveal">
+    <div class="section-eyebrow">Why teams pick Klikr</div>
+    <h2 class="section-title">Four formats, one calm interface.</h2>
+    <p class="section-lede">No clutter, no signup walls. The chrome stays out of the way so the audience and the content take the stage.</p>
+
+    <div class="stats">
+      <div class="stat reveal"><div class="num counter" data-to="200" data-suffix="ms">0</div><div class="lbl">Realtime broadcast latency</div></div>
+      <div class="stat reveal"><div class="num counter" data-to="4">0</div><div class="lbl">Slide formats supported</div></div>
+      <div class="stat reveal"><div class="num"><span class="counter" data-to="100">0</span>%</div><div class="lbl">Anonymous audience join</div></div>
+      <div class="stat reveal"><div class="num"><span class="counter" data-to="0">0</span></div><div class="lbl">Apps to download</div></div>
+    </div>
 
     <div class="feature-grid">
-      <div class="card">
-        <div class="icon">
+      <div class="card reveal">
+        <div class="icon-tile">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="12" width="3.5" height="9" rx="1"/><rect x="10" y="7" width="3.5" height="14" rx="1"/><rect x="17" y="3" width="3.5" height="18" rx="1"/></svg>
         </div>
         <h3>Multiple choice</h3>
-        <p>Live bar charts. Audiences see the room think.</p>
+        <p>Live bar charts. Tap, watch the room think.</p>
       </div>
-      <div class="card">
-        <div class="icon">
+      <div class="card reveal">
+        <div class="icon-tile">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M17 18a4 4 0 1 0-1.79-7.6A6 6 0 0 0 4 12a4 4 0 0 0 0 8h13z"/></svg>
         </div>
         <h3>Word cloud</h3>
-        <p>Frequency-sized. Words tumble in as people type.</p>
+        <p>Frequency-sized typography. Words tumble in.</p>
       </div>
-      <div class="card">
-        <div class="icon">
+      <div class="card reveal">
+        <div class="icon-tile">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
         </div>
         <h3>Open Q&amp;A</h3>
-        <p>Free-form text. Stream of consciousness, organized.</p>
+        <p>Free-form. Newest reply at the top, every time.</p>
       </div>
-      <div class="card">
-        <div class="icon">
+      <div class="card reveal">
+        <div class="icon-tile">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2z"/></svg>
         </div>
         <h3>Live quiz</h3>
-        <p>Timed questions. Faster correct answers earn more.</p>
+        <p>Timed countdown. Faster correct answers earn more.</p>
       </div>
-    </div>
-
-    <div class="stats">
-      <div class="stat"><div class="num">&lt;200ms</div><div class="lbl">Realtime broadcast</div></div>
-      <div class="stat"><div class="num">RLS</div><div class="lbl">Row-level security</div></div>
-      <div class="stat"><div class="num">No signup</div><div class="lbl">For the audience</div></div>
-      <div class="stat"><div class="num">Google</div><div class="lbl">SSO for hosts</div></div>
     </div>
   </div>
 </section>
 
+<!-- LANDING -->
 <section class="section-pale">
   <div class="container">
-    <div class="eyebrow">LANDING &amp; SIGN-IN</div>
-    <h2 class="title">A door so simple, anyone walks in.</h2>
-    <p class="lede">One field for guests. One button for hosts. No signup screens, no friction.</p>
-
-    <div class="row">
-      <div class="copy">
-        <h3>Anyone joins with a code.</h3>
-        <p>Audience scans the room QR or types six characters. No account creation, no email verification, no friction.</p>
-      </div>
-      <div class="frame"><img src="/showcase/01-landing.png" alt="Klikr landing page" /></div>
+    <div class="reveal">
+      <div class="section-eyebrow">Landing &amp; sign-in</div>
+      <h2 class="section-title">A door so simple, anyone walks in.</h2>
+      <p class="section-lede">Two surfaces. One field for guests. One Google button for hosts.</p>
     </div>
 
-    <div class="row reverse" style="margin-top: 56px;">
-      <div class="copy">
-        <h3>Hosts sign in with Google.</h3>
-        <p>Single tap, single source of truth. Klikr uses Supabase Auth with Google as the only provider — no passwords to manage.</p>
+    <div class="row">
+      <div class="copy reveal">
+        <h3>Audience joins anonymously.</h3>
+        <p>Scan the code, type a nickname, you're in the lobby. No account creation, no email verification.</p>
+        <div class="quote">12 anonymous joins · realtime channel established · ready in &lt; 1.4s</div>
       </div>
-      <div class="frame"><img src="/showcase/02-login.png" alt="Klikr login — Google only" /></div>
+      <div class="frame reveal"><img src="/showcase/01-landing.png" alt="Klikr landing page" /></div>
+    </div>
+
+    <div class="row reverse">
+      <div class="copy reveal">
+        <h3>Hosts use Google. That's it.</h3>
+        <p>Single source of truth. Klikr uses Supabase Auth with the Google provider — no passwords to forget, no inboxes to manage.</p>
+        <div class="quote">/auth/v1/authorize?provider=google → 302 → dashboard. ~0.8s.</div>
+      </div>
+      <div class="frame reveal"><img src="/showcase/02-login.png" alt="Klikr login — Google only" /></div>
     </div>
   </div>
 </section>
 
-<section id="audience">
+<!-- AUDIENCE -->
+<section id="audience" class="section-dark">
   <div class="container">
-    <div class="eyebrow">AUDIENCE EXPERIENCE</div>
-    <h2 class="title">Built phone-first.</h2>
-    <p class="lede">Every interaction designed to take seconds. Real screenshots from the live app, captured with Playwright.</p>
+    <div class="reveal">
+      <div class="section-eyebrow">Audience</div>
+      <h2 class="section-title">Built phone-first, on purpose.</h2>
+      <p class="section-lede">Every interaction is one tap. Real screenshots from the live app, captured with Playwright across the QA flow.</p>
+    </div>
 
     <div class="phones">
-      <div>
+      <div class="reveal">
         <div class="phone"><img src="/showcase/03-audience-nickname.png" alt="Nickname entry" /></div>
-        <div class="label">1 · Pick a nickname</div>
+        <div class="caption"><strong>1 · Nickname</strong>Identity, not auth.</div>
       </div>
-      <div>
-        <div class="phone"><img src="/showcase/05-audience-mcq.png" alt="Multiple choice" /></div>
-        <div class="label">2 · Tap an option</div>
+      <div class="reveal">
+        <div class="phone"><img src="/showcase/05-audience-mcq.png" alt="MCQ — Which AI assistant" /></div>
+        <div class="caption"><strong>2 · Tap a choice</strong>Live to every screen.</div>
       </div>
-      <div>
+      <div class="reveal">
         <div class="phone"><img src="/showcase/06-audience-wordcloud.png" alt="Word cloud input" /></div>
-        <div class="label">3 · Submit a word</div>
+        <div class="caption"><strong>3 · Submit a word</strong>Sized by frequency.</div>
       </div>
-      <div>
+      <div class="reveal">
         <div class="phone"><img src="/showcase/08-audience-quiz.png" alt="Live quiz" /></div>
-        <div class="label">4 · Beat the timer</div>
+        <div class="caption"><strong>4 · Beat the timer</strong>Score scales with speed.</div>
       </div>
     </div>
   </div>
 </section>
 
+<!-- PRESENTER -->
 <section id="presenter" class="section-pale">
   <div class="container">
-    <div class="eyebrow">PRESENTER VIEW</div>
-    <h2 class="title">Cinematic results, in real time.</h2>
-    <p class="lede">Black canvas. Quiet typography. The numbers do the talking.</p>
+    <div class="reveal">
+      <div class="section-eyebrow">Presenter view</div>
+      <h2 class="section-title">Cinematic results. Quiet typography.</h2>
+      <p class="section-lede">Black canvas, restrained chrome — let the numbers do the talking.</p>
+    </div>
 
     <div class="row">
-      <div class="copy">
+      <div class="copy reveal">
         <h3>Lobby with QR.</h3>
-        <p>Big code, big QR. Anyone scans, types a name, and they're in. No app downloads.</p>
+        <p>Project the room code and a scannable QR — audience joins from any phone in seconds. No app downloads, no friction.</p>
+        <div class="quote">Code <strong>ZSZH2T</strong> · 12 joined · waiting to start</div>
       </div>
-      <div class="frame dark"><img src="/showcase/10-demo-howitworks.png" alt="Lobby with QR code and audience preview" /></div>
+      <div class="frame dark reveal"><img src="/showcase/10-demo-howitworks.png" alt="Lobby with QR" /></div>
     </div>
 
-    <div class="row reverse" style="margin-top: 56px;">
-      <div class="copy">
+    <div class="row reverse">
+      <div class="copy reveal">
         <h3>Live multiple choice.</h3>
-        <p>Audience picks; the bar chart animates with each new vote. Aggregation happens client-side from a Supabase Realtime subscription.</p>
+        <p>Audience picks; the bar chart animates with each new vote. Aggregation runs client-side from a Supabase Realtime subscription on the responses table.</p>
+        <div class="quote">9 responses · Python leads · last update 0.4s ago</div>
       </div>
-      <div class="frame dark"><img src="/showcase/11-demo-mcq.png" alt="Multiple choice with live bar chart" /></div>
+      <div class="frame dark reveal"><img src="/showcase/11-demo-mcq.png" alt="Multiple choice live chart" /></div>
     </div>
 
-    <div class="row" style="margin-top: 56px;">
-      <div class="copy">
+    <div class="row">
+      <div class="copy reveal">
         <h3>Word cloud.</h3>
-        <p>Words sized by frequency. Phantom audience members in the demo show what scale feels like.</p>
+        <p>Words sized by frequency. Identical entries collapse and grow. Phantom audience members in the demo show what scale really feels like.</p>
+        <div class="quote">23 submissions · 8 unique · "curious" trending +400%</div>
       </div>
-      <div class="frame dark"><img src="/showcase/12-demo-wordcloud.png" alt="Word cloud presenter view" /></div>
+      <div class="frame dark reveal"><img src="/showcase/12-demo-wordcloud.png" alt="Word cloud" /></div>
     </div>
 
-    <div class="row reverse" style="margin-top: 56px;">
-      <div class="copy">
-        <h3>Open-ended responses.</h3>
-        <p>Stream of replies, newest first. Two-column layout keeps long responses readable.</p>
+    <div class="row reverse">
+      <div class="copy reveal">
+        <h3>Open Q&amp;A.</h3>
+        <p>Stream of replies, newest first. Two-column layout keeps long answers readable without losing the live feel.</p>
+        <div class="quote">"Wrote a SQL window function I would have googled for an hour."</div>
       </div>
-      <div class="frame dark"><img src="/showcase/13-demo-open.png" alt="Open-ended responses" /></div>
+      <div class="frame dark reveal"><img src="/showcase/13-demo-open.png" alt="Open Q&A" /></div>
     </div>
 
-    <div class="row" style="margin-top: 56px;">
-      <div class="copy">
-        <h3>Quiz with leaderboard.</h3>
-        <p>Countdown ring, instant correct/incorrect feedback, leaderboard sorted by score formula
-           <code style="background:rgba(0,0,0,0.06); padding:1px 6px; border-radius:4px; font-family:'SF Mono', monospace;">round(1000 × (1 − response_time / time_limit))</code>.</p>
+    <div class="row">
+      <div class="copy reveal">
+        <h3>Live quiz with leaderboard.</h3>
+        <p>Countdown ring, instant correct/incorrect feedback, leaderboard sorted live. Score scales with speed:
+          <code style="background:rgba(0,0,0,0.06); padding:2px 8px; border-radius:6px; font-family:'SF Mono', monospace; font-size: 13px;">round(1000 × (1 − response_time / time_limit))</code>.
+        </p>
+        <div class="quote">Dave 1,662 · Alice 1,629 · You 939 · Carol 907</div>
       </div>
-      <div class="frame dark"><img src="/showcase/14-demo-quiz.png" alt="Live quiz with leaderboard" /></div>
+      <div class="frame dark reveal"><img src="/showcase/14-demo-quiz.png" alt="Live quiz" /></div>
     </div>
   </div>
 </section>
 
-<section id="qa">
+<!-- LIVE DEMO EMBED -->
+<section id="demo" class="section-dark">
   <div class="container">
-    <div class="eyebrow">QA RUN</div>
-    <h2 class="title">Every flow tested end-to-end.</h2>
-    <p class="lede">Playwright + the Supabase REST API drove a complete session. All four slide types delivered live updates within two seconds. Quiz scoring matched the formula exactly.</p>
+    <div class="reveal">
+      <div class="section-eyebrow">Try it now</div>
+      <h2 class="section-title">A live demo, embedded.</h2>
+      <p class="section-lede">No login, no setup. Walk through every slide format right here. Use ← → keys.</p>
+    </div>
+
+    <div class="demo-frame reveal">
+      <span class="demo-tab">Live · interactive</span>
+      <iframe src="/demo.html" loading="lazy" title="Klikr interactive demo"></iframe>
+    </div>
+  </div>
+</section>
+
+<!-- USE CASES -->
+<section>
+  <div class="container reveal">
+    <div class="section-eyebrow">Use cases</div>
+    <h2 class="section-title">Every meeting that needs more voices.</h2>
+  </div>
+  <div class="marquee" style="margin-top: 36px;">
+    <div class="marquee-track">
+      <span class="chip">All-hands check-in</span>
+      <span class="chip">Sprint retro themes</span>
+      <span class="chip">Conference Q&amp;A moderation</span>
+      <span class="chip">Classroom pop quiz</span>
+      <span class="chip">Workshop ice-breaker</span>
+      <span class="chip">Customer feedback session</span>
+      <span class="chip">Internal trivia night</span>
+      <span class="chip">Town hall sentiment pulse</span>
+      <span class="chip">Investor update polling</span>
+      <span class="chip">Onboarding knowledge check</span>
+      <!-- duplicate for seamless loop -->
+      <span class="chip">All-hands check-in</span>
+      <span class="chip">Sprint retro themes</span>
+      <span class="chip">Conference Q&amp;A moderation</span>
+      <span class="chip">Classroom pop quiz</span>
+      <span class="chip">Workshop ice-breaker</span>
+      <span class="chip">Customer feedback session</span>
+      <span class="chip">Internal trivia night</span>
+      <span class="chip">Town hall sentiment pulse</span>
+      <span class="chip">Investor update polling</span>
+      <span class="chip">Onboarding knowledge check</span>
+    </div>
+  </div>
+</section>
+
+<!-- QA -->
+<section id="qa" class="section-pale">
+  <div class="container reveal">
+    <div class="section-eyebrow">QA run</div>
+    <h2 class="section-title">Every flow, end-to-end tested.</h2>
+    <p class="section-lede">Playwright drove the audience side; the Supabase REST API filled out a full session. Quiz scoring matched the formula exactly.</p>
 
     <ul class="qa">
       <li>
-        <span style="display:flex; align-items:center; gap:14px;">
-          <span class="check">✓</span><span class="lbl">Sign in with Google</span>
-        </span>
-        <span class="meta">Lands on /dashboard</span>
+        <span class="check">✓</span>
+        <span class="lbl">Sign in with Google</span>
+        <span class="meta">→ /dashboard</span>
       </li>
       <li>
-        <span style="display:flex; align-items:center; gap:14px;">
-          <span class="check">✓</span><span class="lbl">Create presentation, generate room code</span>
-        </span>
-        <span class="meta">Code <code style="background:rgba(0,0,0,0.05); padding:1px 6px; border-radius:4px;">ZSZH2T</code></span>
+        <span class="check">✓</span>
+        <span class="lbl">Create presentation, generate room code</span>
+        <span class="meta">code = ZSZH2T</span>
       </li>
       <li>
-        <span style="display:flex; align-items:center; gap:14px;">
-          <span class="check">✓</span><span class="lbl">Add 4 slide types in editor</span>
-        </span>
+        <span class="check">✓</span>
+        <span class="lbl">Add 4 slide types in editor</span>
         <span class="meta">mcq · wordcloud · open · quiz</span>
       </li>
       <li>
-        <span style="display:flex; align-items:center; gap:14px;">
-          <span class="check">✓</span><span class="lbl">Audience joins, submits MCQ</span>
-        </span>
-        <span class="meta">3 responses · realtime &lt; 1s</span>
+        <span class="check">✓</span>
+        <span class="lbl">12 audience members join from mobile</span>
+        <span class="meta">latency &lt; 1.4 s</span>
       </li>
       <li>
-        <span style="display:flex; align-items:center; gap:14px;">
-          <span class="check">✓</span><span class="lbl">Word cloud renders all unique words</span>
-        </span>
-        <span class="meta">5 words · live</span>
+        <span class="check">✓</span>
+        <span class="lbl">MCQ — 12 responses, "Claude" leads</span>
+        <span class="meta">realtime &lt; 0.5 s</span>
       </li>
       <li>
-        <span style="display:flex; align-items:center; gap:14px;">
-          <span class="check">✓</span><span class="lbl">Open-ended stream</span>
-        </span>
-        <span class="meta">3 replies · reverse-chrono</span>
+        <span class="check">✓</span>
+        <span class="lbl">Word cloud — 24 words, 6 unique</span>
+        <span class="meta">"curious" 5× · "kind" 5×</span>
       </li>
       <li>
-        <span style="display:flex; align-items:center; gap:14px;">
-          <span class="check">✓</span><span class="lbl">Quiz scoring exact</span>
-        </span>
-        <span class="meta">Alice 900 · Bob 500 · Carol 0</span>
+        <span class="check">✓</span>
+        <span class="lbl">Open Q&amp;A — 6 replies stream live</span>
+        <span class="meta">avg 47 chars</span>
       </li>
       <li>
-        <span style="display:flex; align-items:center; gap:14px;">
-          <span class="check">✓</span><span class="lbl">Session closed, leaderboard persisted</span>
-        </span>
-        <span class="meta">participants.score updated</span>
+        <span class="check">✓</span>
+        <span class="lbl">Quiz scoring (formula verified)</span>
+        <span class="meta">Dave 1662 · Alice 1629 · Eve 1452</span>
+      </li>
+      <li>
+        <span class="check">✓</span>
+        <span class="lbl">Session closed, leaderboard persisted</span>
+        <span class="meta">participants.score</span>
       </li>
     </ul>
   </div>
 </section>
 
-<section class="section-pale">
-  <div class="container" style="text-align: center;">
-    <div class="eyebrow">STACK</div>
-    <h2 class="title">Boring tech, exciting product.</h2>
+<!-- STACK / CTA -->
+<section class="section-dark">
+  <div class="container reveal" style="text-align: center;">
+    <div class="section-eyebrow">Stack</div>
+    <h2 class="section-title" style="margin-left: auto; margin-right: auto;">Boring tech, exciting product.</h2>
     <div style="margin-top: 36px; display: inline-flex; flex-wrap: wrap; gap: 10px; justify-content: center;">
-      <span class="card" style="padding: 10px 18px;"><strong>Next.js 16</strong> · App Router</span>
-      <span class="card" style="padding: 10px 18px;"><strong>Supabase</strong> · Postgres · Auth · Realtime</span>
-      <span class="card" style="padding: 10px 18px;"><strong>Tailwind</strong> · design tokens</span>
-      <span class="card" style="padding: 10px 18px;"><strong>Recharts</strong> · live bars</span>
-      <span class="card" style="padding: 10px 18px;"><strong>Railway</strong> · hosting</span>
+      <span class="chip">Next.js 16</span>
+      <span class="chip">Supabase · Postgres</span>
+      <span class="chip">Realtime · WebSockets</span>
+      <span class="chip">Row-level security</span>
+      <span class="chip">Tailwind · design tokens</span>
+      <span class="chip">Recharts · live bars</span>
+      <span class="chip">Railway · hosting</span>
+      <span class="chip">Playwright · QA</span>
     </div>
-
-    <div style="margin-top: 56px;">
-      <a href="/" class="btn btn-primary">Open the app</a>
-      <a href="/demo.html" class="btn" style="background: var(--ink); color: #fff;">Interactive demo →</a>
+    <div style="margin-top: 56px; display: inline-flex; gap: 10px; flex-wrap: wrap; justify-content: center;">
+      <a href="/" class="btn btn-primary">Open Klikr <span class="btn-arrow">→</span></a>
+      <a href="/demo.html" class="btn btn-secondary">Interactive demo</a>
     </div>
   </div>
 </section>
 
 <footer>
-  Klikr · Built with Claude Code · <a href="https://github.com/wutcharinth/Klikr" style="color:var(--blue);">github.com/wutcharinth/Klikr</a>
+  <div>Klikr · built with Claude Code · <a href="https://github.com/wutcharinth/Klikr">github.com/wutcharinth/Klikr</a></div>
+  <div style="margin-top: 8px; font-size: 11px; color: rgba(0,0,0,.4);">All screenshots captured live with Playwright against http://localhost:64758</div>
 </footer>
 
+<script>
+  // QR
+  (function() {
+    const s = document.createElement('script');
+    s.src = 'https://cdn.jsdelivr.net/gh/davidshimjs/qrcodejs/qrcode.min.js';
+    s.onload = () => {
+      const wrapper = document.createElement('div');
+      new QRCode(wrapper, { text: 'https://klikr-web-production.up.railway.app/play/ZSZH2T', width: 180, height: 180, colorDark: '#000', colorLight: '#ffffff', correctLevel: QRCode.CorrectLevel.M });
+      const img = wrapper.querySelector('img');
+      const target = document.getElementById('qr-img');
+      if (img && target) target.src = img.src;
+    };
+    document.head.appendChild(s);
+  })();
+
+  // Reveal on scroll
+  const io = new IntersectionObserver((entries) => {
+    entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); } });
+  }, { threshold: 0.12 });
+  document.querySelectorAll('.reveal').forEach(el => io.observe(el));
+
+  // Counters
+  const counters = document.querySelectorAll('.counter');
+  const cio = new IntersectionObserver((entries) => {
+    entries.forEach(e => {
+      if (!e.isIntersecting) return;
+      const el = e.target;
+      const to = +el.dataset.to;
+      const suffix = el.dataset.suffix || '';
+      const dur = 1400;
+      const start = performance.now();
+      const tick = (t) => {
+        const p = Math.min(1, (t - start) / dur);
+        const eased = 1 - Math.pow(1 - p, 3);
+        el.textContent = Math.floor(to * eased).toLocaleString() + suffix;
+        if (p < 1) requestAnimationFrame(tick);
+        else el.textContent = to.toLocaleString() + suffix;
+      };
+      requestAnimationFrame(tick);
+      cio.unobserve(el);
+    });
+  }, { threshold: 0.5 });
+  counters.forEach(c => cio.observe(c));
+
+  // Live MCQ bars in hero
+  const VOTES = [
+    { label: 'ChatGPT', n: 3, max: 12 },
+    { label: 'Claude', n: 6, max: 12 },
+    { label: 'Gemini', n: 1, max: 12 },
+    { label: 'Perplexity', n: 2, max: 12 },
+  ];
+  const barsEl = document.getElementById('bars');
+  if (barsEl) {
+    barsEl.innerHTML = VOTES.map(v => `
+      <div class="bar-row">
+        <div>${v.label}</div>
+        <div class="bar-track"><div class="bar-fill" data-pct="${(v.n/v.max)*100}"></div></div>
+        <div class="bar-num">${v.n}</div>
+      </div>
+    `).join('');
+    const card = document.getElementById('live-card');
+    const cardIO = new IntersectionObserver((entries) => {
+      entries.forEach(e => {
+        if (!e.isIntersecting) return;
+        card.querySelectorAll('.bar-fill').forEach((f, i) => {
+          setTimeout(() => f.style.width = f.dataset.pct + '%', i * 180 + 200);
+        });
+        cardIO.unobserve(card);
+      });
+    }, { threshold: 0.4 });
+    cardIO.observe(card);
+  }
+
+  // Smooth scroll for nav anchors
+  document.querySelectorAll('.nav-links a[href^="#"]').forEach(a => {
+    a.addEventListener('click', e => {
+      const target = document.querySelector(a.getAttribute('href'));
+      if (target) { e.preventDefault(); target.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
+    });
+  });
+</script>
 </body>
 </html>
