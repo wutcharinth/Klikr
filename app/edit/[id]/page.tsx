@@ -1,0 +1,104 @@
+import Link from "next/link";
+import { redirect, notFound } from "next/navigation";
+import { createClient } from "@/lib/supabase/server";
+import type { Presentation, Slide, SlideType } from "@/lib/types";
+import { addSlide } from "./actions";
+import { SlideEditor } from "@/components/SlideEditor";
+
+export default async function EditPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  const supabase = await createClient();
+  const { data: userData } = await supabase.auth.getUser();
+  if (!userData.user) redirect("/login");
+
+  const { data: presentation } = await supabase
+    .from("presentations")
+    .select("*")
+    .eq("id", id)
+    .single<Presentation>();
+  if (!presentation || presentation.owner_id !== userData.user.id) notFound();
+
+  const { data: slides } = await supabase
+    .from("slides")
+    .select("*")
+    .eq("presentation_id", id)
+    .order("position", { ascending: true })
+    .returns<Slide[]>();
+
+  return (
+    <main className="mx-auto max-w-6xl px-6 py-10">
+      <div className="flex items-center justify-between">
+        <Link href="/dashboard" className="text-xs muted-text hover:text-[var(--fg)]">
+          ← Dashboard
+        </Link>
+        <Link href={`/present/${presentation.id}`} className="btn-primary">
+          Present
+        </Link>
+      </div>
+
+      <div className="mt-8 flex items-end justify-between">
+        <div>
+          <div className="pill">Editing</div>
+          <h1 className="mt-3 text-3xl font-semibold tracking-tight">{presentation.title}</h1>
+        </div>
+        <div className="text-right">
+          <div className="text-[10px] uppercase tracking-[0.18em] muted-text">Room code</div>
+          <div className="mono mt-1 text-2xl font-semibold tracking-[0.18em]">{presentation.code}</div>
+        </div>
+      </div>
+
+      <div className="mt-10 grid grid-cols-1 gap-8 md:grid-cols-[260px_1fr]">
+        <aside>
+          <div className="text-[10px] uppercase tracking-[0.18em] muted-text">
+            Slides ({slides?.length ?? 0})
+          </div>
+          <ol className="mt-3 space-y-2">
+            {slides?.map((s, i) => (
+              <li key={s.id} className="panel-soft p-3 text-sm">
+                <div className="mono text-[10px] muted-text">
+                  #{String(i + 1).padStart(2, "0")} · {s.type}
+                </div>
+                <div className="mt-1 truncate">
+                  {s.question || <span className="muted-text">(empty)</span>}
+                </div>
+              </li>
+            ))}
+          </ol>
+
+          <div className="mt-6 text-[10px] uppercase tracking-[0.18em] muted-text">Add slide</div>
+          <div className="mt-2 space-y-2">
+            {(["mcq", "wordcloud", "open", "quiz"] as SlideType[]).map((t) => (
+              <form
+                key={t}
+                action={async () => {
+                  "use server";
+                  await addSlide(id, t);
+                }}
+              >
+                <button className="btn-ghost w-full justify-start py-2 text-sm">
+                  + {labelFor(t)}
+                </button>
+              </form>
+            ))}
+          </div>
+        </aside>
+
+        <section className="space-y-5">
+          {slides?.length === 0 ? (
+            <div className="panel-soft p-12 text-center text-sm muted-text">
+              Add a slide on the left to get started.
+            </div>
+          ) : (
+            slides?.map((s, i) => (
+              <SlideEditor key={s.id} slide={s} index={i} presentationId={id} />
+            ))
+          )}
+        </section>
+      </div>
+    </main>
+  );
+}
+
+function labelFor(t: SlideType) {
+  return { mcq: "Multiple choice", wordcloud: "Word cloud", open: "Open-ended", quiz: "Quiz" }[t];
+}

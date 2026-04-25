@@ -1,0 +1,581 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Klikr — Live Demo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/gh/davidshimjs/qrcodejs/qrcode.min.js"></script>
+<script src="https://unpkg.com/lucide@0.460.0/dist/umd/lucide.min.js"></script>
+<style>
+  :root {
+    --bg: #07090d;
+    --bg-2: #0c1016;
+    --fg: #e7eaef;
+    --muted: #6b7484;
+    --line: rgba(255,255,255,.06);
+    --accent: #c9d4ff;
+    --accent-2: #7c8aff;
+  }
+  html, body { height: 100%; margin: 0; overflow: hidden; background: var(--bg); color: var(--fg); font-family: 'Inter', ui-sans-serif, system-ui, sans-serif; font-feature-settings: 'cv11','ss01','ss03'; -webkit-font-smoothing: antialiased; }
+  .mono { font-family: 'JetBrains Mono', ui-monospace, monospace; }
+  .slide { position: absolute; inset: 0; opacity: 0; pointer-events: none; transition: opacity .5s ease; }
+  .slide.active { opacity: 1; pointer-events: auto; }
+  .panel { background: linear-gradient(180deg, rgba(255,255,255,.02), rgba(255,255,255,.005)); border: 1px solid var(--line); border-radius: 16px; }
+  .panel-soft { background: rgba(255,255,255,.015); border: 1px solid var(--line); border-radius: 14px; }
+  .grid-bg {
+    background-image:
+      radial-gradient(1200px 600px at 50% -10%, rgba(124,138,255,.10), transparent 60%),
+      radial-gradient(800px 500px at 90% 110%, rgba(201,212,255,.06), transparent 60%),
+      linear-gradient(rgba(255,255,255,.02) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,255,255,.02) 1px, transparent 1px);
+    background-size: auto, auto, 56px 56px, 56px 56px;
+    background-position: 0 0, 0 0, -1px -1px, -1px -1px;
+  }
+  .live-dot { width: 6px; height: 6px; border-radius: 999px; background: #6ee7b7; box-shadow: 0 0 0 0 rgba(110,231,183,.6); animation: pulse 1.6s infinite; }
+  @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(110,231,183,.55);} 70% { box-shadow: 0 0 0 12px rgba(110,231,183,0);} 100% { box-shadow: 0 0 0 0 rgba(110,231,183,0);} }
+  .icon-tile { width: 36px; height: 36px; border-radius: 10px; background: rgba(255,255,255,.04); border: 1px solid var(--line); display: inline-flex; align-items: center; justify-content: center; }
+  .icon-tile svg { width: 18px; height: 18px; stroke: var(--fg); stroke-width: 1.5; }
+  .icon-tile.muted svg { stroke: var(--muted); }
+  .pill { display: inline-flex; align-items: center; gap: 8px; padding: 6px 10px; border-radius: 999px; border: 1px solid var(--line); background: rgba(255,255,255,.02); font-size: 11px; color: var(--muted); letter-spacing: .04em; text-transform: uppercase; }
+  .key { padding: 1px 7px; border-radius: 6px; background: rgba(255,255,255,.05); border: 1px solid var(--line); font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--fg); }
+  .word-pop { display: inline-block; transform: translateY(8px) scale(.9); opacity: 0; animation: wpop .55s cubic-bezier(.2,.8,.2,1) forwards; }
+  @keyframes wpop { to { transform: translateY(0) scale(1); opacity: 1; } }
+  .float-up { animation: floatup .55s cubic-bezier(.2,.8,.2,1) forwards; transform: translateY(12px); opacity: 0; }
+  @keyframes floatup { to { transform: translateY(0); opacity: 1; } }
+  .progress { height: 2px; background: linear-gradient(90deg, var(--accent-2), var(--accent)); transition: width .45s ease; }
+  .nav-btn { width: 40px; height: 40px; border-radius: 999px; border: 1px solid var(--line); background: rgba(255,255,255,.02); color: var(--fg); display: inline-flex; align-items: center; justify-content: center; transition: all .15s ease; }
+  .nav-btn:hover { background: rgba(255,255,255,.06); border-color: rgba(255,255,255,.12); }
+  .nav-btn svg { width: 16px; height: 16px; stroke: currentColor; stroke-width: 1.5; }
+  .ring { background: conic-gradient(var(--accent) var(--p), rgba(255,255,255,.08) 0); }
+  .scroll-hide::-webkit-scrollbar { display: none; }
+  .display-h { font-weight: 700; letter-spacing: -0.04em; line-height: 0.96; }
+  .display-xl { font-size: clamp(80px, 12vw, 180px); }
+  .display-lg { font-size: clamp(48px, 6vw, 84px); }
+  .display-md { font-size: clamp(36px, 4vw, 56px); }
+  .device { border: 1px solid var(--line); border-radius: 28px; background: linear-gradient(180deg, rgba(255,255,255,.02), rgba(255,255,255,0)); overflow: hidden; }
+  .device-screen { background: #06090d; border: 1px solid var(--line); border-radius: 22px; padding: 20px; }
+  .opt-base { transition: all .18s ease; border: 1px solid var(--line); background: rgba(255,255,255,.015); }
+  .opt-base:hover:not(:disabled) { background: rgba(255,255,255,.045); border-color: rgba(255,255,255,.18); }
+  .opt-selected { background: rgba(124,138,255,.10) !important; border-color: rgba(124,138,255,.5) !important; }
+  .opt-correct { background: rgba(110,231,183,.10) !important; border-color: rgba(110,231,183,.55) !important; }
+  .opt-wrong { background: rgba(248,113,113,.08) !important; border-color: rgba(248,113,113,.45) !important; }
+  .accent-text { color: var(--accent); }
+  .muted { color: var(--muted); }
+</style>
+</head>
+<body class="select-none grid-bg">
+
+<!-- top bar -->
+<header class="absolute top-0 inset-x-0 z-30 px-8 py-5 flex items-center justify-between text-xs muted">
+  <div class="flex items-center gap-3">
+    <span class="icon-tile" data-lucide-name="zap"></span>
+    <span class="text-[var(--fg)] font-semibold tracking-tight">Klikr</span>
+    <span class="muted">/ live demo</span>
+  </div>
+  <nav class="flex items-center gap-3">
+    <span class="hidden md:inline">Use <span class="key">←</span> <span class="key">→</span> · <span class="key">F</span> fullscreen</span>
+    <span id="slide-num" class="mono">01 / 07</span>
+  </nav>
+</header>
+
+<div class="absolute top-0 left-0 z-40 progress" id="progress" style="width: 14%"></div>
+
+<button id="prev" class="nav-btn absolute left-5 top-1/2 -translate-y-1/2 z-30" aria-label="Previous"><span data-lucide-name="chevron-left"></span></button>
+<button id="next" class="nav-btn absolute right-5 top-1/2 -translate-y-1/2 z-30" aria-label="Next"><span data-lucide-name="chevron-right"></span></button>
+
+<!-- =================== SLIDE 1 — TITLE =================== -->
+<section class="slide active" data-slide="1">
+  <div class="h-full flex flex-col items-center justify-center px-12 text-center">
+    <div class="pill"><span class="live-dot"></span> Realtime audience interaction</div>
+    <h1 class="display-h display-xl mt-10 tracking-tighter">Klikr</h1>
+    <p class="mt-6 text-xl muted max-w-xl">A minimal, fast, real-time platform for polls, word clouds, Q&amp;A, and quizzes.</p>
+
+    <div class="mt-14 flex items-center gap-5 panel px-6 py-5">
+      <div class="bg-white p-2.5 rounded-lg" id="qr-title"></div>
+      <div class="text-left">
+        <div class="text-[10px] uppercase tracking-[0.18em] muted">Scan to join</div>
+        <div class="mono text-3xl font-semibold tracking-[.18em] mt-1">ZSZH2T</div>
+        <div class="text-xs muted mt-1">klikr.app/ZSZH2T</div>
+      </div>
+    </div>
+
+    <p class="mt-12 text-xs muted">Press <span class="key">→</span> to begin</p>
+  </div>
+</section>
+
+<!-- =================== SLIDE 2 — HOW IT WORKS =================== -->
+<section class="slide" data-slide="2">
+  <div class="h-full flex flex-col items-center justify-center px-12">
+    <div class="pill mb-6"><span data-lucide-name="workflow" class="opacity-60"></span> Two devices · one session</div>
+    <h2 class="display-h display-md tracking-tight">How it works</h2>
+    <p class="muted mt-3 text-base">Presenter shares a code. Audience scans. Everything syncs in milliseconds.</p>
+
+    <div class="mt-14 grid grid-cols-2 gap-10 max-w-5xl w-full items-stretch">
+      <!-- presenter -->
+      <div class="panel p-7">
+        <div class="flex items-center justify-between text-xs muted">
+          <span class="flex items-center gap-2"><span class="live-dot"></span> Presenter</span>
+          <span class="flex items-center gap-1.5"><span data-lucide-name="users" class="opacity-60"></span> 3 joined</span>
+        </div>
+        <div class="grid grid-cols-[auto_1fr] gap-6 items-center mt-7">
+          <div class="bg-white p-3 rounded-xl" id="qr-howto"></div>
+          <div>
+            <div class="text-[10px] uppercase tracking-[0.18em] muted">Join code</div>
+            <div class="mono text-4xl font-bold tracking-[.18em] mt-1">ZSZH2T</div>
+            <div class="text-xs muted mt-2">klikr.app/ZSZH2T</div>
+          </div>
+        </div>
+        <ul class="mt-8 space-y-2 text-sm">
+          <li class="flex items-center gap-2"><span class="icon-tile muted" data-lucide-name="check" style="width:22px;height:22px;border-radius:6px"></span> Anyone can join — no signup</li>
+          <li class="flex items-center gap-2"><span class="icon-tile muted" data-lucide-name="lock" style="width:22px;height:22px;border-radius:6px"></span> Row-level security on every query</li>
+          <li class="flex items-center gap-2"><span class="icon-tile muted" data-lucide-name="zap" style="width:22px;height:22px;border-radius:6px"></span> Updates broadcast under 200ms</li>
+        </ul>
+      </div>
+      <!-- audience device -->
+      <div class="device p-3 max-w-sm mx-auto self-center">
+        <div class="device-screen">
+          <div class="flex items-center justify-between text-[10px] uppercase tracking-[0.18em] muted">
+            <span>Klikr</span>
+            <span>ZSZH2T</span>
+          </div>
+          <div class="mt-6 text-lg font-semibold">Choose a nickname</div>
+          <div class="mt-3 panel-soft px-3 py-3 text-sm">Alice</div>
+          <button class="mt-3 w-full bg-white text-[var(--bg)] rounded-md py-3 font-semibold text-sm">Join</button>
+          <div class="mt-5 flex items-center gap-2 text-xs muted">
+            <span class="live-dot"></span> Connected · waiting for host
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- =================== SLIDE 3 — MCQ =================== -->
+<section class="slide" data-slide="3">
+  <div class="h-full flex flex-col px-12 py-20">
+    <div class="flex items-center gap-3">
+      <div class="pill"><span data-lucide-name="bar-chart-3"></span> Multiple choice</div>
+      <span class="text-xs muted">01 / 04</span>
+    </div>
+    <h2 class="display-h display-md mt-3 tracking-tight">Tap an option. Watch the room react.</h2>
+
+    <div class="mt-10 grid grid-cols-2 gap-10 flex-1 min-h-0">
+      <div class="panel p-7 flex flex-col">
+        <div class="flex items-center justify-between text-[10px] uppercase tracking-[0.18em] muted">
+          <span>You · audience</span>
+          <span class="flex items-center gap-1.5"><span data-lucide-name="smartphone"></span> mobile</span>
+        </div>
+        <div class="text-2xl font-semibold mt-5">Which language do you reach for first?</div>
+        <div class="mt-7 space-y-3" id="mcq-options">
+          <button data-i="0" class="mcq-opt opt-base w-full text-left rounded-xl px-5 py-4 flex items-center gap-3"><span class="mono text-xs muted w-5">A</span><span>TypeScript</span></button>
+          <button data-i="1" class="mcq-opt opt-base w-full text-left rounded-xl px-5 py-4 flex items-center gap-3"><span class="mono text-xs muted w-5">B</span><span>Python</span></button>
+          <button data-i="2" class="mcq-opt opt-base w-full text-left rounded-xl px-5 py-4 flex items-center gap-3"><span class="mono text-xs muted w-5">C</span><span>Rust</span></button>
+          <button data-i="3" class="mcq-opt opt-base w-full text-left rounded-xl px-5 py-4 flex items-center gap-3"><span class="mono text-xs muted w-5">D</span><span>Go</span></button>
+        </div>
+        <div class="mt-auto pt-5 text-xs muted" id="mcq-status">Awaiting your answer.</div>
+      </div>
+      <div class="panel p-7 flex flex-col">
+        <div class="flex items-center justify-between text-[10px] uppercase tracking-[0.18em] muted">
+          <span>Presenter · live results</span>
+          <span class="flex items-center gap-1.5"><span class="live-dot"></span> realtime</span>
+        </div>
+        <div class="text-sm muted mt-5"><span id="mcq-count" class="mono text-[var(--fg)]">0</span> responses</div>
+        <div class="flex-1 min-h-0 mt-3"><canvas id="mcq-chart"></canvas></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- =================== SLIDE 4 — WORDCLOUD =================== -->
+<section class="slide" data-slide="4">
+  <div class="h-full flex flex-col px-12 py-20">
+    <div class="flex items-center gap-3">
+      <div class="pill"><span data-lucide-name="cloud"></span> Word cloud</div>
+      <span class="text-xs muted">02 / 04</span>
+    </div>
+    <h2 class="display-h display-md mt-3 tracking-tight">Submit a word — bigger means more popular.</h2>
+
+    <div class="mt-10 grid grid-cols-[1fr_2fr] gap-8 flex-1 min-h-0">
+      <div class="panel p-7 flex flex-col">
+        <div class="text-[10px] uppercase tracking-[0.18em] muted">You · audience</div>
+        <div class="text-xl font-semibold mt-5">One word for Friday.</div>
+        <form id="wc-form" class="mt-5 flex gap-2">
+          <input id="wc-input" placeholder="Type a word…" class="flex-1 panel-soft px-3 py-2.5 outline-none focus:border-white/20 placeholder:muted" />
+          <button class="bg-white text-[var(--bg)] hover:bg-white/90 rounded-md px-4 font-medium text-sm">Send</button>
+        </form>
+        <div class="mt-5 text-[10px] uppercase tracking-[0.18em] muted">Your submissions</div>
+        <ul id="wc-mine-list" class="mt-2 flex flex-wrap gap-2"></ul>
+      </div>
+      <div class="panel p-7 flex flex-col items-center justify-center relative overflow-hidden">
+        <div class="absolute top-5 left-5 text-[10px] uppercase tracking-[0.18em] muted">Presenter · live cloud</div>
+        <div id="wc-cloud" class="flex flex-wrap gap-x-5 gap-y-2 items-center justify-center max-w-3xl text-center"></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- =================== SLIDE 5 — OPEN ENDED =================== -->
+<section class="slide" data-slide="5">
+  <div class="h-full flex flex-col px-12 py-20">
+    <div class="flex items-center gap-3">
+      <div class="pill"><span data-lucide-name="message-square"></span> Open-ended</div>
+      <span class="text-xs muted">03 / 04</span>
+    </div>
+    <h2 class="display-h display-md mt-3 tracking-tight">Free-form replies, streaming in.</h2>
+
+    <div class="mt-10 grid grid-cols-[1fr_2fr] gap-8 flex-1 min-h-0">
+      <div class="panel p-7 flex flex-col">
+        <div class="text-[10px] uppercase tracking-[0.18em] muted">You · audience</div>
+        <div class="text-xl font-semibold mt-5">What's one thing on your mind today?</div>
+        <form id="open-form" class="mt-5 flex flex-col gap-3 flex-1">
+          <textarea id="open-input" rows="6" maxlength="280" placeholder="Type your thoughts…" class="panel-soft px-3 py-3 resize-none flex-1 outline-none focus:border-white/20 placeholder:muted text-sm leading-relaxed"></textarea>
+          <button class="bg-white text-[var(--bg)] hover:bg-white/90 rounded-md py-2.5 font-medium text-sm">Send</button>
+        </form>
+      </div>
+      <div class="panel p-7 flex flex-col">
+        <div class="flex items-center justify-between text-[10px] uppercase tracking-[0.18em] muted">
+          <span>Presenter · responses</span>
+          <span><span id="open-count" class="mono text-[var(--fg)]">0</span> received</span>
+        </div>
+        <div id="open-stream" class="flex-1 overflow-y-auto pr-2 grid grid-cols-2 gap-3 content-start scroll-hide mt-5"></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- =================== SLIDE 6 — QUIZ =================== -->
+<section class="slide" data-slide="6">
+  <div class="h-full flex flex-col px-12 py-20">
+    <div class="flex items-center gap-3">
+      <div class="pill"><span data-lucide-name="trophy"></span> Live quiz</div>
+      <span class="text-xs muted">04 / 04</span>
+    </div>
+    <h2 class="display-h display-md mt-3 tracking-tight">Faster correct answers earn more points.</h2>
+
+    <div class="mt-10 grid grid-cols-[2fr_1fr] gap-8 flex-1 min-h-0">
+      <div class="panel p-8 flex flex-col">
+        <div class="flex items-start justify-between gap-6">
+          <div class="text-2xl font-semibold max-w-2xl">Which of these databases supports row-level security natively?</div>
+          <div class="relative w-16 h-16 shrink-0">
+            <div id="quiz-ring" class="absolute inset-0 rounded-full ring" style="--p: 360deg"></div>
+            <div class="absolute inset-1.5 bg-[var(--bg)] rounded-full flex items-center justify-center mono text-base font-semibold" id="quiz-time">15</div>
+          </div>
+        </div>
+        <div class="mt-8 grid grid-cols-2 gap-3" id="quiz-options">
+          <button data-i="0" class="quiz-opt opt-base rounded-xl px-5 py-6 text-left flex items-center gap-4"><span class="mono muted">A</span><span class="font-medium">MySQL</span></button>
+          <button data-i="1" class="quiz-opt opt-base rounded-xl px-5 py-6 text-left flex items-center gap-4"><span class="mono muted">B</span><span class="font-medium">Postgres</span></button>
+          <button data-i="2" class="quiz-opt opt-base rounded-xl px-5 py-6 text-left flex items-center gap-4"><span class="mono muted">C</span><span class="font-medium">SQLite</span></button>
+          <button data-i="3" class="quiz-opt opt-base rounded-xl px-5 py-6 text-left flex items-center gap-4"><span class="mono muted">D</span><span class="font-medium">Redis</span></button>
+        </div>
+        <div id="quiz-feedback" class="mt-6 text-sm font-medium h-6"></div>
+        <div class="mt-auto pt-4 text-[11px] muted mono">round(1000 × (1 − response_time / time_limit))</div>
+      </div>
+      <div class="panel p-7 flex flex-col">
+        <div class="flex items-center justify-between text-[10px] uppercase tracking-[0.18em] muted">
+          <span>Leaderboard</span>
+          <span class="flex items-center gap-1.5"><span class="live-dot"></span> live</span>
+        </div>
+        <ol id="leaderboard" class="space-y-2 mt-5"></ol>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- =================== SLIDE 7 — RECAP =================== -->
+<section class="slide" data-slide="7">
+  <div class="h-full flex flex-col items-center justify-center px-12 text-center">
+    <div class="pill"><span class="live-dot"></span> One stack · four formats</div>
+    <h2 class="display-h display-lg mt-6 tracking-tight">Built for the moment your audience speaks up.</h2>
+    <p class="muted mt-5 max-w-xl">Next.js + Supabase. Postgres state, Realtime sync, RLS for safety.</p>
+
+    <div class="mt-12 grid grid-cols-2 md:grid-cols-4 gap-4 max-w-4xl w-full">
+      <div class="panel p-6 text-left">
+        <div class="icon-tile" data-lucide-name="bar-chart-3"></div>
+        <div class="mt-4 font-semibold">Polls</div>
+        <div class="text-xs muted mt-1">Live bar charts</div>
+      </div>
+      <div class="panel p-6 text-left">
+        <div class="icon-tile" data-lucide-name="cloud"></div>
+        <div class="mt-4 font-semibold">Word cloud</div>
+        <div class="text-xs muted mt-1">Frequency-sized</div>
+      </div>
+      <div class="panel p-6 text-left">
+        <div class="icon-tile" data-lucide-name="message-square"></div>
+        <div class="mt-4 font-semibold">Open Q&amp;A</div>
+        <div class="text-xs muted mt-1">Free-form text</div>
+      </div>
+      <div class="panel p-6 text-left">
+        <div class="icon-tile" data-lucide-name="trophy"></div>
+        <div class="mt-4 font-semibold">Quiz</div>
+        <div class="text-xs muted mt-1">Timed scoring</div>
+      </div>
+    </div>
+
+    <div class="mt-14 flex gap-3">
+      <a href="/" class="rounded-md bg-white text-[var(--bg)] hover:bg-white/90 px-5 py-2.5 font-medium text-sm flex items-center gap-2">Try the real app <span data-lucide-name="arrow-right"></span></a>
+      <button id="restart" class="rounded-md border border-[var(--line)] hover:bg-white/5 px-5 py-2.5 font-medium text-sm flex items-center gap-2"><span data-lucide-name="rotate-ccw"></span> Restart</button>
+    </div>
+  </div>
+</section>
+
+<script>
+// ========== Icons ==========
+function setIcons() {
+  document.querySelectorAll('[data-lucide-name]').forEach(el => {
+    if (el.dataset.lucideRendered) return;
+    const name = el.dataset.lucideName;
+    const node = lucide.createElement(lucide.icons[toPascal(name)]);
+    if (node) { el.innerHTML = ''; el.appendChild(node); el.dataset.lucideRendered = '1'; }
+  });
+}
+function toPascal(s) { return s.split('-').map(p => p[0].toUpperCase() + p.slice(1)).join(''); }
+setIcons();
+
+// ========== QR codes ==========
+const JOIN_URL = 'https://klikr.app/ZSZH2T';
+function drawQR(id, size) {
+  const el = document.getElementById(id);
+  if (!el || !window.QRCode) return;
+  el.innerHTML = '';
+  new QRCode(el, { text: JOIN_URL, width: size, height: size, colorDark: '#0b1220', colorLight: '#ffffff', correctLevel: QRCode.CorrectLevel.M });
+}
+drawQR('qr-title', 110);
+drawQR('qr-howto', 150);
+
+// ========== Navigation ==========
+const slides = [...document.querySelectorAll('.slide')];
+let cur = 0;
+function show(i) {
+  cur = Math.max(0, Math.min(slides.length - 1, i));
+  slides.forEach((s, idx) => s.classList.toggle('active', idx === cur));
+  document.getElementById('slide-num').textContent = `${String(cur+1).padStart(2,'0')} / ${String(slides.length).padStart(2,'0')}`;
+  document.getElementById('progress').style.width = `${((cur+1)/slides.length)*100}%`;
+  setIcons();
+  if (cur === 2) initMCQ();
+  if (cur === 3) initWordcloud();
+  if (cur === 4) initOpen();
+  if (cur === 5) initQuiz();
+}
+document.getElementById('prev').onclick = () => show(cur - 1);
+document.getElementById('next').onclick = () => show(cur + 1);
+document.getElementById('restart').onclick = () => { mcqInit = wcInit = openInit = quizInit = false; show(0); };
+addEventListener('keydown', e => {
+  if (e.key === 'ArrowRight') show(cur + 1);
+  else if (e.key === 'ArrowLeft') show(cur - 1);
+  else if (e.key === 'f' || e.key === 'F') { if (!document.fullscreenElement) document.documentElement.requestFullscreen(); else document.exitFullscreen(); }
+});
+
+// ========== MCQ ==========
+let mcqInit = false, mcqChart, mcqVotes = [0,0,0,0];
+const MCQ_LABELS = ['TypeScript','Python','Rust','Go'];
+
+function initMCQ() {
+  if (mcqInit) return; mcqInit = true;
+  mcqVotes = [0,0,0,0];
+  const ctx = document.getElementById('mcq-chart');
+  mcqChart = new Chart(ctx, {
+    type: 'bar',
+    data: { labels: MCQ_LABELS, datasets: [{ data: mcqVotes, backgroundColor: '#7c8aff', borderRadius: 6, barThickness: 38 }] },
+    options: {
+      responsive: true, maintainAspectRatio: false, animation: { duration: 600 },
+      plugins: { legend: { display: false }, tooltip: { enabled: false } },
+      scales: { x: { ticks: { color: '#6b7484', font: { family: 'Inter', size: 12 } }, grid: { display: false } }, y: { ticks: { color: '#6b7484', stepSize: 1, font: { family: 'JetBrains Mono', size: 11 } }, grid: { color: 'rgba(255,255,255,.04)' }, beginAtZero: true } }
+    }
+  });
+  document.querySelectorAll('.mcq-opt').forEach(b => {
+    b.onclick = () => {
+      document.querySelectorAll('.mcq-opt').forEach(x => x.disabled = true);
+      b.classList.add('opt-selected');
+      mcqVotes[+b.dataset.i]++;
+      updateMcq();
+      document.getElementById('mcq-status').innerHTML = '<span class="accent-text">Locked in.</span> Watching the room…';
+      const total = 14 + Math.floor(Math.random()*8);
+      let n = 0;
+      const pump = () => {
+        if (n >= total) return;
+        const i = Math.random() < .55 ? +b.dataset.i : Math.floor(Math.random()*4);
+        mcqVotes[i]++;
+        updateMcq();
+        n++;
+        setTimeout(pump, 180 + Math.random()*340);
+      };
+      setTimeout(pump, 350);
+    };
+  });
+}
+function updateMcq() {
+  mcqChart.data.datasets[0].data = [...mcqVotes];
+  mcqChart.update();
+  document.getElementById('mcq-count').textContent = mcqVotes.reduce((a,b)=>a+b,0);
+}
+
+// ========== Wordcloud ==========
+let wcInit = false, wcCounts = new Map();
+const WC_SEEDS = ['weekend','sunshine','tacos','sleep','party','run','bbq','beach','sushi','park','games','movies','tacos','weekend','sunshine','sushi','park','beach','party','sleep','weekend'];
+function renderCloud() {
+  const max = Math.max(1, ...wcCounts.values());
+  const cloud = document.getElementById('wc-cloud');
+  cloud.innerHTML = '';
+  [...wcCounts.entries()].sort((a,b)=>b[1]-a[1]).forEach(([w,c]) => {
+    const ratio = c/max;
+    const size = 18 + ratio * 70;
+    const opacity = 0.5 + ratio * 0.5;
+    const span = document.createElement('span');
+    span.className = 'word-pop';
+    span.style.fontSize = size + 'px';
+    span.style.fontWeight = 700;
+    span.style.letterSpacing = '-0.02em';
+    span.style.lineHeight = '1';
+    span.style.color = `rgba(231,234,239,${opacity})`;
+    span.textContent = w;
+    cloud.appendChild(span);
+  });
+}
+function initWordcloud() {
+  if (wcInit) return; wcInit = true;
+  wcCounts = new Map();
+  document.getElementById('wc-mine-list').innerHTML = '';
+  document.getElementById('wc-cloud').innerHTML = '<span class="text-sm muted">Submit a word to start.</span>';
+  document.getElementById('wc-form').onsubmit = e => {
+    e.preventDefault();
+    const w = document.getElementById('wc-input').value.trim().toLowerCase();
+    if (!w) return;
+    document.getElementById('wc-input').value = '';
+    addWord(w, true);
+    let n = 0;
+    const pump = () => {
+      if (n >= 16) return;
+      const seed = WC_SEEDS[Math.floor(Math.random()*WC_SEEDS.length)];
+      const word = Math.random() < .25 ? w : seed;
+      addWord(word, false);
+      n++;
+      setTimeout(pump, 220 + Math.random()*420);
+    };
+    setTimeout(pump, 280);
+  };
+}
+function addWord(w, mine) {
+  wcCounts.set(w, (wcCounts.get(w) || 0) + 1);
+  renderCloud();
+  if (mine) {
+    const li = document.createElement('li');
+    li.className = 'rounded-full panel-soft px-3 py-1 text-sm';
+    li.style.borderColor = 'rgba(124,138,255,.3)';
+    li.style.background = 'rgba(124,138,255,.08)';
+    li.textContent = w;
+    document.getElementById('wc-mine-list').appendChild(li);
+  }
+}
+
+// ========== Open ==========
+let openInit = false;
+const OPEN_SEEDS = [
+  ['Avery','Shipping that big migration today.'],
+  ['Riley','Trying to convince my cat that 6am is too early.'],
+  ['Drew','First espresso of the day. Magical.'],
+  ['Sky','Stuck on a tricky bug, but cake helps.'],
+  ['Reese','Snowing here. Stay warm everyone.'],
+  ['Sam','Refactoring legacy code is a treasure hunt.'],
+  ['Quinn','New album dropped, can\'t stop replaying.'],
+];
+function initOpen() {
+  if (openInit) return; openInit = true;
+  document.getElementById('open-stream').innerHTML = '';
+  document.getElementById('open-count').textContent = '0';
+  document.getElementById('open-input').value = '';
+  document.getElementById('open-form').onsubmit = e => {
+    e.preventDefault();
+    const t = document.getElementById('open-input').value.trim();
+    if (!t) return;
+    document.getElementById('open-input').value = '';
+    pushOpen('You', t, true);
+    let i = 0;
+    const tick = () => {
+      if (i >= OPEN_SEEDS.length) return;
+      pushOpen(...OPEN_SEEDS[i], false);
+      i++;
+      setTimeout(tick, 550 + Math.random()*900);
+    };
+    setTimeout(tick, 450);
+  };
+}
+function pushOpen(name, text, mine) {
+  const wrap = document.createElement('div');
+  wrap.className = 'float-up rounded-lg p-3 text-sm border ' + (mine ? '' : '');
+  wrap.style.borderColor = mine ? 'rgba(124,138,255,.4)' : 'var(--line)';
+  wrap.style.background = mine ? 'rgba(124,138,255,.08)' : 'rgba(255,255,255,.015)';
+  wrap.innerHTML = `<div class="text-[10px] uppercase tracking-[0.18em] muted mb-1.5">${name}</div><div>${text.replace(/</g,'&lt;')}</div>`;
+  const stream = document.getElementById('open-stream');
+  stream.prepend(wrap);
+  document.getElementById('open-count').textContent = stream.children.length;
+}
+
+// ========== Quiz ==========
+let quizInit = false, quizTimer, quizStart, quizDone, quizMs = 15000;
+const CORRECT = 1; // Postgres
+const QUIZ_NAMES = ['Alice','Bob','Carol','Dave','Eve','Frank','Gina','Henry'];
+function initQuiz() {
+  if (quizInit) return; quizInit = true;
+  quizDone = false;
+  quizStart = Date.now();
+  document.getElementById('quiz-feedback').textContent = '';
+  document.querySelectorAll('.quiz-opt').forEach(b => { b.disabled = false; b.classList.remove('opt-selected','opt-correct','opt-wrong'); });
+  const board = QUIZ_NAMES.map(n => ({ name: n, score: Math.floor(Math.random()*1500)+200 }));
+  renderBoard(board);
+  document.querySelectorAll('.quiz-opt').forEach(b => {
+    b.onclick = () => answerQuiz(+b.dataset.i, b, board);
+  });
+  if (quizTimer) clearInterval(quizTimer);
+  quizTimer = setInterval(() => {
+    const left = Math.max(0, quizMs - (Date.now() - quizStart));
+    document.getElementById('quiz-time').textContent = Math.ceil(left/1000);
+    document.getElementById('quiz-ring').style.setProperty('--p', `${(left/quizMs)*360}deg`);
+    if (left <= 0 && !quizDone) {
+      quizDone = true;
+      clearInterval(quizTimer);
+      document.getElementById('quiz-feedback').innerHTML = '<span style="color:#fca5a5">Time\'s up.</span>';
+      revealQuiz();
+    }
+  }, 100);
+}
+function answerQuiz(i, btn, board) {
+  if (quizDone) return;
+  quizDone = true;
+  clearInterval(quizTimer);
+  const ms = Date.now() - quizStart;
+  const correct = i === CORRECT;
+  const points = correct ? Math.max(0, Math.round(1000 * (1 - ms/quizMs))) : 0;
+  document.querySelectorAll('.quiz-opt').forEach(b => b.disabled = true);
+  btn.classList.add(correct ? 'opt-correct' : 'opt-wrong');
+  if (!correct) document.querySelector(`.quiz-opt[data-i="${CORRECT}"]`).classList.add('opt-correct');
+  document.getElementById('quiz-feedback').innerHTML = correct
+    ? `<span style="color:#86efac">Correct in ${(ms/1000).toFixed(1)}s · +${points} pts</span>`
+    : `<span style="color:#fca5a5">Postgres has built-in row-level security.</span>`;
+  board.unshift({ name: 'You', score: points, you: true });
+  renderBoard(board);
+}
+function revealQuiz() {
+  document.querySelector(`.quiz-opt[data-i="${CORRECT}"]`).classList.add('opt-correct');
+  document.querySelectorAll('.quiz-opt').forEach(b => b.disabled = true);
+}
+function renderBoard(board) {
+  const list = [...board].sort((a,b)=>b.score-a.score).slice(0,8);
+  const ol = document.getElementById('leaderboard');
+  ol.innerHTML = '';
+  list.forEach((r, idx) => {
+    const li = document.createElement('li');
+    li.className = 'flex items-center justify-between text-sm rounded-lg px-3 py-2.5 border';
+    li.style.borderColor = r.you ? 'rgba(124,138,255,.4)' : 'var(--line)';
+    li.style.background = r.you ? 'rgba(124,138,255,.08)' : 'rgba(255,255,255,.015)';
+    li.innerHTML = `<span class="flex items-center gap-3"><span class="mono muted w-5 text-right">${String(idx+1).padStart(2,'0')}</span><span class="font-medium">${r.name}</span></span><span class="mono font-semibold">${r.score}</span>`;
+    ol.appendChild(li);
+  });
+}
+</script>
+</body>
+</html>

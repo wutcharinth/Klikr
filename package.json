@@ -1,0 +1,33 @@
+{
+  "name": "klikr",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint"
+  },
+  "dependencies": {
+    "@supabase/ssr": "latest",
+    "@supabase/supabase-js": "latest",
+    "next": "latest",
+    "react": "latest",
+    "react-dom": "latest",
+    "react-tagcloud": "latest",
+    "recharts": "latest",
+    "zod": "latest"
+  },
+  "devDependencies": {
+    "@types/node": "latest",
+    "@types/react": "latest",
+    "@types/react-dom": "latest",
+    "@types/react-tagcloud": "latest",
+    "autoprefixer": "latest",
+    "eslint": "^9",
+    "eslint-config-next": "latest",
+    "postcss": "latest",
+    "tailwindcss": "^3",
+    "typescript": "latest"
+  }
+}

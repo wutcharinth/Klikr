@@ -1,0 +1,45 @@
+import Link from "next/link";
+import { redirect, notFound } from "next/navigation";
+import { createClient } from "@/lib/supabase/server";
+import type { Presentation, Slide } from "@/lib/types";
+import { PresenterView } from "@/components/PresenterView";
+
+export default async function PresentPage({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
+  const { id } = await params;
+  const supabase = await createClient();
+  const { data: userData } = await supabase.auth.getUser();
+  if (!userData.user) redirect("/login");
+
+  const { data: presentation } = await supabase
+    .from("presentations")
+    .select("*")
+    .eq("id", id)
+    .single<Presentation>();
+  if (!presentation || presentation.owner_id !== userData.user.id) notFound();
+
+  const { data: slides } = await supabase
+    .from("slides")
+    .select("*")
+    .eq("presentation_id", id)
+    .order("position", { ascending: true })
+    .returns<Slide[]>();
+
+  return (
+    <main className="mx-auto max-w-6xl px-6 py-8">
+      <div className="mb-6 flex items-center justify-between">
+        <Link href={`/edit/${presentation.id}`} className="text-xs muted-text hover:text-[var(--fg)]">
+          ← Edit
+        </Link>
+        <div className="text-right">
+          <div className="text-[10px] uppercase tracking-[0.18em] muted-text">Code</div>
+          <div className="mono text-2xl font-semibold tracking-[0.18em]">{presentation.code}</div>
+        </div>
+      </div>
+      <PresenterView presentation={presentation} slides={slides ?? []} />
+    </main>
+  );
+}
