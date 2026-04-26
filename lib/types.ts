@@ -106,6 +106,7 @@ export type Template = {
   owner_id: string | null;
   visibility: "public" | "team" | "private";
   usage_count: number;
+  default_count: number | null;
   created_at: string;
 };
 

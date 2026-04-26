@@ -6,24 +6,30 @@ import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { generateRoomCode } from "@/lib/code";
 
-export async function applyTemplate(slug: string) {
+export async function applyTemplate(slug: string, formData: FormData) {
   const supabase = await createClient();
   const { data: userData } = await supabase.auth.getUser();
   if (!userData.user) redirect(`/login?next=/templates/${slug}`);
 
+  const countRaw = formData.get("count");
+  const shuffle = formData.get("shuffle") === "true";
+  const requestedCount = countRaw ? parseInt(String(countRaw), 10) : null;
+
   const { data: tpl, error: tplErr } = await supabase
     .from("templates")
-    .select("id, title")
+    .select("id, title, default_count")
     .eq("slug", slug)
     .single();
   if (tplErr || !tpl) throw new Error("Template not found");
 
-  const { count: slideCount, error: slideCountErr } = await supabase
+  const { count: poolSize, error: poolErr } = await supabase
     .from("template_slides")
     .select("id", { count: "exact", head: true })
     .eq("template_id", tpl.id);
-  if (slideCountErr) throw slideCountErr;
-  if (!slideCount) throw new Error("This template is not ready yet.");
+  if (poolErr) throw poolErr;
+  if (!poolSize) throw new Error("This template is not ready yet.");
+
+  const expectedCount = requestedCount ?? tpl.default_count ?? poolSize;
 
   for (let attempt = 0; attempt < 5; attempt++) {
     const code = generateRoomCode();
@@ -32,15 +38,17 @@ export async function applyTemplate(slug: string) {
       p_owner_id: userData.user.id,
       p_title: tpl.title,
       p_code: code,
+      p_count: requestedCount,
+      p_shuffle: shuffle,
     });
     if (!error && data) {
       const adminSupabase = createServiceClient();
-      const { count: clonedSlideCount, error: clonedSlideErr } = await adminSupabase
+      const { count: clonedCount, error: clonedErr } = await adminSupabase
         .from("slides")
         .select("id", { count: "exact", head: true })
         .eq("presentation_id", data);
-      if (clonedSlideErr) throw clonedSlideErr;
-      if (clonedSlideCount !== slideCount) {
+      if (clonedErr) throw clonedErr;
+      if (clonedCount !== expectedCount) {
         await adminSupabase.from("presentations").delete().eq("id", data);
         throw new Error("Template copy was incomplete. Please try again.");
       }

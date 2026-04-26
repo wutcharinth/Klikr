@@ -3,8 +3,9 @@ import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import type { Template, TemplateSlide } from "@/lib/types";
 import { applyTemplate } from "../actions";
-import { ArrowLeft, Sparkles } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import NavBar from "@/components/NavBar";
+import ApplyTemplateForm from "@/components/ApplyTemplateForm";
 
 export const metadata = { title: "Template — Klikr" };
 
@@ -35,6 +36,8 @@ export default async function TemplateDetail({ params }: { params: Params }) {
     .limit(3);
 
   const apply = applyTemplate.bind(null, slug);
+  const poolSize = (slides ?? []).length;
+  const defaultCount = (tpl as Template).default_count ?? poolSize;
 
   return (
     <main className="mx-auto max-w-4xl px-6 py-10">
@@ -44,23 +47,22 @@ export default async function TemplateDetail({ params }: { params: Params }) {
         <ArrowLeft className="h-3.5 w-3.5" /> All templates
       </Link>
 
-      <header className="mt-4 flex flex-wrap items-end justify-between gap-4">
-        <div>
+      <div className="mt-4 flex flex-wrap items-start gap-8">
+        <div className="flex-1 min-w-0">
           <p className="text-[11px] uppercase tracking-wider muted-text">{tpl.category}</p>
           <h1 className="mt-1 text-3xl font-semibold tracking-tight">{tpl.title}</h1>
           <p className="mt-2 max-w-2xl text-[15px] muted-text">{tpl.description}</p>
         </div>
-        <form action={apply}>
-          <button className="btn-primary">
-            <Sparkles className="h-4 w-4" />
-            Use template
-          </button>
-        </form>
-      </header>
+        <div className="w-full sm:w-72 shrink-0">
+          <ApplyTemplateForm action={apply} poolSize={poolSize} defaultCount={defaultCount} />
+        </div>
+      </div>
 
       <section className="mt-8 space-y-3">
         <h2 className="text-sm font-medium uppercase tracking-wider muted-text">
-          {(slides ?? []).length} slide{(slides ?? []).length === 1 ? "" : "s"}
+          {poolSize > defaultCount
+            ? `${poolSize} questions in pool · ${defaultCount} used by default`
+            : `${poolSize} slide${poolSize === 1 ? "" : "s"}`}
         </h2>
         {(slides ?? []).map((s) => (
           <SlidePreview key={s.id} slide={s as TemplateSlide} />
