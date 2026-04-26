@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { MessageCircle, GraduationCap, Lightbulb, CheckSquare, Image as ImageIcon, ArrowRight, Sparkles } from "lucide-react";
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 
 type Audience = "business" | "education";
 
@@ -10,130 +11,49 @@ type UseCase = {
   Icon: React.ComponentType<{ className?: string; style?: React.CSSProperties }>;
   title: string;
   body: string;
-  /** Link target for the per-card CTA. */
   href: string;
-  /** Background gradient for the right-hand stage. */
   bg: string;
-  /** Headline shown on the right-hand stage. */
   stageTitle: string;
-  /** Three rows shown as bars on the stage to evoke a real screen. */
   stageRows: { label: string; value: number; color: string }[];
 };
 
-const business: UseCase[] = [
-  {
-    Icon: MessageCircle,
-    title: "Get live feedback",
-    body: "Invite live, anonymous feedback to know how your meeting, workshop, or training really landed.",
-    href: "/templates?category=Surveys",
-    bg: "linear-gradient(135deg,#fff7ed,#fde68a 60%)",
-    stageTitle: "Please rate the following:",
-    stageRows: [
-      { label: "Meeting content was relevant", value: 7.4, color: "#7c3aed" },
-      { label: "We aligned on next steps", value: 6.8, color: "#f97316" },
-      { label: "My questions were addressed", value: 7.0, color: "#2563eb" },
-    ],
-  },
-  {
-    Icon: CheckSquare,
-    title: "Make decisions",
-    body: "Let the room weigh in. Run a quick poll and move forward with confidence — together.",
-    href: "/templates?category=Business",
-    bg: "linear-gradient(135deg,#eff6ff,#dbeafe 60%)",
-    stageTitle: "Which option should we ship first?",
-    stageRows: [
-      { label: "Option A", value: 6.0, color: "#2563eb" },
-      { label: "Option B", value: 9.2, color: "#16a34a" },
-      { label: "Option C", value: 3.4, color: "#94a3b8" },
-    ],
-  },
-  {
-    Icon: Lightbulb,
-    title: "Generate ideas",
-    body: "Brainstorm with everyone in the room. Word clouds and open responses surface the best thinking.",
-    href: "/templates?category=Brainstorming",
-    bg: "linear-gradient(135deg,#fdf4ff,#fae8ff 60%)",
-    stageTitle: "What should we focus on next quarter?",
-    stageRows: [
-      { label: "Onboarding", value: 8.8, color: "#a21caf" },
-      { label: "Reliability", value: 6.5, color: "#7c3aed" },
-      { label: "Pricing", value: 5.1, color: "#db2777" },
-    ],
-  },
-  {
-    Icon: ImageIcon,
-    title: "Make it memorable",
-    body: "Engagement that sticks. Quizzes, leaderboards, and a final podium make every session feel like an event.",
-    href: "/templates?category=Classroom",
-    bg: "linear-gradient(135deg,#ecfeff,#a5f3fc 60%)",
-    stageTitle: "Top 3 — final scores",
-    stageRows: [
-      { label: "🥇 Bob", value: 9.4, color: "#f59e0b" },
-      { label: "🥈 Frank", value: 8.6, color: "#94a3b8" },
-      { label: "🥉 Dave", value: 7.7, color: "#d97706" },
-    ],
-  },
-];
+const bizMeta = [
+  { Icon: MessageCircle, href: "/templates?category=Surveys", bg: "linear-gradient(135deg,#fff7ed,#fde68a 60%)", values: [7.4, 6.8, 7.0], colors: ["#7c3aed", "#f97316", "#2563eb"] },
+  { Icon: CheckSquare, href: "/templates?category=Business", bg: "linear-gradient(135deg,#eff6ff,#dbeafe 60%)", values: [6.0, 9.2, 3.4], colors: ["#2563eb", "#16a34a", "#94a3b8"] },
+  { Icon: Lightbulb, href: "/templates?category=Brainstorming", bg: "linear-gradient(135deg,#fdf4ff,#fae8ff 60%)", values: [8.8, 6.5, 5.1], colors: ["#a21caf", "#7c3aed", "#db2777"] },
+  { Icon: ImageIcon, href: "/templates?category=Classroom", bg: "linear-gradient(135deg,#ecfeff,#a5f3fc 60%)", values: [9.4, 8.6, 7.7], colors: ["#f59e0b", "#94a3b8", "#d97706"] },
+] as const;
 
-const education: UseCase[] = [
-  {
-    Icon: GraduationCap,
-    title: "Check understanding",
-    body: "Run a quick comprehension check at the end of class. Spot what stuck and what needs another pass.",
-    href: "/templates?category=Classroom",
-    bg: "linear-gradient(135deg,#ecfdf5,#bbf7d0 60%)",
-    stageTitle: "How confident are you with the topic?",
-    stageRows: [
-      { label: "Confident", value: 8.4, color: "#16a34a" },
-      { label: "Getting there", value: 6.7, color: "#65a30d" },
-      { label: "Lost", value: 2.3, color: "#94a3b8" },
-    ],
-  },
-  {
-    Icon: Lightbulb,
-    title: "Spark discussion",
-    body: "Ask an open question, watch ideas land, and pull the most interesting ones into the discussion.",
-    href: "/templates?category=Classroom",
-    bg: "linear-gradient(135deg,#fdf4ff,#fae8ff 60%)",
-    stageTitle: "One word for today's lesson",
-    stageRows: [
-      { label: "Eye-opening", value: 9.0, color: "#a855f7" },
-      { label: "Tricky", value: 6.4, color: "#9333ea" },
-      { label: "Fun", value: 7.2, color: "#c026d3" },
-    ],
-  },
-  {
-    Icon: CheckSquare,
-    title: "Run a fair quiz",
-    body: "Timed questions with a real podium. Faster correct answers earn more points.",
-    href: "/templates?category=Classroom",
-    bg: "linear-gradient(135deg,#fef2f2,#fecaca 60%)",
-    stageTitle: "Final scores",
-    stageRows: [
-      { label: "🥇 Lia", value: 9.6, color: "#f59e0b" },
-      { label: "🥈 Theo", value: 8.1, color: "#94a3b8" },
-      { label: "🥉 Ava", value: 7.4, color: "#d97706" },
-    ],
-  },
-  {
-    Icon: MessageCircle,
-    title: "Hear every voice",
-    body: "Anonymous Q&A means the quietest students get heard. Upvotes float the best questions to the top.",
-    href: "/templates?category=Classroom",
-    bg: "linear-gradient(135deg,#eff6ff,#dbeafe 60%)",
-    stageTitle: "Questions for the teacher",
-    stageRows: [
-      { label: "Will this be on the test?", value: 9.5, color: "#2563eb" },
-      { label: "Is there a study guide?", value: 7.1, color: "#1d4ed8" },
-      { label: "Can we have an example?", value: 5.8, color: "#3b82f6" },
-    ],
-  },
-];
+const eduMeta = [
+  { Icon: GraduationCap, href: "/templates?category=Classroom", bg: "linear-gradient(135deg,#ecfdf5,#bbf7d0 60%)", values: [8.4, 6.7, 2.3], colors: ["#16a34a", "#65a30d", "#94a3b8"] },
+  { Icon: Lightbulb, href: "/templates?category=Classroom", bg: "linear-gradient(135deg,#fdf4ff,#fae8ff 60%)", values: [9.0, 6.4, 7.2], colors: ["#a855f7", "#9333ea", "#c026d3"] },
+  { Icon: CheckSquare, href: "/templates?category=Classroom", bg: "linear-gradient(135deg,#fef2f2,#fecaca 60%)", values: [9.6, 8.1, 7.4], colors: ["#f59e0b", "#94a3b8", "#d97706"] },
+  { Icon: MessageCircle, href: "/templates?category=Classroom", bg: "linear-gradient(135deg,#eff6ff,#dbeafe 60%)", values: [9.5, 7.1, 5.8], colors: ["#2563eb", "#1d4ed8", "#3b82f6"] },
+] as const;
+
+type CaseData = { title: string; body: string; stageTitle: string; rows: string[] };
+
+function buildList(meta: typeof bizMeta | typeof eduMeta, data: CaseData[]): UseCase[] {
+  return meta.map((m, i) => ({
+    Icon: m.Icon,
+    title: data[i].title,
+    body: data[i].body,
+    href: m.href,
+    bg: m.bg,
+    stageTitle: data[i].stageTitle,
+    stageRows: data[i].rows.map((label, j) => ({ label, value: m.values[j], color: m.colors[j] })),
+  }));
+}
 
 export default function UseCaseTabs() {
+  const t = useTranslations("useCases");
   const [audience, setAudience] = useState<Audience>("business");
-  const list = audience === "business" ? business : education;
   const [activeIdx, setActiveIdx] = useState(0);
+
+  const business = useMemo(() => buildList(bizMeta, t.raw("biz") as CaseData[]), [t]);
+  const education = useMemo(() => buildList(eduMeta, t.raw("edu") as CaseData[]), [t]);
+
+  const list = audience === "business" ? business : education;
   const active = list[activeIdx];
 
   return (
@@ -153,7 +73,7 @@ export default function UseCaseTabs() {
                 color: audience === a ? "var(--ink)" : "rgba(255,255,255,0.7)",
               }}
             >
-              {a === "business" ? "Business" : "Education"}
+              {a === "business" ? t("business") : t("education")}
             </button>
           ))}
         </div>
@@ -198,18 +118,30 @@ export default function UseCaseTabs() {
           </ul>
           <div className="mt-6">
             <Link href={active.href} className="btn-dark inline-flex">
-              See templates <ArrowRight className="h-4 w-4" />
+              {t("seeTemplates")} <ArrowRight className="h-4 w-4" />
             </Link>
           </div>
         </div>
 
-        <Stage useCase={active} />
+        <Stage useCase={active} liveLabel={t("live")} answeredFn={(c) => t("answered", { count: c })} agreeMin={t("agreeMin")} agreeMax={t("agreeMax")} />
       </div>
     </section>
   );
 }
 
-function Stage({ useCase }: { useCase: UseCase }) {
+function Stage({
+  useCase,
+  liveLabel,
+  answeredFn,
+  agreeMin,
+  agreeMax,
+}: {
+  useCase: UseCase;
+  liveLabel: string;
+  answeredFn: (count: number) => string;
+  agreeMin: string;
+  agreeMax: string;
+}) {
   const animated = useAnimatedRows(useCase);
   const respondents = useAnimatedNumber(28, useCase.stageTitle, 1500);
   const answered = Math.min(respondents, Math.round(respondents * 0.82));
@@ -228,7 +160,7 @@ function Stage({ useCase }: { useCase: UseCase }) {
         <div className="flex items-center justify-between">
           <Sparkles className="h-4 w-4 animate-pulse" style={{ color: "var(--blue)" }} />
           <span className="inline-flex items-center gap-1.5 text-[10px] uppercase tracking-wider muted-text">
-            <span className="live-dot" /> Klikr · live
+            <span className="live-dot" /> {liveLabel}
           </span>
         </div>
         <h3 className="mt-6 text-xl font-semibold tracking-tight">{useCase.stageTitle}</h3>
@@ -253,12 +185,12 @@ function Stage({ useCase }: { useCase: UseCase }) {
           ))}
         </div>
         <div className="mt-7 flex items-center justify-between text-[10px] muted-text">
-          <span>Don't agree at all</span>
-          <span>Very much agree</span>
+          <span>{agreeMin}</span>
+          <span>{agreeMax}</span>
         </div>
         <div className="mt-3 flex items-center justify-between text-[10px]">
           <span className="muted-text">
-            <span className="live-dot mr-1" /> {answered} answered
+            <span className="live-dot mr-1" /> {answeredFn(answered)}
           </span>
           <span className="rounded-full px-2 py-0.5 mono tabular-nums" style={{ background: "var(--pale)", color: "var(--ink)" }}>
             {answered} / {respondents}
@@ -269,8 +201,6 @@ function Stage({ useCase }: { useCase: UseCase }) {
   );
 }
 
-/** Eases each row's value from 0 → target on mount and re-animates on switch.
- *  After the initial tween, micro-jitters keep the chart feeling alive. */
 function useAnimatedRows(useCase: UseCase) {
   type Row = UseCase["stageRows"][number] & { displayed: number };
   const [rows, setRows] = useState<Row[]>(() => useCase.stageRows.map((r) => ({ ...r, displayed: 0 })));
@@ -290,9 +220,8 @@ function useAnimatedRows(useCase: UseCase) {
     };
     raf = requestAnimationFrame(tween);
     return () => cancelAnimationFrame(raf);
-  }, [useCase.stageTitle]);
+  }, [useCase.stageTitle, useCase.stageRows]);
 
-  // Jitter to feel "live"
   useEffect(() => {
     const id = setInterval(() => {
       setRows((prev) => prev.map((r, i) => {
@@ -308,7 +237,6 @@ function useAnimatedRows(useCase: UseCase) {
   return rows;
 }
 
-/** Counts to a target value on mount and on dependency change. */
 function useAnimatedNumber(target: number, depKey: string, durationMs = 1200): number {
   const [val, setVal] = useState(0);
   useEffect(() => {
@@ -328,7 +256,6 @@ function useAnimatedNumber(target: number, depKey: string, durationMs = 1200): n
 }
 
 function FloatingDots() {
-  // Subtle dots drifting on the colored canvas
   const dots = useMemo(
     () => Array.from({ length: 14 }).map((_, i) => ({
       cx: 5 + (i * 7.3) % 90,

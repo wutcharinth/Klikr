@@ -1,49 +1,44 @@
 import Link from "next/link";
 import { LayoutTemplate, Sparkles, Plus } from "lucide-react";
+import { getTranslations } from "next-intl/server";
 
-/**
- * Visitor-facing "3 ways to start" panel. Routes through /login so any
- * action ends with the user on /welcome and then in the right place. For
- * already-signed-in users the same tiles link directly to the destinations.
- */
-export default function StartTiles({ signedIn = false }: { signedIn?: boolean }) {
+export default async function StartTiles({ signedIn = false }: { signedIn?: boolean }) {
+  const t = await getTranslations("startTiles");
   const tiles = [
     {
       Icon: LayoutTemplate,
-      title: "An icebreaker, retro, or quiz",
-      body: "Open a ready-made template, change a couple of words, share the code.",
+      title: t("tile1Title"),
+      body: t("tile1Body"),
       href: "/templates",
-      cta: "Browse templates",
+      cta: t("tile1Cta"),
     },
     {
       Icon: Sparkles,
-      title: "Something tailored",
-      body: "Describe the meeting — the slides arrive in a few seconds.",
+      title: t("tile2Title"),
+      body: t("tile2Body"),
       href: signedIn ? "/dashboard?ai=1" : "/login?next=/dashboard?ai=1",
-      cta: "Try AI",
+      cta: t("tile2Cta"),
     },
     {
       Icon: Plus,
-      title: "I know what I want",
-      body: "Start a blank deck and build it your way — polls, word clouds, quizzes, Q&A, ratings.",
+      title: t("tile3Title"),
+      body: t("tile3Body"),
       href: signedIn ? "/dashboard" : "/login",
-      cta: signedIn ? "Open dashboard" : "Sign in",
+      cta: signedIn ? t("tile3CtaSignedIn") : t("tile3CtaVisitor"),
     },
   ];
   return (
     <section className="mx-auto max-w-5xl px-6 pb-20">
-      <h2 className="text-center text-3xl font-semibold tracking-tight">What do you want to run?</h2>
-      <p className="mx-auto mt-2 max-w-xl text-center text-sm muted-text">
-        Pick a starting point. You can always change your mind.
-      </p>
+      <h2 className="text-center text-3xl font-semibold tracking-tight">{t("title")}</h2>
+      <p className="mx-auto mt-2 max-w-xl text-center text-sm muted-text">{t("intro")}</p>
       <div className="mt-8 grid gap-3 sm:grid-cols-3">
-        {tiles.map((t) => (
-          <Link key={t.title} href={t.href} className="panel p-6 transition-transform hover:-translate-y-0.5">
-            <t.Icon className="h-6 w-6" style={{ color: "var(--blue)" }} />
-            <p className="mt-3 font-medium">{t.title}</p>
-            <p className="mt-1 text-xs muted-text">{t.body}</p>
+        {tiles.map((tile) => (
+          <Link key={tile.title} href={tile.href} className="panel p-6 transition-transform hover:-translate-y-0.5">
+            <tile.Icon className="h-6 w-6" style={{ color: "var(--blue)" }} />
+            <p className="mt-3 font-medium">{tile.title}</p>
+            <p className="mt-1 text-xs muted-text">{tile.body}</p>
             <span className="mt-4 inline-flex text-sm" style={{ color: "var(--blue)" }}>
-              {t.cta} →
+              {tile.cta} →
             </span>
           </Link>
         ))}

@@ -3,12 +3,21 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { Search, X } from "lucide-react";
+import { useTranslations } from "next-intl";
 import type { Template } from "@/lib/types";
 
-const CATEGORIES = ["All", "Icebreakers", "Brainstorming", "Classroom", "Business", "Workshops", "Surveys"];
+const CATEGORY_KEYS = [
+  { key: "All", label: "categoryAll" },
+  { key: "Icebreakers", label: "categoryIcebreakers" },
+  { key: "Brainstorming", label: "categoryBrainstorming" },
+  { key: "Classroom", label: "categoryClassroom" },
+  { key: "Business", label: "categoryBusiness" },
+  { key: "Workshops", label: "categoryWorkshops" },
+  { key: "Surveys", label: "categorySurveys" },
+] as const;
 
 function scoreTemplate(t: Template, words: string[]): number {
-  if (words.length === 0) return 1; // show all when no query
+  if (words.length === 0) return 1;
   const title = t.title.toLowerCase();
   const desc = t.description.toLowerCase();
   const tags = t.tags.map((x) => x.toLowerCase()).join(" ");
@@ -24,6 +33,7 @@ function scoreTemplate(t: Template, words: string[]): number {
 }
 
 export default function TemplateSearch({ templates }: { templates: Template[] }) {
+  const t = useTranslations("templates");
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState("All");
 
@@ -33,69 +43,65 @@ export default function TemplateSearch({ templates }: { templates: Template[] })
   );
 
   const results = useMemo(() => {
-    let pool = category === "All" ? templates : templates.filter((t) => t.category === category);
+    const pool = category === "All" ? templates : templates.filter((tpl) => tpl.category === category);
     if (words.length === 0) return pool;
     return pool
-      .map((t) => ({ t, s: scoreTemplate(t, words) }))
+      .map((tpl) => ({ tpl, s: scoreTemplate(tpl, words) }))
       .filter(({ s }) => s > 0)
       .sort((a, b) => b.s - a.s)
-      .map(({ t }) => t);
+      .map(({ tpl }) => tpl);
   }, [templates, category, words]);
 
   return (
     <>
-      {/* Search bar */}
       <div className="mt-6 flex max-w-2xl items-center gap-2 rounded-2xl px-4" style={{ background: "var(--white)", border: "1px solid var(--line)" }}>
         <Search className="h-4 w-4 flex-none muted-text" />
         <input
           type="text"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="Describe your meeting — results update instantly"
+          placeholder={t("searchPlaceholder")}
           className="h-12 w-full bg-transparent text-[15px] outline-none"
           autoComplete="off"
         />
         {query && (
-          <button onClick={() => setQuery("")} className="flex-none muted-text hover:text-[var(--ink)]">
+          <button onClick={() => setQuery("")} className="flex-none muted-text hover:text-[var(--ink)]" aria-label="Clear">
             <X className="h-4 w-4" />
           </button>
         )}
       </div>
 
-      {/* Category pills */}
       <nav className="mt-6 flex flex-wrap gap-2">
-        {CATEGORIES.map((c) => (
+        {CATEGORY_KEYS.map(({ key, label }) => (
           <button
-            key={c}
-            onClick={() => setCategory(c)}
+            key={key}
+            onClick={() => setCategory(key)}
             className="rounded-full px-4 py-1.5 text-sm transition-colors"
             style={
-              category === c
+              category === key
                 ? { background: "var(--ink)", color: "var(--white)" }
                 : { background: "transparent", color: "var(--neutral)", border: "1px solid var(--line)" }
             }
           >
-            {c}
+            {t(label)}
           </button>
         ))}
       </nav>
 
-      {/* Results count hint when searching */}
       {words.length > 0 && (
         <p className="mt-4 text-xs muted-text">
-          {results.length === 0 ? "No matches" : `${results.length} template${results.length !== 1 ? "s" : ""}`}
+          {t("resultCount", { count: results.length })}
         </p>
       )}
 
-      {/* Grid */}
       {results.length === 0 ? (
         <div className="panel-soft mt-8 p-8 text-center text-sm muted-text">
-          No templates found{query ? ` for "${query}"` : ""}. Try a different category or clear the search.
+          {query ? t("noTemplatesFor", { query }) : t("noTemplates")}
         </div>
       ) : (
         <section className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {results.map((t) => (
-            <TemplateCard key={t.id} t={t} highlight={words} />
+          {results.map((tpl) => (
+            <TemplateCard key={tpl.id} t={tpl} highlight={words} usesLabel={(c: number) => t("uses", { count: c })} />
           ))}
         </section>
       )}
@@ -103,7 +109,15 @@ export default function TemplateSearch({ templates }: { templates: Template[] })
   );
 }
 
-function TemplateCard({ t, highlight }: { t: Template; highlight: string[] }) {
+function TemplateCard({
+  t,
+  highlight,
+  usesLabel,
+}: {
+  t: Template;
+  highlight: string[];
+  usesLabel: (count: number) => string;
+}) {
   return (
     <Link
       href={`/templates/${t.slug}`}
@@ -119,7 +133,7 @@ function TemplateCard({ t, highlight }: { t: Template; highlight: string[] }) {
         <div className="flex items-center gap-2 text-[11px] uppercase tracking-wider muted-text">
           <span>{t.category}</span>
           <span>·</span>
-          <span>{t.usage_count > 0 ? `${t.usage_count} uses` : "New"}</span>
+          <span>{usesLabel(t.usage_count)}</span>
         </div>
         <p className="mt-2 line-clamp-2 text-sm">
           <Highlighted text={t.description} words={highlight} />

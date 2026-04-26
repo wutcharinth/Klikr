@@ -2,42 +2,38 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useTranslations } from "next-intl";
 
-/**
- * Mentimeter-style "Easy to start. Simple to connect." section: a chunky
- * display headline and three illustration-led cards on a warm cream canvas.
- * Each card runs a small infographic animation; the headline accent word
- * cycles through a small phrase set.
- */
 export default function EasyToStart({ signedIn = false }: { signedIn?: boolean }) {
+  const t = useTranslations("easyToStart");
   const cards = useMemo(
     () => [
       {
         Illust: TemplatesInfo,
-        title: "Customizable templates",
-        body: "Pick a template. Then make it your own.",
-        cta: "Explore free templates",
+        title: t("card1Title"),
+        body: t("card1Body"),
+        cta: t("card1Cta"),
         href: "/templates",
       },
       {
         Illust: AIDeckInfo,
-        title: "Instant decks",
-        body: "Prompt our AI, customize, present. Done.",
-        cta: "Try the AI deck builder",
+        title: t("card2Title"),
+        body: t("card2Body"),
+        cta: t("card2Cta"),
         href: signedIn ? "/dashboard?ai=1" : "/login?next=/dashboard?ai=1",
       },
       {
         Illust: FlowInfo,
-        title: "Flexible setups",
-        body: "In the room, remote, or both — same code, every screen.",
-        cta: "Get started for free",
+        title: t("card3Title"),
+        body: t("card3Body"),
+        cta: t("card3Cta"),
         href: "/login",
       },
     ],
-    [signedIn]
+    [signedIn, t]
   );
 
-  const accents = ["connect.", "engage.", "spark joy.", "decide together."];
+  const accents = useMemo(() => t.raw("accents") as string[], [t]);
   const [idx, setIdx] = useState(0);
   useEffect(() => {
     const id = setInterval(() => setIdx((i) => (i + 1) % accents.length), 2800);
@@ -55,11 +51,11 @@ export default function EasyToStart({ signedIn = false }: { signedIn?: boolean }
       <div className="mx-auto max-w-6xl px-6 py-24">
         <h2
           className="text-center text-5xl font-extrabold tracking-tight sm:text-6xl"
-          style={{ letterSpacing: "-0.04em", lineHeight: 0.96 }}
+          style={{ letterSpacing: "-0.04em", lineHeight: 0.96, color: "#1d1d1f" }}
         >
-          Easy to start.
+          {t("headlineLine1")}
           <br />
-          Simple to{" "}
+          {t("headlineLine2")}
           <span
             key={idx}
             className="inline-block"
@@ -71,9 +67,8 @@ export default function EasyToStart({ signedIn = false }: { signedIn?: boolean }
             {accents[idx]}
           </span>
         </h2>
-        <p className="mx-auto mt-5 max-w-2xl text-center text-base muted-text">
-          Choose a template, build from scratch, or prompt AI. You'll be ready to present and
-          interact in no time, no matter where your audience is.
+        <p className="mx-auto mt-5 max-w-2xl text-center text-base" style={{ color: "#6e6e73" }}>
+          {t("intro")}
         </p>
 
         <div className="mt-14 grid gap-5 md:grid-cols-3">

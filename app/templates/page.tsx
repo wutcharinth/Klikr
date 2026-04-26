@@ -1,16 +1,21 @@
 import { Sparkles } from "lucide-react";
 import Link from "next/link";
+import { getTranslations } from "next-intl/server";
 import { createClient } from "@/lib/supabase/server";
 import type { Template } from "@/lib/types";
 import NavBar from "@/components/NavBar";
 import TemplateSearch from "@/components/TemplateSearch";
 
-export const metadata = {
-  title: "Free presentation templates — Klikr",
-  description: "Hundreds of ready-to-go templates. Pick one and you're presenting in seconds.",
-};
+export async function generateMetadata() {
+  const t = await getTranslations("templates");
+  return {
+    title: t("metaTitle"),
+    description: t("intro"),
+  };
+}
 
 export default async function TemplatesPage() {
+  const t = await getTranslations("templates");
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("templates")
@@ -25,51 +30,35 @@ export default async function TemplatesPage() {
       <NavBar active="templates" />
 
       <header className="mt-10 max-w-3xl">
-        <h1 className="text-4xl font-semibold tracking-tight">
-          Find a template for your meeting.
-        </h1>
-        <p className="mt-3 text-[17px] text-[var(--neutral)]">
-          Filter by what you're running — a retro, a quiz, an icebreaker — then change a few
-          words. Most of these are 1–6 slides, ready in under a minute.
-        </p>
+        <h1 className="text-4xl font-semibold tracking-tight">{t("title")}</h1>
+        <p className="mt-3 text-[17px] text-[var(--neutral)]">{t("intro")}</p>
       </header>
 
       {error ? (
-        <ErrorPanel message={error.message} />
+        <div className="panel-soft mt-8 p-6 text-sm">
+          <p className="font-medium">{t("errorTitle")}</p>
+          <p className="mt-1 muted-text">
+            {t("errorBody1")}
+            <code className="mono">npm run migrate</code>
+            {t("errorBody2")}
+            <code className="mono">DATABASE_URL</code>
+            {t("errorBody3")}
+          </p>
+          <p className="mt-2 muted-text text-xs">{t("errorDetail", { message: error.message })}</p>
+        </div>
       ) : (
         <TemplateSearch templates={templates} />
       )}
 
-      <CTA />
+      <section className="mt-16 panel-soft flex flex-wrap items-center justify-between gap-4 p-8">
+        <div>
+          <h2 className="text-2xl font-semibold tracking-tight">{t("ctaTitle")}</h2>
+          <p className="mt-2 max-w-xl text-sm muted-text">{t("ctaBody")}</p>
+        </div>
+        <Link href="/dashboard?ai=1" className="btn-primary">
+          <Sparkles className="h-4 w-4" /> {t("ctaButton")}
+        </Link>
+      </section>
     </main>
-  );
-}
-
-function ErrorPanel({ message }: { message: string }) {
-  return (
-    <div className="panel-soft mt-8 p-6 text-sm">
-      <p className="font-medium">Templates aren't ready yet.</p>
-      <p className="mt-1 muted-text">
-        Run <code className="mono">npm run migrate</code> with{" "}
-        <code className="mono">DATABASE_URL</code> set, then refresh.
-      </p>
-      <p className="mt-2 muted-text text-xs">Detail: {message}</p>
-    </div>
-  );
-}
-
-function CTA() {
-  return (
-    <section className="mt-16 panel-soft flex flex-wrap items-center justify-between gap-4 p-8">
-      <div>
-        <h2 className="text-2xl font-semibold tracking-tight">Nothing fits? Make one.</h2>
-        <p className="mt-2 max-w-xl text-sm muted-text">
-          Tell us what your meeting is about. Your slides will be ready in seconds.
-        </p>
-      </div>
-      <Link href="/dashboard?ai=1" className="btn-primary">
-        <Sparkles className="h-4 w-4" /> Generate with AI
-      </Link>
-    </section>
   );
 }

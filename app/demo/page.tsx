@@ -1,28 +1,32 @@
 import Link from "next/link";
 import { ArrowLeft, Play } from "lucide-react";
+import { getTranslations } from "next-intl/server";
 import NavBar from "@/components/NavBar";
 
-export const metadata = {
-  title: "See Klikr in action — Klikr",
-  description: "Walk through every slide format with sample audience activity. No signup needed.",
-};
+export async function generateMetadata() {
+  const t = await getTranslations("demo");
+  return {
+    title: t("metaTitle"),
+    description: t("intro"),
+  };
+}
 
-export default function DemoPage() {
+export default async function DemoPage() {
+  const t = await getTranslations("demo");
+
   return (
     <main className="mx-auto max-w-5xl px-6 py-10">
       <NavBar />
 
       <header className="mt-10 max-w-3xl">
-        <p className="text-[11px] uppercase tracking-[0.18em] muted-text">Try Klikr · no signup</p>
-        <h1 className="mt-2 text-4xl font-semibold tracking-tight">Run a real session right here.</h1>
-        <p className="mt-3 text-[17px] muted-text">
-          A poll, a word cloud, a quick Q&amp;A, and a quiz with a podium. Tap through it like you're hosting one — sample answers come in so the room feels alive.
-        </p>
+        <p className="text-[11px] uppercase tracking-[0.18em] muted-text">{t("eyebrow")}</p>
+        <h1 className="mt-2 text-4xl font-semibold tracking-tight">{t("title")}</h1>
+        <p className="mt-3 text-[17px] muted-text">{t("intro")}</p>
         <div className="mt-6 flex gap-3">
           <a href="/demo.html" className="btn-primary">
-            <Play className="h-4 w-4" /> Start the demo
+            <Play className="h-4 w-4" /> {t("startDemo")}
           </a>
-          <Link href="/templates" className="btn-ghost">Or pick a template</Link>
+          <Link href="/templates" className="btn-ghost">{t("orPickTemplate")}</Link>
         </div>
       </header>
 
@@ -37,20 +41,20 @@ export default function DemoPage() {
 
       <section className="mt-16 grid gap-3 sm:grid-cols-2">
         <Link href="/templates" className="panel-soft p-5 hover:border-[var(--blue)]">
-          <p className="font-medium">Ready to host your own?</p>
-          <p className="mt-1 text-sm muted-text">Pick a template — you'll be presenting in under a minute.</p>
-          <span className="mt-3 inline-flex text-sm" style={{ color: "var(--blue)" }}>Browse templates →</span>
+          <p className="font-medium">{t("readyTitle")}</p>
+          <p className="mt-1 text-sm muted-text">{t("readyBody")}</p>
+          <span className="mt-3 inline-flex text-sm" style={{ color: "var(--blue)" }}>{t("browseTemplates")}</span>
         </Link>
         <Link href="/login" className="panel-soft p-5 hover:border-[var(--blue)]">
-          <p className="font-medium">Got it. Let me try.</p>
-          <p className="mt-1 text-sm muted-text">Sign in with Google. Free, no card, ready in 30 seconds.</p>
-          <span className="mt-3 inline-flex text-sm" style={{ color: "var(--blue)" }}>Sign in →</span>
+          <p className="font-medium">{t("tryTitle")}</p>
+          <p className="mt-1 text-sm muted-text">{t("tryBody")}</p>
+          <span className="mt-3 inline-flex text-sm" style={{ color: "var(--blue)" }}>{t("signIn")}</span>
         </Link>
       </section>
 
       <p className="mt-12 muted-text text-xs">
         <Link href="/" className="inline-flex items-center gap-1 hover:text-[var(--ink)]">
-          <ArrowLeft className="h-3 w-3" /> Back home
+          <ArrowLeft className="h-3 w-3" /> {t("backHome")}
         </Link>
       </p>
     </main>
