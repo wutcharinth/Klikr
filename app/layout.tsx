@@ -4,8 +4,35 @@ import { getLocale, getMessages } from "next-intl/server";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Klikr",
-  description: "Real-time audience interaction — polls, word clouds, Q&A, quizzes.",
+  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL ?? "https://klikrapp.com"),
+  title: { default: "Klikr — Live audience polls, quizzes, and Q&A", template: "%s — Klikr" },
+  description:
+    "Run real-time polls, word clouds, quizzes, Q&A, and rankings with your audience. No app install — they join with a 6-letter code. Free to start.",
+  keywords: [
+    "live polls",
+    "audience response system",
+    "Mentimeter alternative",
+    "Slido alternative",
+    "Kahoot alternative",
+    "word cloud",
+    "live Q&A",
+    "live quiz",
+    "interactive presentation",
+  ],
+  openGraph: {
+    type: "website",
+    siteName: "Klikr",
+    title: "Klikr — Live audience polls, quizzes, and Q&A",
+    description: "Real-time audience interaction. No app install. 6-letter join code.",
+    url: "https://klikrapp.com",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Klikr — Live audience polls, quizzes, and Q&A",
+    description: "Live audience polls, quizzes, and Q&A. No app install.",
+  },
+  alternates: { canonical: "https://klikrapp.com" },
+  robots: { index: true, follow: true },
 };
 
 const themeInitScript = `

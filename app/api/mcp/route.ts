@@ -2,6 +2,8 @@ import { NextRequest } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import { generateRoomCode } from "@/lib/code";
 import type { SlideType, SlideConfig } from "@/lib/types";
+import { authenticateRequest } from "@/lib/apiAuth";
+import { createServiceClient } from "@/lib/supabase/service";
 
 /**
  * Klikr Model Context Protocol server.
@@ -156,12 +158,32 @@ export async function POST(req: NextRequest) {
   }
 
   const { name, arguments: args } = (params ?? {}) as { name: string; arguments: Record<string, unknown> };
-  const supabase = clientFromAuth(req);
-  const { data: userData } = await supabase.auth.getUser();
-  const user = userData?.user;
+
+  // Two auth paths: a `klikr_pk_*` API key (minted at /dashboard/api-keys),
+  // or a Supabase access token (still supported for the in-app inspector).
+  // API key wins when present; we resolve to a userId and use the service-role
+  // client for queries (ownership is enforced explicitly per tool below).
+  const authHeader = req.headers.get("authorization") ?? "";
+  const isApiKey = /^Bearer\s+klikr_pk_/i.test(authHeader);
+
+  let supabase;
+  let userId: string | null = null;
+  if (isApiKey) {
+    const auth = await authenticateRequest(req);
+    if (!auth.ok) return rpcError(id, -32001, auth.message);
+    userId = auth.userId;
+    supabase = createServiceClient();
+  } else {
+    supabase = clientFromAuth(req);
+    const { data: userData } = await supabase.auth.getUser();
+    userId = userData?.user?.id ?? null;
+  }
+
   const requireAuth = () => {
-    if (!user) throw new Error("Authentication required: send Authorization: Bearer <supabase_access_token>");
-    return user;
+    if (!userId) {
+      throw new Error("Authentication required: send Authorization: Bearer klikr_pk_<token> or a Supabase access token.");
+    }
+    return { id: userId };
   };
   const requirePresentationAccess = async (presentationId: string) => {
     const u = requireAuth();

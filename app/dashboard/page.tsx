@@ -8,6 +8,7 @@ import SaveAsTemplateButton from "@/components/SaveAsTemplateButton";
 import AIGenerateButton from "@/components/AIGenerateButton";
 import EmptyDashboard from "@/components/EmptyDashboard";
 import NavBar from "@/components/NavBar";
+import { AI_ENABLED } from "@/lib/featureFlags";
 
 type SearchParams = Promise<{ ai?: string }>;
 
@@ -40,6 +41,8 @@ export default async function Dashboard({ searchParams }: { searchParams?: Searc
       <div className="mt-1 flex items-center gap-2 text-xs muted-text">
         <span>{userData.user.email}</span>
         <span>·</span>
+        <Link href="/dashboard/api-keys" className="hover:text-[var(--ink)]">API keys</Link>
+        <span>·</span>
         <form action={logout}>
           <button className="hover:text-[var(--ink)]">Sign out</button>
         </form>
@@ -57,7 +60,7 @@ export default async function Dashboard({ searchParams }: { searchParams?: Searc
             />
             <button className="btn-primary">+ Create</button>
           </form>
-          <AIGenerateButton autoOpen={sp?.ai === "1"} />
+          {AI_ENABLED && <AIGenerateButton autoOpen={sp?.ai === "1"} />}
         </div>
       </section>
 

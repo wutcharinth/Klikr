@@ -40,10 +40,14 @@ export default async function PresentPage({
     .returns<Slide[]>();
 
   const h = await headers();
-  const host = h.get("x-forwarded-host") ?? h.get("host") ?? "klikr.app";
+  const rawHost = h.get("x-forwarded-host") ?? h.get("host") ?? "klikr.app";
   const proto = h.get("x-forwarded-proto") ?? "https";
-  const joinUrl = `${proto}://${host}/play/${presentation.code}`;
-  const joinHost = host;
+  // Prefer the canonical custom domain when we're on Railway's preview URL,
+  // so audience sees "klikrapp.com/play/CODE" instead of the railway subdomain.
+  const isRailwayPreview = /\.up\.railway\.app$/.test(rawHost);
+  const displayHost = (isRailwayPreview ? "www.klikrapp.com" : rawHost).replace(/^www\./, "");
+  const joinUrl = `${proto}://${rawHost}/play/${presentation.code}`;
+  const displayJoinUrl = `${displayHost}/play/${presentation.code}`;
 
   return (
     <main className="flex h-screen flex-col overflow-hidden px-4 py-3 lg:px-8 lg:py-4">
@@ -52,12 +56,12 @@ export default async function PresentPage({
           ← Edit
         </Link>
         <div className="flex items-center gap-3">
-          <div className="text-right">
+          <div className="text-right leading-tight">
             <div className="text-[10px] uppercase tracking-[0.18em] muted-text">Join at</div>
-            <div className="text-xs muted-text">{joinHost}/play</div>
-            <div className="mono text-xl font-semibold tracking-[0.18em]">{presentation.code}</div>
+            <div className="mono text-sm">{displayJoinUrl}</div>
+            <div className="mono text-2xl font-semibold tracking-[0.22em]">{presentation.code}</div>
           </div>
-          <QrCode value={joinUrl} size={72} />
+          <QrCode value={joinUrl} size={88} />
         </div>
       </div>
       <div className="flex min-h-0 flex-1 flex-col">

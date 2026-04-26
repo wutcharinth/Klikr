@@ -45,7 +45,7 @@ export function ResultsBarChart({
   const correctFill = isDark ? "#30d158" : "#16a34a";
 
   return (
-    <div className={fill ? "w-full flex-1 min-h-[18rem]" : "h-72 w-full"}>
+    <div className={fill ? "w-full min-h-0 flex-1" : "h-72 w-full"}>
       <ResponsiveContainer>
         <BarChart data={counts} margin={{ top: 16, right: 16, bottom: 8, left: 0 }}>
           <CartesianGrid strokeDasharray="3 3" stroke={gridStroke} />

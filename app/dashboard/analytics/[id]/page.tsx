@@ -5,6 +5,7 @@ import type { Slide, MCQConfig, QuizConfig, RatingConfig } from "@/lib/types";
 import { ArrowLeft, Download, FileText } from "lucide-react";
 import AIThemeSummary from "@/components/AIThemeSummary";
 import NavBar from "@/components/NavBar";
+import { AI_ENABLED } from "@/lib/featureFlags";
 
 type Params = Promise<{ id: string }>;
 
@@ -124,7 +125,7 @@ function SlideAnalytics({
       {slide.type === "wordcloud" && (
         <p className="mt-3 text-sm muted-text">{responses.length} words submitted.</p>
       )}
-      {(slide.type === "open" || slide.type === "qa") && (
+      {AI_ENABLED && (slide.type === "open" || slide.type === "qa") && (
         <AIThemeSummary slideId={slide.id} sample={responses.map((r) => r.value_text ?? "").filter(Boolean).slice(0, 5)} />
       )}
     </div>

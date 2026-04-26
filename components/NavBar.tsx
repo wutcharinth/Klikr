@@ -3,6 +3,7 @@ import { getTranslations } from "next-intl/server";
 import { createClient } from "@/lib/supabase/server";
 import LocaleSwitcher from "./LocaleSwitcher";
 import ThemeToggle from "./ThemeToggle";
+import { AI_ENABLED } from "@/lib/featureFlags";
 
 export default async function NavBar({
   active,
@@ -53,7 +54,9 @@ export default async function NavBar({
         <ThemeToggle />
         {signedIn ? (
           <>
-            <Link href="/credits" className={`hidden sm:inline-block text-sm transition-colors ${active === "credits" ? "text-[var(--ink)] font-medium" : "muted-text hover:text-[var(--ink)]"}`}>{t("credits")}</Link>
+            {AI_ENABLED && (
+              <Link href="/credits" className={`hidden sm:inline-block text-sm transition-colors ${active === "credits" ? "text-[var(--ink)] font-medium" : "muted-text hover:text-[var(--ink)]"}`}>{t("credits")}</Link>
+            )}
             <Link href="/dashboard" className="btn-primary text-xs sm:text-sm" style={{ padding: "8px 14px" }}>{t("myDashboard")}</Link>
           </>
         ) : (

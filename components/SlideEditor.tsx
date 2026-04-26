@@ -5,6 +5,7 @@ import { Sparkles, Loader2 } from "lucide-react";
 import type { Slide, MCQConfig, QuizConfig, WordCloudConfig, QAConfig, RatingConfig, EmbedConfig, RankingConfig, ImageCredit } from "@/lib/types";
 import { updateSlide, deleteSlide } from "@/app/edit/[id]/actions";
 import { UnsplashPicker } from "./UnsplashPicker";
+import { AI_ENABLED } from "@/lib/featureFlags";
 
 export function SlideEditor({
   slide,
@@ -734,6 +735,7 @@ function SuggestOptionsButton({
     }
   }
 
+  if (!AI_ENABLED) return null;
   return (
     <div className="mt-3">
       <button onClick={go} disabled={busy} className="btn-ghost text-xs" style={{ color: "var(--blue)" }}>

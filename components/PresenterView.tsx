@@ -154,8 +154,8 @@ export function PresenterView({
 
   return (
     <ThemedShell theme={presentation.theme}>
-      <div className="flex flex-1 flex-col gap-4">
-        <div className="flex flex-1 flex-col gap-4 rounded-2xl px-2 py-3 sm:px-6 sm:py-5">
+      <div className="flex min-h-0 flex-1 flex-col gap-4">
+        <div className="flex min-h-0 flex-1 flex-col gap-4 rounded-2xl px-2 py-3 sm:px-6 sm:py-5">
           <div className="flex items-center justify-between">
             <div className="mono text-[11px] uppercase tracking-[0.2em] muted-text">
               Slide {String(idx + 1).padStart(2, "0")} of {String(slides.length).padStart(2, "0")} · {currentSlide.type}
@@ -174,7 +174,7 @@ export function PresenterView({
               <span className="flex items-center gap-2"><span className="live-dot" /> live</span>
             </div>
           </div>
-          <div key={currentSlide.id} className="slide-enter flex flex-1 flex-col">
+          <div key={currentSlide.id} className="slide-enter flex min-h-0 flex-1 flex-col">
             {isKahoot ? (
               <KahootPresenterView
                 slide={currentSlide}
@@ -214,7 +214,7 @@ export function PresenterView({
                   <QAModerationTray responses={responses} qaCfg={qaCfg} />
                 )}
 
-                <div className="anim-fade-up mt-6 flex flex-1 flex-col" style={{ animationDelay: "0.25s" }}>
+                <div className="anim-fade-up mt-6 flex min-h-0 flex-1 flex-col" style={{ animationDelay: "0.25s" }}>
                   {currentSlide.type === "mcq" && (
                     <ResultsBarChart slide={currentSlide} responses={responses} fill />
                   )}
