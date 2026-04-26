@@ -1,0 +1,195 @@
+{
+  "nav": {
+    "features": "Features",
+    "templates": "Templates",
+    "pricing": "Pricing",
+    "resources": "Resources",
+    "credits": "Credits",
+    "myDashboard": "My dashboard",
+    "login": "Log in",
+    "signupFree": "Sign up free",
+    "demo": "Live demo",
+    "demoBlurb": "Try a session, no signup.",
+    "about": "About Klikr",
+    "aboutBlurb": "What we do and why.",
+    "forHosts": "For hosts",
+    "forHostsBlurb": "Everything you can build."
+  },
+  "common": {
+    "language": "Language",
+    "theme": "Theme",
+    "lightMode": "Light mode",
+    "darkMode": "Dark mode",
+    "systemMode": "System"
+  },
+  "landing": {
+    "joiningBadge": "Joining a session?",
+    "headline": "Got a code? Drop it in.",
+    "subhead": "Type the six letters your host shared and you're in. ",
+    "subheadNoSignup": "No app, no signup.",
+    "tip": "Tip — your host can also share a QR. Just point your camera at it.",
+    "forHosts": "For hosts",
+    "hostCardTitle": "Run your own poll, quiz, or Q&A.",
+    "hostCardBody": "Build a deck in seconds, share a code, and watch live answers roll in.",
+    "openDashboard": "Open dashboard",
+    "getStarted": "Get started",
+    "curiousFirst": "Curious first? ",
+    "seeDemo": "See a live demo",
+    "aboutKlikr": "About Klikr"
+  },
+  "home": {
+    "badge": "Free for everyone — no card, no expiry",
+    "headlinePart1": "Live answers",
+    "headlinePart2": "from every phone",
+    "headlinePart3": "in the room.",
+    "subhead": "Run a poll, ask a question, score a quiz — your audience answers from any phone. No apps, no signups, no waiting.",
+    "ctaHost": "Host a session",
+    "ctaTemplates": "Browse templates",
+    "howItWorks": "How it works",
+    "step": "Step",
+    "step1Title": "Pick a template or generate one",
+    "step1Body": "Start from one of our ready-to-go templates — icebreakers, retros, classroom quizzes — or describe your meeting and let AI build the deck.",
+    "step2Title": "Share the code",
+    "step2Body": "Klikr makes a six-character code and a QR. Your audience joins from any phone — no app, no signup, just a nickname.",
+    "step3Title": "Watch reactions roll in",
+    "step3Body": "Bars grow, words tumble in, the leaderboard reranks — every answer hits the screen the moment it's tapped.",
+    "faqTitle": "Common questions",
+    "finalCtaTitle": "Your next meeting, but better.",
+    "finalCtaBody": "Sign in with Google. You're hosting in 30 seconds.",
+    "ctaStart": "Start hosting",
+    "ctaAbout": "About Klikr",
+    "faq": {
+      "freeQ": "Is Klikr really free?",
+      "freeA": "Yes — every plan is $0 right now while we grow to 1,000 hosts. No card. No expiry. We'll tell you first when that changes and grandfather everyone in.",
+      "installQ": "Do my audience need to install anything?",
+      "installA": "No. They open klikr.app on any phone, type the code (or scan the QR), pick a nickname, and they're in. No accounts. No app store.",
+      "typesQ": "What slide types are there?",
+      "typesA": "Polls, word clouds, open-ended responses, Q&A with upvotes, ratings (1–5 or NPS 0–10), Kahoot-style quizzes with a podium, and embedded Google Slides / PowerPoint.",
+      "aiQ": "Can AI build my deck for me?",
+      "aiA": "Yes. Describe your meeting in one line — 'Q4 retro for engineering' — and Klikr generates a 3–6 slide deck you can edit, share, or present right away.",
+      "compareQ": "How does Klikr compare to Mentimeter or Slido?",
+      "compareA": "Same slide types, same live results, same templates. Pro is $4.99 vs Mentimeter Pro at $24.99 — and right now, both are $0.",
+      "anonQ": "Is my audience anonymous?",
+      "anonA": "Yes. Audience members are identified only by the nickname they choose. Hosts can export results to CSV, Excel, or PDF whenever they want.",
+      "demoQ": "Can I see a demo before I sign in?",
+      "demoBefore": "Yes — the ",
+      "demoLink": "interactive demo",
+      "demoAfter": " walks through every slide format with sample audience activity. No signup needed."
+    }
+  },
+  "plans": {
+    "metaTitle": "Plans — Klikr",
+    "title": "Pick the plan that fits your room.",
+    "intro": "Up to a hundred people in the room? Free covers it. Bigger crowds, branding, AI? Basic or Pro. Everything is {price} right now — no card, no card-on-file games.",
+    "promoStrong": "100% off — every plan is {price}",
+    "promoRest": "until we reach 1,000 hosts. No card. No expiry.",
+    "startFree": "Start free",
+    "mostPopular": "Most popular",
+    "saveAll": "Save 100% — early-access discount",
+    "vs": "vs {price} on Mentimeter",
+    "forever": "forever",
+    "perMonth": "/ month",
+    "freeName": "Free",
+    "freeTagline": "Try Klikr forever. Great for one-off meetings and demos.",
+    "basicName": "Basic",
+    "basicTagline": "For presenters who run sessions every week. No walls, no caps.",
+    "proName": "Pro",
+    "proTagline": "Most popular. Basic + AI that does the heavy lifting.",
+    "featuresTitle": "What you can do with AI credits",
+    "featuresIntro": "Pro gives you 200 credits a month — enough for ~40 full deck generations, or hundreds of smaller AI lifts. Run out? Top up any time.",
+    "credits": "credits",
+    "topupLink": "See top-up packages →",
+    "compareTitle": "Compare features",
+    "feature": "Feature",
+    "faqTitle": "Common questions",
+    "footerNote": "Free for the first 1,000 hosts. Then we'll let you know — and grandfather everyone in.",
+    "freeFeatures": [
+      "Up to 100 audience members per month",
+      "Up to 5 slides per presentation",
+      "All slide types — polls, word clouds, Q&A, ratings, quizzes",
+      "Live results streamed to every screen",
+      "CSV export"
+    ],
+    "freeFeaturesOff": [
+      "Custom logo and brand colors",
+      "Templates, co-editing, embeds",
+      "AI features"
+    ],
+    "basicFeatures": [
+      "Everything in Free",
+      "Unlimited audience — no monthly cap",
+      "Unlimited slides per presentation",
+      "Custom logo + brand colors (Klikr branding off)",
+      "Templates — use, save, and share with your team",
+      "Co-edit decks with teammates",
+      "Embed Google Slides + PowerPoint",
+      "Kahoot-style quizzes with podium",
+      "PDF + Excel export",
+      "Moderate Q&A before it's shown",
+      "10 AI credits / month — taste of Pro"
+    ],
+    "proFeatures": [
+      "Everything in Basic",
+      "200 AI credits / month",
+      "✨ Generate full decks from one line",
+      "✨ AI suggests poll and quiz options",
+      "✨ AI summarises open-ended answers",
+      "✨ AI cleans up word clouds (synonym merge)",
+      "✨ AI recommends the right template",
+      "Top-up credits anytime",
+      "Advanced per-slide analytics",
+      "Priority support"
+    ],
+    "creditCosts": [
+      { "route": "Generate a full deck", "cost": 5 },
+      { "route": "Suggest poll/quiz options", "cost": 1 },
+      { "route": "Summarise open responses", "cost": 3 },
+      { "route": "Clean up a word cloud", "cost": 2 },
+      { "route": "Recommend a template", "cost": 1 }
+    ],
+    "compareRows": [
+      { "feature": "Audience per month", "values": ["100", "Unlimited", "Unlimited"] },
+      { "feature": "Slides per presentation", "values": ["5", "Unlimited", "Unlimited"] },
+      { "feature": "All slide types", "values": [true, true, true] },
+      { "feature": "CSV export", "values": [true, true, true] },
+      { "feature": "PDF + Excel export", "values": [false, true, true] },
+      { "feature": "Custom branding (logo + colors)", "values": [false, true, true] },
+      { "feature": "Templates: save and share", "values": [false, true, true] },
+      { "feature": "Co-edit with teammates", "values": [false, true, true] },
+      { "feature": "Embed Google Slides / PowerPoint", "values": [false, true, true] },
+      { "feature": "Kahoot-style quiz mode", "values": [false, true, true] },
+      { "feature": "Moderate Q&A", "values": [false, true, true] },
+      { "feature": "AI: deck generation", "values": [false, false, true] },
+      { "feature": "AI: option suggestions", "values": [false, false, true] },
+      { "feature": "AI: response summaries", "values": [false, false, true] },
+      { "feature": "AI: word cloud cleanup", "values": [false, false, true] },
+      { "feature": "Monthly AI credits", "values": ["—", "10", "200"] }
+    ],
+    "faqItems": [
+      {
+        "q": "Why is everything free right now?",
+        "a": "Because we're early. While we grow to 1,000 hosts, every paid feature is unlocked for everyone. When that changes, we'll tell you first and grandfather everyone who joined."
+      },
+      {
+        "q": "How does Klikr compare to Mentimeter or Slido?",
+        "a": "Same slide types, same live results, same templates. Pro is $4.99 vs Mentimeter Pro at $24.99. We undercut on price by being smaller and AI-first."
+      },
+      {
+        "q": "What can I do with one Pro AI credit?",
+        "a": "Suggest options for one quiz question, or recommend templates from a one-line description. Bigger AI tasks (full deck generation) cost 5 credits."
+      },
+      {
+        "q": "Can I cancel?",
+        "a": "There's nothing to cancel — we don't take a card. When we start charging, you'll be able to cancel any time."
+      },
+      {
+        "q": "What does 'Pro' get me that Basic doesn't?",
+        "a": "AI. Pro is the only tier that can generate decks from prompts, suggest options, summarise responses, and clean up word clouds."
+      },
+      {
+        "q": "Is my audience anonymous?",
+        "a": "Yes. Audience members are identified only by the nickname they choose. Hosts can export results to CSV, Excel, or PDF whenever they want."
+      }
+    ]
+  }
+}

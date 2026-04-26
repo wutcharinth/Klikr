@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { getTranslations } from "next-intl/server";
 import { JoinForm } from "@/components/JoinForm";
 import { ArrowRight } from "lucide-react";
 import NavBar from "@/components/NavBar";
@@ -12,12 +13,8 @@ async function joinAction(formData: FormData) {
   redirect(`/play/${encodeURIComponent(raw)}`);
 }
 
-/**
- * Audience-first homepage. Most visitors arrive here to join a session — the
- * giant join code field is the whole point. A small "Hosting?" link in the
- * top-right and a card at the bottom send hosts to /host.
- */
 export default async function Landing() {
+  const t = await getTranslations("landing");
   const supabase = await createClient();
   const { data } = await supabase.auth.getUser();
   const signedIn = Boolean(data.user);
@@ -35,24 +32,23 @@ export default async function Landing() {
 
       <div className="mx-auto flex min-h-0 w-full max-w-2xl flex-1 flex-col items-center justify-center px-6 py-8 text-center">
         <div className="anim-fade-up flex items-center gap-2 text-[11px] uppercase tracking-[0.18em] muted-text">
-          <span className="live-dot" /> Joining a session?
+          <span className="live-dot" /> {t("joiningBadge")}
         </div>
 
         <h1 className="mt-6 text-5xl font-semibold tracking-tight sm:text-6xl">
-          Got a code? Drop it in.
+          {t("headline")}
         </h1>
         <p className="anim-fade-up delay-300 mt-4 max-w-md text-base muted-text">
-          Type the six letters your host shared and you're in. <span className="whitespace-nowrap">No app, no signup.</span>
+          {t("subhead")}<span className="whitespace-nowrap">{t("subheadNoSignup")}</span>
         </p>
 
         <JoinForm action={joinAction} />
 
         <p className="anim-fade-up delay-700 mt-5 text-xs muted-text">
-          Tip — your host can also share a QR. Just point your camera at it.
+          {t("tip")}
         </p>
       </div>
 
-      {/* Host CTA — visible but secondary */}
       <section className="mx-auto mb-8 w-full max-w-3xl flex-none px-6">
         <Link
           href={signedIn ? "/dashboard" : "/host"}
@@ -60,29 +56,29 @@ export default async function Landing() {
         >
           <div className="flex items-center justify-between gap-4">
             <div>
-              <p className="text-[11px] uppercase tracking-[0.18em] muted-text">For hosts</p>
+              <p className="text-[11px] uppercase tracking-[0.18em] muted-text">{t("forHosts")}</p>
               <h2 className="mt-1 text-xl font-semibold tracking-tight">
-                Run your own poll, quiz, or Q&amp;A.
+                {t("hostCardTitle")}
               </h2>
               <p className="mt-1 text-sm muted-text">
-                Build a deck in seconds, share a code, and watch live answers roll in.
+                {t("hostCardBody")}
               </p>
             </div>
             <span className="btn-primary">
-              {signedIn ? "Open dashboard" : "Get started"}
+              {signedIn ? t("openDashboard") : t("getStarted")}
               <ArrowRight className="h-4 w-4" />
             </span>
           </div>
         </Link>
 
         <p className="mt-4 text-center text-xs muted-text">
-          Curious first?{" "}
+          {t("curiousFirst")}
           <Link href="/demo" className="hover:text-[var(--ink)] underline-offset-4 hover:underline">
-            See a live demo
+            {t("seeDemo")}
           </Link>{" "}
           ·{" "}
           <Link href="/about" className="hover:text-[var(--ink)] underline-offset-4 hover:underline">
-            About Klikr
+            {t("aboutKlikr")}
           </Link>
         </p>
       </section>

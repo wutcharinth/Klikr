@@ -40,6 +40,28 @@
   --accent: var(--blue);
 }
 
+/* App-wide dark mode (toggle via data-theme="dark" on <html>) */
+:root[data-theme="dark"] {
+  --pale: #1c1c1e;
+  --white: #2a2a2d;
+  --ink: #f5f5f7;
+  --neutral: #a1a1a6;
+  --neutral-strong: #c7c7cc;
+  --border-soft: rgba(255, 255, 255, 0.10);
+  --border-mid: rgba(255, 255, 255, 0.20);
+  --bg: #1d1d1f;
+  --bg-soft: #2a2a2d;
+  --fg: #f5f5f7;
+  --muted: #a1a1a6;
+  --line: rgba(255, 255, 255, 0.10);
+  --line-strong: rgba(255, 255, 255, 0.20);
+  --accent: var(--blue-bright);
+  color-scheme: dark;
+}
+:root[data-theme="dark"] .panel { background: var(--graphite-1); border-color: rgba(255,255,255,0.06); }
+:root[data-theme="dark"] .panel-soft { background: rgba(255,255,255,0.04); }
+:root[data-theme="dark"] ::selection { background: rgba(41,151,255,0.28); }
+
 @layer base {
   html {
     font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text",

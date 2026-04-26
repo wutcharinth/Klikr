@@ -1,20 +1,15 @@
 import Link from "next/link";
+import { getTranslations } from "next-intl/server";
 import { createClient } from "@/lib/supabase/server";
+import LocaleSwitcher from "./LocaleSwitcher";
+import ThemeToggle from "./ThemeToggle";
 
-/**
- * Top nav modeled after Mentimeter's: a horizontal list of marketing links
- * (Features · Templates · Pricing · Resources) on the left of the right-side
- * Log in / Sign up cluster.
- *
- * Logo links to:
- *   - /dashboard if the user is signed in
- *   - /          for visitors (homepage = audience join)
- */
 export default async function NavBar({
   active,
 }: {
   active?: "features" | "templates" | "plans" | "credits" | "dashboard" | "admin" | "demo" | "about";
 }) {
+  const t = await getTranslations("nav");
   const supabase = await createClient();
   const { data } = await supabase.auth.getUser();
   const signedIn = Boolean(data.user);
@@ -47,22 +42,24 @@ export default async function NavBar({
           <span className="text-xl font-semibold tracking-tight">Klikr</span>
         </Link>
         <div className="hidden items-center gap-5 md:flex">
-          {link("/features", "Features", "features")}
-          {link("/templates", "Templates", "templates")}
-          {link("/plans", "Pricing", "plans")}
+          {link("/features", t("features"), "features")}
+          {link("/templates", t("templates"), "templates")}
+          {link("/plans", t("pricing"), "plans")}
           <ResourcesMenu activeDemo={active === "demo"} activeAbout={active === "about"} />
         </div>
       </div>
       <div className="flex items-center gap-3 text-sm">
+        <LocaleSwitcher />
+        <ThemeToggle />
         {signedIn ? (
           <>
-            {link("/credits", "Credits", "credits")}
-            <Link href="/dashboard" className="btn-primary">My dashboard</Link>
+            {link("/credits", t("credits"), "credits")}
+            <Link href="/dashboard" className="btn-primary">{t("myDashboard")}</Link>
           </>
         ) : (
           <>
-            <Link href="/login" className="muted-text hover:text-[var(--ink)]">Log in</Link>
-            <Link href="/login" className="btn-primary">Sign up free</Link>
+            <Link href="/login" className="muted-text hover:text-[var(--ink)]">{t("login")}</Link>
+            <Link href="/login" className="btn-primary">{t("signupFree")}</Link>
           </>
         )}
       </div>
@@ -70,7 +67,8 @@ export default async function NavBar({
   );
 }
 
-function ResourcesMenu({ activeDemo, activeAbout }: { activeDemo: boolean; activeAbout: boolean }) {
+async function ResourcesMenu({ activeDemo, activeAbout }: { activeDemo: boolean; activeAbout: boolean }) {
+  const t = await getTranslations("nav");
   const active = activeDemo || activeAbout;
   return (
     <details className="group relative">
@@ -79,20 +77,20 @@ function ResourcesMenu({ activeDemo, activeAbout }: { activeDemo: boolean; activ
           active ? "text-[var(--ink)] font-medium" : "muted-text hover:text-[var(--ink)]"
         }`}
       >
-        Resources <span className="ml-0.5 text-[10px]">▾</span>
+        {t("resources")} <span className="ml-0.5 text-[10px]">▾</span>
       </summary>
       <div className="panel absolute left-0 top-7 z-30 w-56 p-2 shadow-xl">
         <Link href="/demo" className="block rounded-md px-3 py-2 text-sm hover:bg-[var(--pale)]">
-          <p className="font-medium">Live demo</p>
-          <p className="muted-text text-xs">Try a session, no signup.</p>
+          <p className="font-medium">{t("demo")}</p>
+          <p className="muted-text text-xs">{t("demoBlurb")}</p>
         </Link>
         <Link href="/about" className="block rounded-md px-3 py-2 text-sm hover:bg-[var(--pale)]">
-          <p className="font-medium">About Klikr</p>
-          <p className="muted-text text-xs">What we do and why.</p>
+          <p className="font-medium">{t("about")}</p>
+          <p className="muted-text text-xs">{t("aboutBlurb")}</p>
         </Link>
         <Link href="/host" className="block rounded-md px-3 py-2 text-sm hover:bg-[var(--pale)]">
-          <p className="font-medium">For hosts</p>
-          <p className="muted-text text-xs">Everything you can build.</p>
+          <p className="font-medium">{t("forHosts")}</p>
+          <p className="muted-text text-xs">{t("forHostsBlurb")}</p>
         </Link>
       </div>
     </details>
