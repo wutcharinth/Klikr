@@ -1,7 +1,9 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { JoinForm } from "@/components/JoinForm";
-import { HomeLanding } from "@/components/HomeLanding";
+import { ArrowRight } from "lucide-react";
+import NavBar from "@/components/NavBar";
+import { createClient } from "@/lib/supabase/server";
 
 async function joinAction(formData: FormData) {
   "use server";
@@ -10,51 +12,80 @@ async function joinAction(formData: FormData) {
   redirect(`/play/${encodeURIComponent(raw)}`);
 }
 
-export default function Landing() {
+/**
+ * Audience-first homepage. Most visitors arrive here to join a session — the
+ * giant join code field is the whole point. A small "Hosting?" link in the
+ * top-right and a card at the bottom send hosts to /host.
+ */
+export default async function Landing() {
+  const supabase = await createClient();
+  const { data } = await supabase.auth.getUser();
+  const signedIn = Boolean(data.user);
+
   return (
-    <>
-      <main className="relative overflow-hidden">
-        <div className="absolute inset-0 -z-10">
-          <div className="orb orb-1" />
-          <div className="orb orb-2" />
+    <main className="relative overflow-hidden">
+      <div className="mx-auto max-w-6xl px-6 pt-6">
+        <NavBar />
+      </div>
+
+      <div className="absolute inset-0 -z-10">
+        <div className="orb orb-1" />
+        <div className="orb orb-2" />
+      </div>
+
+      <div className="mx-auto flex min-h-[78vh] max-w-2xl flex-col items-center justify-center px-6 pt-8 pb-12 text-center">
+        <div className="anim-fade-up flex items-center gap-2 text-[11px] uppercase tracking-[0.18em] muted-text">
+          <span className="live-dot" /> Joining a session?
         </div>
 
-        <div className="mx-auto flex min-h-screen max-w-2xl flex-col items-center justify-center px-6 py-20 text-center">
-          <div className="anim-fade-up flex items-center gap-2 text-[11px] uppercase tracking-[0.18em] muted-text">
-            <span className="live-dot" /> Realtime audience interaction
+        <h1 className="mt-8 text-5xl font-semibold tracking-tight sm:text-6xl">
+          Got a code? Drop it in.
+        </h1>
+        <p className="anim-fade-up delay-300 mt-4 max-w-md text-base muted-text">
+          Type the six letters your host shared and you're in. No app, no signup.
+        </p>
+
+        <JoinForm action={joinAction} />
+
+        <p className="anim-fade-up delay-700 mt-6 text-xs muted-text">
+          Tip — your host can also share a QR. Just point your camera at it.
+        </p>
+      </div>
+
+      {/* Host CTA — visible but secondary */}
+      <section className="mx-auto mb-20 max-w-3xl px-6">
+        <Link
+          href={signedIn ? "/dashboard" : "/host"}
+          className="panel block p-6 transition-transform hover:-translate-y-0.5"
+        >
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <p className="text-[11px] uppercase tracking-[0.18em] muted-text">For hosts</p>
+              <h2 className="mt-1 text-xl font-semibold tracking-tight">
+                Run your own poll, quiz, or Q&amp;A.
+              </h2>
+              <p className="mt-1 text-sm muted-text">
+                Build a deck in seconds, share a code, and watch live answers roll in.
+              </p>
+            </div>
+            <span className="btn-primary">
+              {signedIn ? "Open dashboard" : "Get started"}
+              <ArrowRight className="h-4 w-4" />
+            </span>
           </div>
+        </Link>
 
-          <h1 className="mt-10 text-[6.5rem] leading-[0.95] font-semibold tracking-[-0.04em] sm:text-[10rem]">
-            <span className="reveal-word" style={{ animationDelay: "0.05s" }}>K</span>
-            <span className="reveal-word" style={{ animationDelay: "0.15s" }}>l</span>
-            <span className="reveal-word" style={{ animationDelay: "0.25s" }}>i</span>
-            <span className="reveal-word" style={{ animationDelay: "0.35s" }}>k</span>
-            <span className="reveal-word" style={{ animationDelay: "0.45s" }}>r</span>
-          </h1>
-
-          <p className="anim-fade-up delay-500 mt-6 max-w-md text-base muted-text">
-            A minimal, fast platform for live polls, word clouds, Q&amp;A and quizzes.
-          </p>
-
-          <JoinForm action={joinAction} />
-
-          <div className="anim-fade-up delay-700 mt-10 flex flex-wrap items-center justify-center gap-x-4 gap-y-2 text-xs muted-text">
-            <Link href="/demo.html" className="text-[var(--fg)] underline-offset-4 hover:underline">
-              Watch the interactive demo →
-            </Link>
-            <span aria-hidden>·</span>
-            <Link href="/login" className="text-[var(--fg)] underline-offset-4 hover:underline">
-              Sign in to present
-            </Link>
-            <span aria-hidden>·</span>
-            <Link href="/showcase.html" className="text-[var(--fg)] underline-offset-4 hover:underline">
-              See the showcase
-            </Link>
-          </div>
-        </div>
-      </main>
-
-      <HomeLanding />
-    </>
+        <p className="mt-4 text-center text-xs muted-text">
+          Curious first?{" "}
+          <Link href="/demo" className="hover:text-[var(--ink)] underline-offset-4 hover:underline">
+            See a live demo
+          </Link>{" "}
+          ·{" "}
+          <Link href="/about" className="hover:text-[var(--ink)] underline-offset-4 hover:underline">
+            About Klikr
+          </Link>
+        </p>
+      </section>
+    </main>
   );
 }

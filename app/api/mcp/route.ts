@@ -95,6 +95,7 @@ const DEFAULT_CONFIG: Record<SlideType, SlideConfig> = {
   quiz: { options: ["Right", "Wrong"], correct_index: 0, time_limit_s: 20 },
   qa: { upvotes: true },
   rating: { scale: 5, min_label: "Poor", max_label: "Great" },
+  embed: { url: "", provider: "google-slides" },
 };
 
 type RpcRequest = { jsonrpc: "2.0"; id?: number | string | null; method: string; params?: unknown };

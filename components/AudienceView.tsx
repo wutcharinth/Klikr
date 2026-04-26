@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import type { Presentation, Slide, MCQConfig, QuizConfig, WordCloudConfig, QAConfig, RatingConfig, ResponseRow } from "@/lib/types";
 import { joinSession, submitResponse, sendReaction, toggleQuestionVote, submitQuestion } from "@/app/play/[code]/actions";
+import { KahootAudienceView } from "./KahootAudienceView";
 
 type LocalParticipant = { id: string; nickname: string; presentationId: string };
 
@@ -113,7 +114,14 @@ export function AudienceView({
             <MCQ slide={currentSlide} participantId={participant.id} />
           ) : null}
           {currentSlide.type === "quiz" ? (
-            <Quiz slide={currentSlide} participantId={participant.id} startedAt={slideStartedAt} />
+            currentSlide.kahoot_mode ? (
+              <KahootAudienceView slide={currentSlide} participantId={participant.id} />
+            ) : (
+              <Quiz slide={currentSlide} participantId={participant.id} startedAt={slideStartedAt} />
+            )
+          ) : null}
+          {currentSlide.type === "embed" ? (
+            <p className="text-sm muted-text">Look at the host's screen — there's nothing to tap on this one.</p>
           ) : null}
           {currentSlide.type === "wordcloud" ? (
             <WordCloudInput slide={currentSlide} participantId={participant.id} />

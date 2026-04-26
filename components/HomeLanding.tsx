@@ -4,61 +4,61 @@ import { Plus, QrCode, Sparkles, Zap, ArrowRight } from "lucide-react";
 const steps = [
   {
     n: "1",
-    title: "Build a deck",
+    title: "Pick a template or generate one",
     Icon: Plus,
     body:
-      "Create a presentation, add slides — multiple choice, word cloud, open Q&A, or a timed quiz with leaderboard. Drop in an image too.",
+      "Start from one of our ready-to-go templates — icebreakers, retros, classroom quizzes — or describe your meeting and let AI build the deck.",
   },
   {
     n: "2",
     title: "Share the code",
     Icon: QrCode,
     body:
-      "Klikr generates a six-character room code and a QR. Audience joins from any phone — no app, no signup, just a nickname.",
+      "Klikr makes a six-character code and a QR. Your audience joins from any phone — no app, no signup, just a nickname.",
   },
   {
     n: "3",
-    title: "Watch it live",
+    title: "Watch reactions roll in",
     Icon: Sparkles,
     body:
-      "Every answer broadcasts in under 200 ms. Bar charts grow, words tumble in, the leaderboard reranks — all in real time.",
+      "Bars grow, words tumble in, the leaderboard reranks — every answer hits the screen the moment it's tapped.",
   },
 ];
 
 const faqs = [
   {
-    q: "Is Klikr free?",
-    a: "Free for the audience — they only need a phone and the code. Hosting a session requires a Google sign-in. No payment, no plans, no quotas at this stage.",
+    q: "Is Klikr really free?",
+    a: "Yes — every plan is $0 right now while we grow to 1,000 hosts. No card. No expiry. We'll tell you first when that changes and grandfather everyone in.",
   },
   {
     q: "Do my audience need to install anything?",
-    a: "No. They open klikr.app in any mobile browser, type the code (or scan the QR), pick a nickname, and they're in. No accounts, no app downloads.",
+    a: "No. They open klikr.app on any phone, type the code (or scan the QR), pick a nickname, and they're in. No accounts. No app store.",
   },
   {
-    q: "What slide formats are supported?",
-    a: "Four: multiple-choice polls, word clouds, open-ended Q&A, and timed quizzes with a live leaderboard. Each slide can include an image as context.",
+    q: "What slide types are there?",
+    a: "Polls, word clouds, open-ended responses, Q&A with upvotes, ratings (1–5 or NPS 0–10), Kahoot-style quizzes with a podium, and embedded Google Slides / PowerPoint.",
   },
   {
-    q: "How fast is realtime, really?",
-    a: "Klikr uses Supabase Realtime over WebSockets. Median end-to-end response broadcast in our QA was well under 500 ms. Your network conditions vary, of course.",
+    q: "Can AI build my deck for me?",
+    a: "Yes. Describe your meeting in one line — 'Q4 retro for engineering' — and Klikr generates a 3–6 slide deck you can edit, share, or present right away.",
   },
   {
-    q: "How is quiz scoring calculated?",
-    a: "round(1000 × (1 − response_time / time_limit)) for correct answers, zero otherwise. Faster correct answers earn more points; the leaderboard sorts by total.",
+    q: "How does Klikr compare to Mentimeter or Slido?",
+    a: "Same slide types, same live results, same templates. Pro is $4.99 vs Mentimeter Pro at $24.99 — and right now, both are $0.",
   },
   {
-    q: "Is the audience anonymous?",
-    a: "Yes. Audience members are identified only by their chosen nickname plus a session-local id stored in their browser. There is no email, no IP logging beyond what Supabase keeps for rate limiting.",
+    q: "Is my audience anonymous?",
+    a: "Yes. Audience members are identified only by the nickname they choose. Hosts can export results to CSV, Excel, or PDF whenever they want.",
   },
   {
     q: "Can I see a demo before I sign in?",
     a: (
       <>
         Yes — the{" "}
-        <Link href="/demo.html" className="underline" style={{ color: "var(--blue)" }}>
+        <Link href="/demo" className="underline" style={{ color: "var(--blue)" }}>
           interactive demo
         </Link>{" "}
-        walks through every slide format with phantom audience activity. No signup needed.
+        walks through every slide format with sample audience activity. No signup needed.
       </>
     ),
   },
@@ -129,29 +129,29 @@ export function HomeLanding() {
           <div className="anim-fade-up inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em]"
                style={{ background: "rgba(0,113,227,0.08)", border: "1px solid rgba(0,113,227,0.25)", color: "var(--blue)" }}>
             <Zap size={12} strokeWidth={2.5} />
-            Live · realtime · free
+            Free for everyone — no card, no expiry
           </div>
           <h1
             id="home-landing-heading"
             className="anim-fade-up delay-100 mt-5 text-4xl font-semibold tracking-tight sm:text-5xl"
             style={{ letterSpacing: "-0.025em" }}
           >
-            Run a poll{" "}
+            Live answers{" "}
             <span style={{ background: "linear-gradient(120deg, var(--blue) 0%, #7c8aff 100%)", WebkitBackgroundClip: "text", backgroundClip: "text", color: "transparent" }}>
-              fairly
+              from every phone
             </span>{" "}
-            with any audience.
+            in the room.
           </h1>
           <p className="anim-fade-up delay-200 mx-auto mt-4 max-w-2xl text-base sm:text-lg muted-text">
-            Klikr turns any room into a live conversation — polls, word clouds, Q&amp;A, and timed quizzes. No app downloads. Under 200 ms updates.
+            Run a poll, ask a question, score a quiz — your audience answers from any phone. No apps, no signups, no waiting.
           </p>
           <div className="anim-fade-up delay-300 mt-7 flex items-center justify-center gap-2.5">
             <Link href="/login" className="btn-primary press">
               Host a session
               <ArrowRight size={14} strokeWidth={2.5} />
             </Link>
-            <Link href="/demo.html" className="btn-ghost press">
-              Watch the demo
+            <Link href="/templates" className="btn-ghost press">
+              Browse templates
             </Link>
           </div>
         </div>
@@ -208,15 +208,15 @@ export function HomeLanding() {
 
         {/* Final CTA */}
         <div className="mt-24 text-center">
-          <h2 className="text-2xl font-semibold tracking-tight">Ready when you are.</h2>
-          <p className="mt-2 text-sm muted-text">No setup, no quotas. Sign in with Google and you're hosting in 30 seconds.</p>
+          <h2 className="text-2xl font-semibold tracking-tight">Your next meeting, but better.</h2>
+          <p className="mt-2 text-sm muted-text">Sign in with Google. You're hosting in 30 seconds.</p>
           <div className="mt-6 flex items-center justify-center gap-2.5">
             <Link href="/login" className="btn-primary press">
-              Open Klikr
+              Start hosting
               <ArrowRight size={14} strokeWidth={2.5} />
             </Link>
-            <Link href="/showcase.html" className="btn-ghost press">
-              See the showcase
+            <Link href="/about" className="btn-ghost press">
+              About Klikr
             </Link>
           </div>
         </div>

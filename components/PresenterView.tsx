@@ -11,6 +11,10 @@ import { Leaderboard } from "./Leaderboard";
 import { QAStream } from "./QAStream";
 import { RatingDistribution } from "./RatingDistribution";
 import { ReactionOverlay } from "./ReactionOverlay";
+import { EmbedSlide } from "./EmbedSlide";
+import { KahootPresenterView } from "./KahootPresenterView";
+import { QuizPodium } from "./QuizPodium";
+import type { EmbedConfig } from "@/lib/types";
 
 export function PresenterView({
   presentation: initialPresentation,
@@ -106,15 +110,24 @@ export function PresenterView({
     );
   }
 
+  const hadAnyKahoot = slides.some((s) => s.type === "quiz" && s.kahoot_mode);
+  const hasAnyQuiz = slides.some((s) => s.type === "quiz");
+
   if (presentation.state === "closed") {
     return (
-      <div className="space-y-6">
-        <div className="panel p-12 text-center">
-          <div className="pill"><span className="live-dot" /> Session complete</div>
-          <h2 className="mt-6 text-3xl font-semibold tracking-tight">Thanks for playing.</h2>
+      <ThemedShell theme={presentation.theme}>
+        <div className="space-y-6">
+          <div className="panel p-12 text-center">
+            <div className="pill"><span className="live-dot" /> Session complete</div>
+            <h2 className="mt-6 text-3xl font-semibold tracking-tight">Thanks for playing.</h2>
+          </div>
+          {hadAnyKahoot ? (
+            <QuizPodium participants={participants} presentationId={presentation.id} />
+          ) : hasAnyQuiz ? (
+            <Leaderboard participants={participants} />
+          ) : null}
         </div>
-        <Leaderboard participants={participants} />
-      </div>
+      </ThemedShell>
     );
   }
 
@@ -125,51 +138,68 @@ export function PresenterView({
   const idx = slides.findIndex((s) => s.id === currentSlide.id);
   const isLast = idx === slides.length - 1;
 
+  const isKahoot = currentSlide.type === "quiz" && currentSlide.kahoot_mode;
+
   return (
+    <ThemedShell theme={presentation.theme}>
     <div className="space-y-5">
       <div className="panel p-8">
         <div className="flex items-center justify-between">
           <div className="mono text-[10px] uppercase tracking-[0.18em] muted-text">
             Slide {String(idx + 1).padStart(2, "0")} of {String(slides.length).padStart(2, "0")} · {currentSlide.type}
+            {isKahoot && <span className="ml-2" style={{ color: "var(--blue)" }}>· Kahoot mode</span>}
           </div>
           <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.18em] muted-text">
             <span className="live-dot" /> live
           </div>
         </div>
         <div key={currentSlide.id} className="slide-enter">
-          <h2 className="mt-3 text-4xl font-semibold tracking-tight">
-            {currentSlide.question || <span className="muted-text">(no question)</span>}
-          </h2>
-
-          {currentSlide.image_url && (
-            <img
-              src={currentSlide.image_url}
-              alt=""
-              className="anim-fade-up mt-6 max-h-80 w-full object-contain rounded-xl"
-              style={{ border: "1px solid var(--line)", animationDelay: "0.15s" }}
+          {isKahoot ? (
+            <KahootPresenterView
+              slide={currentSlide}
+              responses={responses}
+              startedAt={presentation.current_slide_started_at}
             />
-          )}
+          ) : (
+            <>
+              <h2 className="mt-3 text-4xl font-semibold tracking-tight">
+                {currentSlide.question || <span className="muted-text">(no question)</span>}
+              </h2>
 
-          <div className="anim-fade-up mt-8" style={{ animationDelay: "0.25s" }}>
-          {currentSlide.type === "mcq" && (
-            <ResultsBarChart slide={currentSlide} responses={responses} />
-          )}
-          {currentSlide.type === "wordcloud" && <WordCloudView responses={responses} />}
-          {currentSlide.type === "open" && <OpenResponses responses={responses} />}
-          {currentSlide.type === "quiz" && (
-            <ResultsBarChart slide={currentSlide} responses={responses} highlightCorrect />
-          )}
-          {currentSlide.type === "qa" && (
-            <QAStream slide={currentSlide} responses={responses} />
-          )}
-          {currentSlide.type === "rating" && (
-            <RatingDistribution slide={currentSlide} responses={responses} />
-          )}
-        </div>
+              {currentSlide.image_url && (
+                <img
+                  src={currentSlide.image_url}
+                  alt=""
+                  className="anim-fade-up mt-6 max-h-80 w-full object-contain rounded-xl"
+                  style={{ border: "1px solid var(--line)", animationDelay: "0.15s" }}
+                />
+              )}
 
-          <div className="mt-5 text-xs muted-text">
-            <span className="mono text-[var(--fg)]">{responses.length}</span> responses
-          </div>
+              <div className="anim-fade-up mt-8" style={{ animationDelay: "0.25s" }}>
+                {currentSlide.type === "mcq" && (
+                  <ResultsBarChart slide={currentSlide} responses={responses} />
+                )}
+                {currentSlide.type === "wordcloud" && <WordCloudView responses={responses} />}
+                {currentSlide.type === "open" && <OpenResponses responses={responses} />}
+                {currentSlide.type === "quiz" && (
+                  <ResultsBarChart slide={currentSlide} responses={responses} highlightCorrect />
+                )}
+                {currentSlide.type === "qa" && (
+                  <QAStream slide={currentSlide} responses={responses} />
+                )}
+                {currentSlide.type === "rating" && (
+                  <RatingDistribution slide={currentSlide} responses={responses} />
+                )}
+                {currentSlide.type === "embed" && (
+                  <EmbedSlide config={currentSlide.config as EmbedConfig} />
+                )}
+              </div>
+
+              <div className="mt-5 text-xs muted-text">
+                <span className="mono text-[var(--fg)]">{responses.length}</span> responses
+              </div>
+            </>
+          )}
         </div>
       </div>
 
@@ -196,9 +226,33 @@ export function PresenterView({
         )}
       </div>
 
-      {slides.some((s) => s.type === "quiz") && <Leaderboard participants={participants} />}
+      {hasAnyQuiz && <Leaderboard participants={participants} />}
 
       <ReactionOverlay presentationId={presentation.id} />
+    </div>
+    </ThemedShell>
+  );
+}
+
+function ThemedShell({ theme, children }: { theme: Presentation["theme"]; children: React.ReactNode }) {
+  const accent = theme?.accent_color;
+  const dark = theme?.mode === "dark";
+  const style: React.CSSProperties = {};
+  if (accent) {
+    (style as Record<string, string>)["--accent"] = accent;
+    (style as Record<string, string>)["--blue"] = accent;
+    (style as Record<string, string>)["--blue-hover"] = accent;
+  }
+  if (dark) {
+    style.background = "var(--graphite-1)";
+    style.color = "var(--white)";
+  }
+  return (
+    <div style={style} className={dark ? "scene-dark rounded-2xl p-1" : ""}>
+      {theme?.logo_url && (
+        <img src={theme.logo_url} alt="" className="mb-4 h-8 w-auto object-contain" />
+      )}
+      {children}
     </div>
   );
 }

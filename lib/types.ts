@@ -1,4 +1,4 @@
-export type SlideType = "mcq" | "wordcloud" | "open" | "quiz" | "qa" | "rating";
+export type SlideType = "mcq" | "wordcloud" | "open" | "quiz" | "qa" | "rating" | "embed";
 
 export type MCQConfig = {
   options: string[];
@@ -28,13 +28,20 @@ export type RatingConfig = {
   max_label?: string;
 };
 
+export type EmbedConfig = {
+  /** Public Google Slides / PowerPoint Web / Office.com URL. */
+  url: string;
+  provider?: "google-slides" | "powerpoint" | "office" | "other";
+};
+
 export type SlideConfig =
   | MCQConfig
   | WordCloudConfig
   | OpenConfig
   | QuizConfig
   | QAConfig
-  | RatingConfig;
+  | RatingConfig
+  | EmbedConfig;
 
 export type Slide = {
   id: string;
@@ -44,7 +51,14 @@ export type Slide = {
   question: string;
   config: SlideConfig;
   image_url: string | null;
+  kahoot_mode?: boolean;
   created_at: string;
+};
+
+export type Theme = {
+  logo_url?: string | null;
+  accent_color?: string | null;
+  mode?: "light" | "dark";
 };
 
 export type Presentation = {
@@ -56,6 +70,9 @@ export type Presentation = {
   state: "lobby" | "active" | "closed";
   current_slide_started_at: string | null;
   created_at: string;
+  theme?: Theme;
+  is_template?: boolean;
+  source_template_id?: string | null;
 };
 
 export type Participant = {
@@ -73,5 +90,43 @@ export type ResponseRow = {
   value_text: string | null;
   value_index: number | null;
   response_ms: number | null;
+  created_at: string;
+};
+
+export type Template = {
+  id: string;
+  slug: string;
+  title: string;
+  description: string;
+  category: string;
+  tags: string[];
+  cover_image_url: string | null;
+  is_seed: boolean;
+  owner_id: string | null;
+  visibility: "public" | "team" | "private";
+  usage_count: number;
+  created_at: string;
+};
+
+export type TemplateSlide = {
+  id: string;
+  template_id: string;
+  position: number;
+  type: SlideType;
+  question: string;
+  config: SlideConfig;
+  image_url: string | null;
+  kahoot_mode?: boolean;
+};
+
+export type PlanTier = "free" | "basic" | "pro";
+
+export type Profile = {
+  id: string;
+  plan_tier: PlanTier;
+  display_name: string | null;
+  avatar_url: string | null;
+  is_admin: boolean;
+  onboarded_at: string | null;
   created_at: string;
 };

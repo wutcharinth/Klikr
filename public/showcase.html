@@ -268,8 +268,13 @@
     transition: transform 0.5s cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 0.5s;
   }
   .frame:hover { transform: scale(1.02) translateY(-4px); box-shadow: 0 50px 120px -30px rgba(0, 0, 0, 0.34); }
-  .frame img { display: block; width: 100%; height: auto; }
+  /* Lock every frame to the same 16:10 box so a row of screenshots always
+     lines up. Images cover the box to keep crisp detail; dark frames letter-
+     box to preserve the chrome. */
+  .frame { aspect-ratio: 16 / 10; }
+  .frame img { display: block; width: 100%; height: 100%; object-fit: cover; object-position: center; }
   .frame.dark { background: var(--black); border-color: rgba(255, 255, 255, 0.08); }
+  .frame.dark img { object-fit: contain; padding: 6%; }
 
   /* Phone gallery */
   .phones { display: grid; gap: 36px; grid-template-columns: repeat(4, 1fr); margin-top: 80px; }
@@ -408,12 +413,12 @@
 <section id="features">
   <div class="container reveal">
     <div class="section-eyebrow">Why teams pick Klikr</div>
-    <h2 class="section-title">Four formats, one calm interface.</h2>
+    <h2 class="section-title">Every format you need, one calm interface.</h2>
     <p class="section-lede">No clutter, no signup walls. The chrome stays out of the way so the audience and the content take the stage.</p>
 
     <div class="stats">
       <div class="stat reveal"><div class="num counter" data-to="200" data-suffix="ms">0</div><div class="lbl">Realtime broadcast latency</div></div>
-      <div class="stat reveal"><div class="num counter" data-to="4">0</div><div class="lbl">Slide formats supported</div></div>
+      <div class="stat reveal"><div class="num">∞</div><div class="lbl">Slide formats — and more on the way</div></div>
       <div class="stat reveal"><div class="num"><span class="counter" data-to="100">0</span>%</div><div class="lbl">Anonymous audience join</div></div>
       <div class="stat reveal"><div class="num"><span class="counter" data-to="0">0</span></div><div class="lbl">Apps to download</div></div>
     </div>

@@ -1,13 +1,33 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { Sparkles, BarChart3 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { createPresentation, deletePresentation } from "./actions";
 import { logout } from "../(auth)/actions";
+import SaveAsTemplateButton from "@/components/SaveAsTemplateButton";
+import AIGenerateButton from "@/components/AIGenerateButton";
+import EmptyDashboard from "@/components/EmptyDashboard";
+import NavBar from "@/components/NavBar";
 
-export default async function Dashboard() {
+type SearchParams = Promise<{ ai?: string }>;
+
+export default async function Dashboard({ searchParams }: { searchParams?: SearchParams }) {
   const supabase = await createClient();
   const { data: userData } = await supabase.auth.getUser();
   if (!userData.user) redirect("/login");
+
+  // Onboarding gate: only redirect to /welcome if the row exists and the user
+  // really hasn't finished onboarding. If the lookup errors (e.g. profiles
+  // table missing because migrations haven't run), let them into the dashboard
+  // — never trap them in a /welcome ↔ /dashboard loop.
+  const { data: profile, error: profileErr } = await supabase
+    .from("profiles")
+    .select("onboarded_at")
+    .eq("id", userData.user.id)
+    .maybeSingle();
+  if (!profileErr && profile && !profile.onboarded_at) redirect("/welcome");
+
+  const sp = (await searchParams) ?? {};
 
   const { data: presentations } = await supabase
     .from("presentations")
@@ -16,37 +36,33 @@ export default async function Dashboard() {
 
   return (
     <main className="mx-auto max-w-4xl px-6 py-12">
-      <header className="flex items-center justify-between">
-        <div>
-          <Link href="/" className="text-xl font-semibold tracking-tight">
-            Klikr
-          </Link>
-          <p className="mt-1 text-xs muted-text">{userData.user.email}</p>
-        </div>
+      <NavBar active="dashboard" />
+      <div className="mt-1 flex items-center gap-2 text-xs muted-text">
+        <span>{userData.user.email}</span>
+        <span>·</span>
         <form action={logout}>
-          <button className="text-xs muted-text hover:text-[var(--fg)]">Sign out</button>
+          <button className="hover:text-[var(--ink)]">Sign out</button>
         </form>
-      </header>
+      </div>
 
       <section className="mt-10">
         <h1 className="text-2xl font-semibold tracking-tight">Your presentations</h1>
-        <form action={createPresentation} className="mt-6 panel p-2 flex gap-2">
-          <input
-            name="title"
-            placeholder="New presentation title…"
-            className="input flex-1 border-0 bg-transparent focus:bg-transparent"
-            required
-          />
-          <button className="btn-primary">+ Create</button>
-        </form>
+        <div className="mt-6 grid gap-3 md:grid-cols-[1fr_auto]">
+          <form action={createPresentation} className="panel p-2 flex gap-2">
+            <input
+              name="title"
+              placeholder="New presentation title…"
+              className="input flex-1 border-0 bg-transparent focus:bg-transparent"
+              required
+            />
+            <button className="btn-primary">+ Create</button>
+          </form>
+          <AIGenerateButton autoOpen={sp?.ai === "1"} />
+        </div>
       </section>
 
       <ul className="mt-8 space-y-3">
-        {presentations?.length === 0 && (
-          <li className="panel-soft p-10 text-center text-sm muted-text">
-            No presentations yet. Create your first one above.
-          </li>
-        )}
+        {presentations?.length === 0 && <EmptyDashboard />}
         {presentations?.map((p) => (
           <li key={p.id} className="panel p-5 flex items-center justify-between">
             <div className="min-w-0">
@@ -60,26 +76,21 @@ export default async function Dashboard() {
               </div>
             </div>
             <div className="flex items-center gap-2">
-              <Link href={`/present/${p.id}`} className="btn-primary">
-                Present
+              <Link href={`/dashboard/analytics/${p.id}`} className="btn-ghost text-xs muted-text" title="Analytics">
+                <BarChart3 className="h-3.5 w-3.5" />
               </Link>
-              <a
-                href={`/api/export/${p.id}`}
-                download
-                className="btn-ghost text-xs muted-text"
-                title="Export results as CSV"
-              >
-                CSV
-              </a>
+              <Link href={`/present/${p.id}`} className="btn-primary">Present</Link>
+              <a href={`/api/export/${p.id}`} download className="btn-ghost text-xs muted-text" title="Export CSV">CSV</a>
+              <a href={`/api/export/${p.id}?format=xlsx`} className="btn-ghost text-xs muted-text" title="Export Excel">XLSX</a>
+              <a href={`/api/export/${p.id}?format=pdf`} className="btn-ghost text-xs muted-text" title="Export PDF">PDF</a>
+              <SaveAsTemplateButton presentationId={p.id} presentationTitle={p.title} />
               <form
                 action={async () => {
                   "use server";
                   await deletePresentation(p.id);
                 }}
               >
-                <button className="btn-ghost text-xs muted-text" aria-label="Delete">
-                  Delete
-                </button>
+                <button className="btn-ghost text-xs muted-text" aria-label="Delete">Delete</button>
               </form>
             </div>
           </li>
@@ -91,11 +102,11 @@ export default async function Dashboard() {
 
 function StatePill({ state }: { state: string }) {
   const map: Record<string, { label: string; color: string }> = {
-    lobby: { label: "Lobby", color: "rgba(255,255,255,.04)" },
-    active: { label: "Live", color: "rgba(110,231,183,.12)" },
-    closed: { label: "Closed", color: "rgba(255,255,255,.02)" },
+    lobby: { label: "Lobby", color: "rgba(0,0,0,.04)" },
+    active: { label: "Live", color: "rgba(110,231,183,.18)" },
+    closed: { label: "Closed", color: "rgba(0,0,0,.02)" },
   };
-  const v = map[state] ?? { label: state, color: "rgba(255,255,255,.04)" };
+  const v = map[state] ?? { label: state, color: "rgba(0,0,0,.04)" };
   return (
     <span
       className="rounded-full px-2 py-0.5 text-[10px] uppercase tracking-[0.14em]"

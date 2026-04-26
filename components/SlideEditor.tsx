@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import type { Slide, MCQConfig, QuizConfig, WordCloudConfig, QAConfig, RatingConfig } from "@/lib/types";
+import { Sparkles, Loader2 } from "lucide-react";
+import type { Slide, MCQConfig, QuizConfig, WordCloudConfig, QAConfig, RatingConfig, EmbedConfig } from "@/lib/types";
 import { updateSlide, deleteSlide } from "@/app/edit/[id]/actions";
 
 export function SlideEditor({
@@ -16,15 +17,17 @@ export function SlideEditor({
   const [question, setQuestion] = useState(slide.question);
   const [config, setConfig] = useState(slide.config);
   const [imageUrl, setImageUrl] = useState<string | null>(slide.image_url);
+  const [kahoot, setKahoot] = useState<boolean>(slide.kahoot_mode ?? false);
   const [pending, startTransition] = useTransition();
   const [savedAt, setSavedAt] = useState<number | null>(null);
 
-  const save = (override?: { image_url?: string | null }) => {
+  const save = (override?: { image_url?: string | null; kahoot_mode?: boolean; config?: typeof config }) => {
     startTransition(async () => {
       await updateSlide(slide.id, presentationId, {
         question,
-        config,
+        config: override?.config ?? config,
         image_url: override?.image_url !== undefined ? override.image_url : imageUrl,
+        kahoot_mode: override?.kahoot_mode ?? kahoot,
       });
       setSavedAt(Date.now());
     });
@@ -129,15 +132,59 @@ export function SlideEditor({
 
       <div className="mt-4">
         {slide.type === "mcq" && (
-          <McqConfig
-            value={config as MCQConfig}
-            onChange={(c) => setConfig(c)}
-            onCommit={save}
-          />
+          <>
+            <McqConfig
+              value={config as MCQConfig}
+              onChange={(c) => setConfig(c)}
+              onCommit={save}
+            />
+            <SuggestOptionsButton
+              question={question}
+              type="mcq"
+              onResult={(opts) => {
+                const next = { options: opts } as MCQConfig;
+                setConfig(next);
+                save({ config: next });
+              }}
+            />
+          </>
         )}
         {slide.type === "quiz" && (
-          <QuizConfigEditor
-            value={config as QuizConfig}
+          <>
+            <QuizConfigEditor
+              value={config as QuizConfig}
+              onChange={(c) => setConfig(c)}
+              onCommit={save}
+            />
+            <label className="mt-3 flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={kahoot}
+                onChange={(e) => {
+                  setKahoot(e.target.checked);
+                  save({ kahoot_mode: e.target.checked });
+                }}
+              />
+              <span>Kahoot-style answer tiles (colored shapes on phones, podium at the end)</span>
+            </label>
+            <SuggestOptionsButton
+              question={question}
+              type="quiz"
+              onResult={(opts, correct) => {
+                const next: QuizConfig = {
+                  options: opts,
+                  correct_index: correct ?? 0,
+                  time_limit_s: (config as QuizConfig).time_limit_s ?? 20,
+                };
+                setConfig(next);
+                save({ config: next });
+              }}
+            />
+          </>
+        )}
+        {slide.type === "embed" && (
+          <EmbedConfigEditor
+            value={config as EmbedConfig}
             onChange={(c) => setConfig(c)}
             onCommit={save}
           />
@@ -416,5 +463,97 @@ function labelFor(t: Slide["type"]) {
     quiz: "Quiz",
     qa: "Q&A (upvoted)",
     rating: "Rating / NPS",
+    embed: "Embedded slide",
   } as Record<Slide["type"], string>)[t];
+}
+
+function EmbedConfigEditor({
+  value,
+  onChange,
+  onCommit,
+}: {
+  value: EmbedConfig;
+  onChange: (v: EmbedConfig) => void;
+  onCommit: () => void;
+}) {
+  const [touched, setTouched] = useState(false);
+  const ok = value.url ? isLikelyAllowed(value.url) : true;
+  return (
+    <div className="space-y-2">
+      <label className="block text-xs muted-text">
+        Public Google Slides or PowerPoint Web URL
+      </label>
+      <input
+        value={value.url}
+        onChange={(e) => onChange({ ...value, url: e.target.value })}
+        onBlur={() => { setTouched(true); onCommit(); }}
+        placeholder="https://docs.google.com/presentation/d/…/embed"
+        className="input"
+      />
+      {!ok && touched && (
+        <p className="text-xs" style={{ color: "#b91c1c" }}>
+          Only Google Slides, PowerPoint Web, or Office.com URLs are allowed.
+        </p>
+      )}
+      <p className="text-xs muted-text">
+        For Google Slides: File → Share → Publish to web → Embed → copy the iframe URL.
+      </p>
+    </div>
+  );
+}
+
+function isLikelyAllowed(raw: string): boolean {
+  try {
+    const u = new URL(raw);
+    if (u.protocol !== "https:") return false;
+    const allowed = ["docs.google.com", "drive.google.com", "onedrive.live.com", "office.com", "office.live.com", "1drv.ms"];
+    return allowed.some((h) => u.hostname === h || u.hostname.endsWith(`.${h}`));
+  } catch {
+    return false;
+  }
+}
+
+function SuggestOptionsButton({
+  question,
+  type,
+  onResult,
+}: {
+  question: string;
+  type: "mcq" | "quiz";
+  onResult: (options: string[], correctIndex?: number) => void;
+}) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function go() {
+    if (!question.trim()) {
+      setError("Add a question first.");
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/ai/suggest-options", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ question, type, count: 4 }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "AI failed");
+      onResult(data.options, data.correct_index);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="mt-3">
+      <button onClick={go} disabled={busy} className="btn-ghost text-xs" style={{ color: "var(--blue)" }}>
+        {busy ? <><Loader2 className="h-3 w-3 animate-spin" /> Suggesting…</> : <><Sparkles className="h-3 w-3" /> Suggest options with AI</>}
+      </button>
+      {error && <p className="mt-1 text-xs" style={{ color: "#b91c1c" }}>{error}</p>}
+    </div>
+  );
 }
