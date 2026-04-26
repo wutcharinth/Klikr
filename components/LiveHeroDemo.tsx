@@ -334,6 +334,11 @@ function RatingScene({ tick }: { tick: number }) {
   const base = [1, 0, 1, 2, 3, 4, 6, 8, 11, 9, 5];
   const dist = base.map((b, i) => b + Math.min(tick, 4) * (i > 7 ? 2 : 1));
   const max = Math.max(...dist);
+  const total = dist.reduce((a, b) => a + b, 0);
+  const detractors = dist.slice(0, 7).reduce((a, b) => a + b, 0);
+  const promoters = dist.slice(9).reduce((a, b) => a + b, 0);
+  const nps = Math.round(((promoters - detractors) / total) * 100);
+  const npsColor = nps >= 50 ? "#22c55e" : nps >= 0 ? "#eab308" : "#ef4444";
 
   const [mounted, setMounted] = useState(false);
   useLayoutEffect(() => {
@@ -343,7 +348,19 @@ function RatingScene({ tick }: { tick: number }) {
 
   return (
     <>
-      <p className="text-xs uppercase tracking-[0.18em] muted-text">NPS · 0–10</p>
+      <div className="flex items-center justify-between">
+        <p className="text-xs uppercase tracking-[0.18em] muted-text">NPS · 0–10</p>
+        <span
+          className="mono inline-flex items-baseline gap-1 rounded-full px-2 py-0.5 text-[11px]"
+          style={{
+            background: `${npsColor}1a`,
+            color: npsColor,
+            border: `1px solid ${npsColor}40`,
+          }}
+        >
+          NPS <span className="text-sm font-bold">{nps > 0 ? `+${nps}` : nps}</span>
+        </span>
+      </div>
       <h3 className="mt-1 text-lg font-semibold tracking-tight">How likely to recommend?</h3>
       <div className="mt-6 flex h-[140px] items-end justify-between gap-1.5">
         {dist.map((v, i) => {
