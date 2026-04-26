@@ -3,6 +3,8 @@ import { redirect, notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import type { Presentation, Slide } from "@/lib/types";
 import { PresenterView } from "@/components/PresenterView";
+import { QrCode } from "@/components/QrCode";
+import { headers } from "next/headers";
 
 export default async function PresentPage({
   params,
@@ -37,18 +39,28 @@ export default async function PresentPage({
     .order("position", { ascending: true })
     .returns<Slide[]>();
 
+  const h = await headers();
+  const host = h.get("x-forwarded-host") ?? h.get("host") ?? "klikr.app";
+  const proto = h.get("x-forwarded-proto") ?? "https";
+  const joinUrl = `${proto}://${host}/play/${presentation.code}`;
+  const joinHost = host;
+
   return (
-    <main className="flex min-h-screen flex-col px-6 py-4 lg:px-10 lg:py-6">
-      <div className="mb-4 flex items-center justify-between">
-        <Link href={`/edit/${presentation.id}`} className="text-xs muted-text hover:text-[var(--fg)]">
+    <main className="flex h-screen flex-col overflow-hidden px-4 py-3 lg:px-8 lg:py-4">
+      <div className="mb-3 flex items-start justify-between gap-4">
+        <Link href={`/edit/${presentation.id}`} className="mt-2 text-xs muted-text hover:text-[var(--fg)]">
           ← Edit
         </Link>
-        <div className="text-right">
-          <div className="text-[10px] uppercase tracking-[0.18em] muted-text">Code</div>
-          <div className="mono text-2xl font-semibold tracking-[0.18em]">{presentation.code}</div>
+        <div className="flex items-center gap-3">
+          <div className="text-right">
+            <div className="text-[10px] uppercase tracking-[0.18em] muted-text">Join at</div>
+            <div className="text-xs muted-text">{joinHost}/play</div>
+            <div className="mono text-xl font-semibold tracking-[0.18em]">{presentation.code}</div>
+          </div>
+          <QrCode value={joinUrl} size={72} />
         </div>
       </div>
-      <div className="flex flex-1 flex-col">
+      <div className="flex min-h-0 flex-1 flex-col">
         <PresenterView presentation={presentation} slides={slides ?? []} />
       </div>
     </main>
