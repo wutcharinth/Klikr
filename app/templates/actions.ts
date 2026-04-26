@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { createServiceClient } from "@/lib/supabase/service";
 import { generateRoomCode } from "@/lib/code";
 
 export async function applyTemplate(slug: string) {
@@ -17,6 +18,13 @@ export async function applyTemplate(slug: string) {
     .single();
   if (tplErr || !tpl) throw new Error("Template not found");
 
+  const { count: slideCount, error: slideCountErr } = await supabase
+    .from("template_slides")
+    .select("id", { count: "exact", head: true })
+    .eq("template_id", tpl.id);
+  if (slideCountErr) throw slideCountErr;
+  if (!slideCount) throw new Error("This template is not ready yet.");
+
   for (let attempt = 0; attempt < 5; attempt++) {
     const code = generateRoomCode();
     const { data, error } = await supabase.rpc("apply_template", {
@@ -26,7 +34,18 @@ export async function applyTemplate(slug: string) {
       p_code: code,
     });
     if (!error && data) {
+      const adminSupabase = createServiceClient();
+      const { count: clonedSlideCount, error: clonedSlideErr } = await adminSupabase
+        .from("slides")
+        .select("id", { count: "exact", head: true })
+        .eq("presentation_id", data);
+      if (clonedSlideErr) throw clonedSlideErr;
+      if (clonedSlideCount !== slideCount) {
+        await adminSupabase.from("presentations").delete().eq("id", data);
+        throw new Error("Template copy was incomplete. Please try again.");
+      }
       revalidatePath("/dashboard");
+      revalidatePath(`/edit/${data}`);
       redirect(`/edit/${data}`);
     }
     if (error && error.code !== "23505") throw error;
