@@ -33,7 +33,7 @@ export function JoinForm({ action }: { action: (formData: FormData) => Promise<v
           type="submit"
           disabled={!ready}
           className="btn-primary press"
-          style={{ height: 48, padding: "0 20px" }}
+          style={{ height: 52, padding: "0 20px" }}
         >
           Join
           <span style={{ display: "inline-block", transition: "transform 0.2s", transform: ready ? "translateX(2px)" : "translateX(0)" }}>→</span>

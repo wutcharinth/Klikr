@@ -34,7 +34,7 @@ export default async function NavBar({
 
   return (
     <nav className="flex items-center justify-between gap-6">
-      <div className="flex items-center gap-7">
+      <div className="flex items-center gap-6">
         <Link href={homeHref} className="group inline-flex items-center gap-2.5">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
@@ -81,10 +81,7 @@ function ResourcesMenu({ activeDemo, activeAbout }: { activeDemo: boolean; activ
       >
         Resources <span className="ml-0.5 text-[10px]">▾</span>
       </summary>
-      <div
-        className="panel absolute left-0 top-7 z-30 w-56 p-2 shadow-xl"
-        style={{ background: "var(--white)" }}
-      >
+      <div className="panel absolute left-0 top-7 z-30 w-56 p-2 shadow-xl">
         <Link href="/demo" className="block rounded-md px-3 py-2 text-sm hover:bg-[var(--pale)]">
           <p className="font-medium">Live demo</p>
           <p className="muted-text text-xs">Try a session, no signup.</p>

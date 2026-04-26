@@ -64,7 +64,7 @@ export default function EasyToStart({ signedIn = false }: { signedIn?: boolean }
             key={idx}
             className="inline-block"
             style={{
-              color: "#646cff",
+              color: "var(--blue)",
               animation: "fadeUp 0.55s cubic-bezier(0.2, 0.8, 0.2, 1) both",
             }}
           >
@@ -226,7 +226,7 @@ function AIDeckInfo({ playing }: { playing: boolean }) {
       <path
         d="M30 100 L60 80 L90 60 L120 36 L150 22"
         fill="none"
-        stroke="#646cff"
+        stroke="#0071e3"
         strokeWidth={2.5}
         strokeLinecap="round"
         style={{
@@ -237,11 +237,11 @@ function AIDeckInfo({ playing }: { playing: boolean }) {
       />
       {/* sparkle */}
       <g style={{ animation: playing ? "eaiPop 0.55s 1.2s both" : undefined, opacity: 0, transformOrigin: "150px 22px", transformBox: "fill-box" }}>
-        <path d="M150 14 l3 6 l6 2 l-6 2 l-3 6 l-3 -6 l-6 -2 l6 -2 z" fill="#646cff" />
+        <path d="M150 14 l3 6 l6 2 l-6 2 l-3 6 l-3 -6 l-6 -2 l6 -2 z" fill="#0071e3" />
       </g>
       {/* tiny dots */}
-      <circle cx="170" cy="40" r="2" fill="#646cff" style={{ animation: playing ? "eaiPop 0.5s 1.4s both" : undefined, opacity: 0 }} />
-      <circle cx="178" cy="56" r="1.5" fill="#646cff" style={{ animation: playing ? "eaiPop 0.5s 1.55s both" : undefined, opacity: 0 }} />
+      <circle cx="170" cy="40" r="2" fill="#0071e3" style={{ animation: playing ? "eaiPop 0.5s 1.4s both" : undefined, opacity: 0 }} />
+      <circle cx="178" cy="56" r="1.5" fill="#0071e3" style={{ animation: playing ? "eaiPop 0.5s 1.55s both" : undefined, opacity: 0 }} />
       <style>{`
         @keyframes eaiBar { from { transform: scaleY(0); } to { transform: scaleY(1); } }
         @keyframes eaiPop { 0% { opacity: 0; transform: scale(0.4); } 60% { opacity: 1; transform: scale(1.1); } 100% { opacity: 1; transform: scale(1); } }
@@ -262,7 +262,7 @@ function FlowInfo({ playing }: { playing: boolean }) {
       {/* center presenter */}
       <g style={{ transformOrigin: "100px 36px", transformBox: "fill-box", animation: playing ? "efoPop 0.55s 0s both" : undefined, opacity: 0 }}>
         <rect x={78} y={18} width={44} height={32} rx={3} fill="white" />
-        <rect x={86} y={26} width={28} height={3} fill="#646cff" />
+        <rect x={86} y={26} width={28} height={3} fill="#0071e3" />
         <rect x={86} y={32} width={20} height={3} fill="#1d1d1f" />
         <rect x={86} y={38} width={24} height={3} fill="#1d1d1f" />
       </g>
