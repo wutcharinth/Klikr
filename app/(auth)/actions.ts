@@ -17,7 +17,8 @@ export async function completeOnboarding() {
   // not applied), don't block the user — just send them through.
   const { error } = await supabase
     .from("profiles")
-    .upsert({ id: u.user.id, onboarded_at: new Date().toISOString() });
-  if (error) console.warn("completeOnboarding: profiles upsert failed:", error.message);
+    .update({ onboarded_at: new Date().toISOString() })
+    .eq("id", u.user.id);
+  if (error) console.warn("completeOnboarding: profiles update failed:", error.message);
   redirect("/dashboard");
 }
