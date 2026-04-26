@@ -23,8 +23,8 @@ export default async function Landing() {
   const signedIn = Boolean(data.user);
 
   return (
-    <main className="relative overflow-hidden">
-      <div className="mx-auto max-w-6xl px-6 pt-6">
+    <main className="relative flex min-h-screen flex-col overflow-hidden">
+      <div className="mx-auto w-full max-w-6xl flex-none px-6 pt-6">
         <NavBar />
       </div>
 
@@ -33,12 +33,12 @@ export default async function Landing() {
         <div className="orb orb-2" />
       </div>
 
-      <div className="mx-auto flex min-h-[78vh] max-w-2xl flex-col items-center justify-center px-6 pt-8 pb-12 text-center">
+      <div className="mx-auto flex min-h-0 w-full max-w-2xl flex-1 flex-col items-center justify-center px-6 py-8 text-center">
         <div className="anim-fade-up flex items-center gap-2 text-[11px] uppercase tracking-[0.18em] muted-text">
           <span className="live-dot" /> Joining a session?
         </div>
 
-        <h1 className="mt-8 text-5xl font-semibold tracking-tight sm:text-6xl">
+        <h1 className="mt-6 text-5xl font-semibold tracking-tight sm:text-6xl">
           Got a code? Drop it in.
         </h1>
         <p className="anim-fade-up delay-300 mt-4 max-w-md text-base muted-text">
@@ -47,13 +47,13 @@ export default async function Landing() {
 
         <JoinForm action={joinAction} />
 
-        <p className="anim-fade-up delay-700 mt-6 text-xs muted-text">
+        <p className="anim-fade-up delay-700 mt-5 text-xs muted-text">
           Tip — your host can also share a QR. Just point your camera at it.
         </p>
       </div>
 
       {/* Host CTA — visible but secondary */}
-      <section className="mx-auto mb-20 max-w-3xl px-6">
+      <section className="mx-auto mb-8 w-full max-w-3xl flex-none px-6">
         <Link
           href={signedIn ? "/dashboard" : "/host"}
           className="panel block p-6 transition-transform hover:-translate-y-0.5"

@@ -9,7 +9,7 @@ export function JoinForm({ action }: { action: (formData: FormData) => Promise<v
   return (
     <form
       action={action}
-      className="anim-fade-up delay-500 mt-14 panel mx-auto p-2 transition-shadow"
+      className="anim-fade-up delay-500 mt-10 panel mx-auto p-2 transition-shadow"
       style={{
         boxShadow: ready ? "0 0 0 4px rgba(0, 113, 227, 0.15)" : "0 0 0 0 transparent",
         width: "fit-content",
