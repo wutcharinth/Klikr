@@ -38,8 +38,8 @@ export default async function PresentPage({
     .returns<Slide[]>();
 
   return (
-    <main className="mx-auto max-w-6xl px-6 py-8">
-      <div className="mb-6 flex items-center justify-between">
+    <main className="flex min-h-screen flex-col px-6 py-4 lg:px-10 lg:py-6">
+      <div className="mb-4 flex items-center justify-between">
         <Link href={`/edit/${presentation.id}`} className="text-xs muted-text hover:text-[var(--fg)]">
           ← Edit
         </Link>
@@ -48,7 +48,9 @@ export default async function PresentPage({
           <div className="mono text-2xl font-semibold tracking-[0.18em]">{presentation.code}</div>
         </div>
       </div>
-      <PresenterView presentation={presentation} slides={slides ?? []} />
+      <div className="flex flex-1 flex-col">
+        <PresenterView presentation={presentation} slides={slides ?? []} />
+      </div>
     </main>
   );
 }

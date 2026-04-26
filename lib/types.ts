@@ -1,7 +1,11 @@
-export type SlideType = "mcq" | "wordcloud" | "open" | "quiz" | "qa" | "rating" | "embed";
+export type SlideType = "mcq" | "wordcloud" | "open" | "quiz" | "qa" | "rating" | "embed" | "ranking";
 
 export type MCQConfig = {
   options: string[];
+  /** Allow audience to pick more than one option. */
+  multi?: boolean;
+  /** When `multi`, cap on how many options each participant may pick. */
+  max_choices?: number;
 };
 
 export type WordCloudConfig = {
@@ -19,6 +23,16 @@ export type QuizConfig = {
 export type QAConfig = {
   /** Allow audience members to upvote each other's questions. */
   upvotes?: boolean;
+  /**
+   * - `'off'` (default): questions show up immediately.
+   * - `'pre'`: questions land in a presenter-only tray until approved.
+   * - `'post'`: questions show immediately, presenter can hide them.
+   */
+  moderation?: "off" | "pre" | "post";
+};
+
+export type RankingConfig = {
+  items: string[];
 };
 
 export type RatingConfig = {
@@ -41,7 +55,14 @@ export type SlideConfig =
   | QuizConfig
   | QAConfig
   | RatingConfig
-  | EmbedConfig;
+  | EmbedConfig
+  | RankingConfig;
+
+export type ImageCredit = {
+  source: "unsplash";
+  photographer: string;
+  photographer_url: string;
+};
 
 export type Slide = {
   id: string;
@@ -51,6 +72,7 @@ export type Slide = {
   question: string;
   config: SlideConfig;
   image_url: string | null;
+  image_credit?: ImageCredit | null;
   kahoot_mode?: boolean;
   created_at: string;
 };
@@ -92,6 +114,9 @@ export type ResponseRow = {
   value_index: number | null;
   response_ms: number | null;
   created_at: string;
+  status?: "pending" | "approved" | "rejected" | "answered";
+  pinned?: boolean;
+  flagged?: boolean;
 };
 
 export type Template = {

@@ -3,16 +3,17 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { isAllowedEmbedUrl } from "@/lib/embed";
-import type { SlideType, SlideConfig, Theme } from "@/lib/types";
+import type { SlideType, SlideConfig, Theme, ImageCredit } from "@/lib/types";
 
 const DEFAULT_CONFIG: Record<SlideType, SlideConfig> = {
   mcq: { options: ["Option A", "Option B"] },
   wordcloud: { max_words_per_participant: 3 },
   open: {},
   quiz: { options: ["Right", "Wrong"], correct_index: 0, time_limit_s: 20 },
-  qa: { upvotes: true },
+  qa: { upvotes: true, moderation: "off" },
   rating: { scale: 5, min_label: "Poor", max_label: "Great" },
   embed: { url: "", provider: "google-slides" },
+  ranking: { items: ["Item A", "Item B", "Item C"] },
 };
 
 export async function addSlide(presentationId: string, type: SlideType) {
@@ -39,7 +40,13 @@ export async function addSlide(presentationId: string, type: SlideType) {
 export async function updateSlide(
   slideId: string,
   presentationId: string,
-  patch: { question?: string; config?: SlideConfig; image_url?: string | null; kahoot_mode?: boolean },
+  patch: {
+    question?: string;
+    config?: SlideConfig;
+    image_url?: string | null;
+    image_credit?: ImageCredit | null;
+    kahoot_mode?: boolean;
+  },
 ) {
   const supabase = await createClient();
   if (patch.config && (patch.config as { url?: string }).url !== undefined) {

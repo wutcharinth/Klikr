@@ -4,18 +4,21 @@ import { useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import type { Presentation, Slide, ResponseRow, Participant } from "@/lib/types";
 import { startPresentation, moveSlide, endPresentation } from "@/app/present/[id]/actions";
+import { setQuestionStatus } from "@/app/play/[code]/actions";
 import { ResultsBarChart } from "./ResultsBarChart";
 import { WordCloudView } from "./WordCloudView";
 import { OpenResponses } from "./OpenResponses";
 import { Leaderboard } from "./Leaderboard";
 import { QAStream } from "./QAStream";
 import { RatingDistribution } from "./RatingDistribution";
+import { ResultsRanking } from "./ResultsRanking";
 import { ReactionOverlay } from "./ReactionOverlay";
 import { EmbedSlide } from "./EmbedSlide";
 import { KahootPresenterView } from "./KahootPresenterView";
 import { QuizPodium } from "./QuizPodium";
 import { QrCode } from "./QrCode";
-import type { EmbedConfig } from "@/lib/types";
+import { PresenterMusicToggle } from "./PresenterMusicToggle";
+import type { EmbedConfig, QAConfig } from "@/lib/types";
 
 export function PresenterView({
   presentation: initialPresentation,
@@ -117,10 +120,17 @@ export function PresenterView({
   if (presentation.state === "closed") {
     return (
       <ThemedShell theme={presentation.theme}>
-        <div className="space-y-6">
+        <div className="flex flex-1 flex-col gap-6">
           <div className="panel p-12 text-center">
             <div className="pill"><span className="live-dot" /> Session complete</div>
             <h2 className="mt-6 text-3xl font-semibold tracking-tight">Thanks for playing.</h2>
+            <a
+              href={`/api/export/${presentation.id}/csv`}
+              download
+              className="btn-ghost mt-6 text-sm"
+            >
+              ⬇ Export CSV
+            </a>
           </div>
           {hadAnyKahoot ? (
             <QuizPodium participants={participants} presentationId={presentation.id} />
@@ -140,98 +150,182 @@ export function PresenterView({
   const isLast = idx === slides.length - 1;
 
   const isKahoot = currentSlide.type === "quiz" && currentSlide.kahoot_mode;
+  const qaCfg = currentSlide.type === "qa" ? (currentSlide.config as QAConfig) : null;
 
   return (
     <ThemedShell theme={presentation.theme}>
-    <div className="space-y-5">
-      <div className="panel p-8">
-        <div className="flex items-center justify-between">
-          <div className="mono text-[10px] uppercase tracking-[0.18em] muted-text">
-            Slide {String(idx + 1).padStart(2, "0")} of {String(slides.length).padStart(2, "0")} · {currentSlide.type}
-            {isKahoot && <span className="ml-2" style={{ color: "var(--blue)" }}>· Kahoot mode</span>}
+      <div className="flex flex-1 flex-col gap-4">
+        <div className="flex flex-1 flex-col gap-4 rounded-2xl px-2 py-3 sm:px-6 sm:py-5">
+          <div className="flex items-center justify-between">
+            <div className="mono text-[11px] uppercase tracking-[0.2em] muted-text">
+              Slide {String(idx + 1).padStart(2, "0")} of {String(slides.length).padStart(2, "0")} · {currentSlide.type}
+              {isKahoot && <span className="ml-2" style={{ color: "var(--blue)" }}>· Kahoot mode</span>}
+            </div>
+            <div className="flex items-center gap-3 text-[11px] uppercase tracking-[0.2em] muted-text">
+              <a
+                href={`/api/export/${presentation.id}/csv`}
+                download
+                className="hover:text-[var(--fg)]"
+                title="Download responses as CSV"
+              >
+                ⬇ CSV
+              </a>
+              <PresenterMusicToggle />
+              <span className="flex items-center gap-2"><span className="live-dot" /> live</span>
+            </div>
           </div>
-          <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.18em] muted-text">
-            <span className="live-dot" /> live
+          <div key={currentSlide.id} className="slide-enter flex flex-1 flex-col">
+            {isKahoot ? (
+              <KahootPresenterView
+                slide={currentSlide}
+                responses={responses}
+                startedAt={presentation.current_slide_started_at}
+              />
+            ) : (
+              <>
+                <h2 className="display-l mt-1 break-words">
+                  {currentSlide.question || <span className="muted-text">(no question)</span>}
+                </h2>
+
+                {currentSlide.image_url && (
+                  <div className="anim-fade-up mt-6" style={{ animationDelay: "0.15s" }}>
+                    <img
+                      src={currentSlide.image_url}
+                      alt=""
+                      className="max-h-72 w-full object-contain rounded-xl"
+                      style={{ border: "1px solid var(--line)" }}
+                    />
+                    {currentSlide.image_credit && (
+                      <p className="mt-1 text-[10px] muted-text">
+                        Photo by{" "}
+                        <a href={currentSlide.image_credit.photographer_url} target="_blank" rel="noopener noreferrer">
+                          {currentSlide.image_credit.photographer}
+                        </a>{" "}
+                        on{" "}
+                        <a href="https://unsplash.com/?utm_source=klikr&utm_medium=referral" target="_blank" rel="noopener noreferrer">
+                          Unsplash
+                        </a>
+                      </p>
+                    )}
+                  </div>
+                )}
+
+                {qaCfg && (qaCfg.moderation === "pre" || qaCfg.moderation === "post") && (
+                  <QAModerationTray responses={responses} qaCfg={qaCfg} />
+                )}
+
+                <div className="anim-fade-up mt-6 flex flex-1 flex-col" style={{ animationDelay: "0.25s" }}>
+                  {currentSlide.type === "mcq" && (
+                    <ResultsBarChart slide={currentSlide} responses={responses} fill />
+                  )}
+                  {currentSlide.type === "wordcloud" && <WordCloudView responses={responses} />}
+                  {currentSlide.type === "open" && <OpenResponses responses={responses} />}
+                  {currentSlide.type === "quiz" && (
+                    <ResultsBarChart slide={currentSlide} responses={responses} highlightCorrect fill />
+                  )}
+                  {currentSlide.type === "qa" && (
+                    <QAStream slide={currentSlide} responses={responses} />
+                  )}
+                  {currentSlide.type === "rating" && (
+                    <RatingDistribution slide={currentSlide} responses={responses} />
+                  )}
+                  {currentSlide.type === "ranking" && (
+                    <ResultsRanking slide={currentSlide} responses={responses} />
+                  )}
+                  {currentSlide.type === "embed" && (
+                    <EmbedSlide config={currentSlide.config as EmbedConfig} />
+                  )}
+                </div>
+
+                <div className="mt-4 text-xs muted-text">
+                  <span className="mono text-[var(--fg)]">{responses.filter((r) => (r.status ?? "approved") !== "rejected").length}</span> responses
+                </div>
+              </>
+            )}
           </div>
         </div>
-        <div key={currentSlide.id} className="slide-enter">
-          {isKahoot ? (
-            <KahootPresenterView
-              slide={currentSlide}
-              responses={responses}
-              startedAt={presentation.current_slide_started_at}
-            />
+
+        <div className="flex items-center justify-between px-2 sm:px-6">
+          <button
+            onClick={() => moveSlide(presentation.id, "prev")}
+            disabled={idx === 0}
+            className="btn-ghost disabled:opacity-40"
+          >
+            ← Prev
+          </button>
+          {isLast ? (
+            <button
+              onClick={() => endPresentation(presentation.id)}
+              className="btn-ghost"
+              style={{ color: "var(--danger)", borderColor: "rgba(252,165,165,.3)" }}
+            >
+              End session
+            </button>
           ) : (
-            <>
-              <h2 className="mt-3 text-4xl font-semibold tracking-tight">
-                {currentSlide.question || <span className="muted-text">(no question)</span>}
-              </h2>
-
-              {currentSlide.image_url && (
-                <img
-                  src={currentSlide.image_url}
-                  alt=""
-                  className="anim-fade-up mt-6 max-h-80 w-full object-contain rounded-xl"
-                  style={{ border: "1px solid var(--line)", animationDelay: "0.15s" }}
-                />
-              )}
-
-              <div className="anim-fade-up mt-8" style={{ animationDelay: "0.25s" }}>
-                {currentSlide.type === "mcq" && (
-                  <ResultsBarChart slide={currentSlide} responses={responses} />
-                )}
-                {currentSlide.type === "wordcloud" && <WordCloudView responses={responses} />}
-                {currentSlide.type === "open" && <OpenResponses responses={responses} />}
-                {currentSlide.type === "quiz" && (
-                  <ResultsBarChart slide={currentSlide} responses={responses} highlightCorrect />
-                )}
-                {currentSlide.type === "qa" && (
-                  <QAStream slide={currentSlide} responses={responses} />
-                )}
-                {currentSlide.type === "rating" && (
-                  <RatingDistribution slide={currentSlide} responses={responses} />
-                )}
-                {currentSlide.type === "embed" && (
-                  <EmbedSlide config={currentSlide.config as EmbedConfig} />
-                )}
-              </div>
-
-              <div className="mt-5 text-xs muted-text">
-                <span className="mono text-[var(--fg)]">{responses.length}</span> responses
-              </div>
-            </>
+            <button onClick={() => moveSlide(presentation.id, "next")} className="btn-primary">
+              Next →
+            </button>
           )}
         </div>
+
+        {hasAnyQuiz && <Leaderboard participants={participants} />}
+
+        <ReactionOverlay presentationId={presentation.id} />
       </div>
-
-      <div className="flex items-center justify-between">
-        <button
-          onClick={() => moveSlide(presentation.id, "prev")}
-          disabled={idx === 0}
-          className="btn-ghost disabled:opacity-40"
-        >
-          ← Prev
-        </button>
-        {isLast ? (
-          <button
-            onClick={() => endPresentation(presentation.id)}
-            className="btn-ghost"
-            style={{ color: "var(--danger)", borderColor: "rgba(252,165,165,.3)" }}
-          >
-            End session
-          </button>
-        ) : (
-          <button onClick={() => moveSlide(presentation.id, "next")} className="btn-primary">
-            Next →
-          </button>
-        )}
-      </div>
-
-      {hasAnyQuiz && <Leaderboard participants={participants} />}
-
-      <ReactionOverlay presentationId={presentation.id} />
-    </div>
     </ThemedShell>
+  );
+}
+
+function QAModerationTray({ responses, qaCfg }: { responses: ResponseRow[]; qaCfg: QAConfig }) {
+  // In `pre` mode the tray holds pending + flagged. In `post` mode it holds
+  // only flagged (everything else is already on stage).
+  const tray = responses.filter((r) => {
+    const status = r.status ?? "approved";
+    if (qaCfg.moderation === "pre") return status === "pending" || r.flagged;
+    return r.flagged && status !== "rejected";
+  });
+  if (tray.length === 0) return null;
+
+  return (
+    <div className="mt-4 rounded-xl p-3" style={{ border: "1px dashed var(--line-strong)", background: "rgba(255,255,255,0.03)" }}>
+      <div className="mb-2 flex items-center justify-between text-[10px] uppercase tracking-[0.2em] muted-text">
+        <span>Moderation tray ({tray.length})</span>
+        <span>only you see this</span>
+      </div>
+      <ul className="space-y-2">
+        {tray.map((q) => (
+          <li
+            key={q.id}
+            className="flex items-start gap-3 rounded-lg p-3"
+            style={{
+              border: "1px solid " + (q.flagged ? "rgba(252,165,165,0.5)" : "var(--line)"),
+              background: q.flagged ? "rgba(252,165,165,0.06)" : "rgba(255,255,255,0.02)",
+            }}
+          >
+            <div className="flex-1 text-sm leading-snug">
+              {q.flagged && <span className="mono mr-2 text-[10px]" style={{ color: "var(--danger, #fca5a5)" }}>FLAG</span>}
+              {q.value_text}
+            </div>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => setQuestionStatus({ responseId: q.id, status: "approved" })}
+                className="btn-ghost text-xs"
+                style={{ color: "var(--blue)" }}
+              >
+                Approve
+              </button>
+              <button
+                onClick={() => setQuestionStatus({ responseId: q.id, status: "rejected" })}
+                className="btn-ghost text-xs"
+                style={{ color: "var(--danger, #fca5a5)" }}
+              >
+                Reject
+              </button>
+            </div>
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }
 
@@ -249,7 +343,7 @@ function ThemedShell({ theme, children }: { theme: Presentation["theme"]; childr
     style.color = "var(--white)";
   }
   return (
-    <div style={style} className={dark ? "scene-dark rounded-2xl p-1" : ""}>
+    <div style={style} className={"flex flex-1 flex-col " + (dark ? "scene-dark rounded-2xl p-1" : "")}>
       {theme?.logo_url && (
         <img src={theme.logo_url} alt="" className="mb-4 h-8 w-auto object-contain" />
       )}
@@ -285,7 +379,7 @@ function Lobby({
         <span className="mono">{presentation.code}</span>
       </p>
 
-      <div className="mt-10 flex flex-col items-center justify-center gap-8 sm:mt-12 sm:flex-row sm:gap-12">
+      <div className="mt-10 flex flex-col items-center justify-center gap-8 sm:mt-12 sm:flex-row sm:gap-10">
         <p
           className="anim-pop delay-300 mono text-6xl font-bold tracking-[0.18em] sm:text-8xl"
           style={{
@@ -297,9 +391,9 @@ function Lobby({
         >
           {presentation.code}
         </p>
-        <div className="anim-pop delay-300 flex flex-col items-center gap-2">
-          <QrCode value={joinUrl} size={180} />
-          <p className="text-[10px] uppercase tracking-[0.18em] muted-text">Scan to join</p>
+        <div className="anim-pop delay-300 flex flex-col items-center gap-3">
+          <QrCode value={joinUrl} size={280} />
+          <p className="text-xs uppercase tracking-[0.18em] muted-text">Scan to join</p>
         </div>
       </div>
 

@@ -1,6 +1,9 @@
 "use server";
 
+import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
+import { containsProfanity } from "@/lib/profanity";
+import type { MCQConfig, QAConfig, RankingConfig } from "@/lib/types";
 
 export async function joinSession(presentationId: string, nickname: string) {
   const supabase = createServiceClient();
@@ -54,12 +57,67 @@ export async function submitResponse(input: {
 }) {
   const { supabase, participant } = await assertParticipant(input);
   await assertCurrentSlide(supabase, participant.presentation_id, input.slideId);
+
+  // Pull slide so we can validate type-specific payloads + run the content filter.
+  const { data: slide } = await supabase
+    .from("slides")
+    .select("id, type, config")
+    .eq("id", input.slideId)
+    .maybeSingle();
+  if (!slide) throw new Error("Slide not found");
+
+  let valueText = input.valueText?.trim().slice(0, 500) ?? null;
+  const valueIndex = input.valueIndex ?? null;
+
+  // Multi-MCQ: valueText is JSON array of indices. Validate against options + max_choices.
+  if (slide.type === "mcq") {
+    const cfg = slide.config as MCQConfig;
+    if (cfg.multi && valueText) {
+      let picks: number[];
+      try {
+        picks = JSON.parse(valueText);
+      } catch {
+        throw new Error("Invalid multi-MCQ payload");
+      }
+      if (!Array.isArray(picks) || picks.some((n) => !Number.isInteger(n) || n < 0 || n >= cfg.options.length)) {
+        throw new Error("Invalid option");
+      }
+      const max = cfg.max_choices ?? cfg.options.length;
+      if (picks.length === 0 || picks.length > max) throw new Error(`Pick 1–${max}`);
+      valueText = JSON.stringify(Array.from(new Set(picks)).sort((a, b) => a - b));
+    }
+  }
+
+  // Ranking: valueText is JSON permutation of [0..items.length-1].
+  if (slide.type === "ranking") {
+    const cfg = slide.config as RankingConfig;
+    if (!valueText) throw new Error("Ranking required");
+    let order: number[];
+    try {
+      order = JSON.parse(valueText);
+    } catch {
+      throw new Error("Invalid ranking payload");
+    }
+    if (!Array.isArray(order) || order.length !== cfg.items.length) throw new Error("Ranking length mismatch");
+    const seen = new Set<number>();
+    for (const n of order) {
+      if (!Number.isInteger(n) || n < 0 || n >= cfg.items.length || seen.has(n)) throw new Error("Invalid ranking");
+      seen.add(n);
+    }
+    valueText = JSON.stringify(order);
+  }
+
+  // Content filter applies to wordcloud + open. Q&A has its own path (submitQuestion).
+  if ((slide.type === "wordcloud" || slide.type === "open") && valueText && containsProfanity(valueText)) {
+    throw new Error("Your response was filtered.");
+  }
+
   const { error } = await supabase.from("responses").upsert(
     {
       slide_id: input.slideId,
       participant_id: input.participantId,
-      value_text: input.valueText?.trim().slice(0, 500) ?? null,
-      value_index: input.valueIndex ?? null,
+      value_text: valueText,
+      value_index: valueIndex,
       response_ms: input.responseMs ?? null,
     },
     { onConflict: "slide_id,participant_id" },
@@ -68,7 +126,8 @@ export async function submitResponse(input: {
 }
 
 /** Q&A slides allow each participant to submit MULTIPLE questions, so we INSERT
- *  rather than upsert. Returns the new row id so the client can locally optimistic-render. */
+ *  rather than upsert. Returns the new row id + status so the client can render
+ *  an "awaiting approval" hint when moderation is on. */
 export async function submitQuestion(input: {
   slideId: string;
   participantId: string;
@@ -79,17 +138,62 @@ export async function submitQuestion(input: {
   await assertCurrentSlide(supabase, participant.presentation_id, input.slideId);
   const text = input.text.trim().slice(0, 280);
   if (!text) throw new Error("Question required");
+
+  const { data: slide } = await supabase
+    .from("slides")
+    .select("config")
+    .eq("id", input.slideId)
+    .maybeSingle();
+  const cfg = (slide?.config ?? {}) as QAConfig;
+  const flagged = containsProfanity(text);
+  // Flagged questions always go to the tray, regardless of moderation mode.
+  const status = flagged ? "pending" : cfg.moderation === "pre" ? "pending" : "approved";
+
   const { data, error } = await supabase
     .from("responses")
     .insert({
       slide_id: input.slideId,
       participant_id: input.participantId,
       value_text: text,
+      status,
+      flagged,
     })
-    .select("id")
+    .select("id, status")
     .single();
   if (error) throw error;
-  return data.id as string;
+  return { id: data.id as string, status: data.status as string };
+}
+
+/** Owner-only: change a question's moderation status or pin/unpin it. */
+export async function setQuestionStatus(input: {
+  responseId: string;
+  status?: "approved" | "rejected" | "answered" | "pending";
+  pinned?: boolean;
+}) {
+  const supabase = await createClient();
+  const { data: u } = await supabase.auth.getUser();
+  if (!u.user) throw new Error("Not signed in");
+
+  // Verify the user owns the presentation this response belongs to.
+  const { data: row } = await supabase
+    .from("responses")
+    .select("id, slides!inner(presentation_id, presentations!inner(owner_id))")
+    .eq("id", input.responseId)
+    .maybeSingle();
+  type Joined = { slides: { presentations: { owner_id: string } | { owner_id: string }[] } | { presentations: { owner_id: string } | { owner_id: string }[] }[] };
+  const slides = (row as unknown as Joined | null)?.slides;
+  const slide = Array.isArray(slides) ? slides[0] : slides;
+  const pres = Array.isArray(slide?.presentations) ? slide?.presentations?.[0] : slide?.presentations;
+  if (!pres || pres.owner_id !== u.user.id) throw new Error("Not allowed");
+
+  const patch: Record<string, unknown> = {};
+  if (input.status) patch.status = input.status;
+  if (input.pinned !== undefined) patch.pinned = input.pinned;
+  if (Object.keys(patch).length === 0) return;
+
+  const service = createServiceClient();
+  const { error } = await service.from("responses").update(patch).eq("id", input.responseId);
+  if (error) throw error;
 }
 
 /** Toggle an upvote on a Q&A question. Returns whether the user is now upvoting. */

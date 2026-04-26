@@ -38,7 +38,10 @@ export function QAStream({ slide, responses }: { slide: Slide; responses: Respon
   const counts = new Map<string, number>();
   for (const v of votes) counts.set(v.response_id, (counts.get(v.response_id) ?? 0) + 1);
 
-  const sorted = [...responses].sort((a, b) => {
+  // On stage: only show approved questions, with pinned floating to top.
+  const visible = responses.filter((q) => (q.status ?? "approved") === "approved");
+  const sorted = [...visible].sort((a, b) => {
+    if ((b.pinned ? 1 : 0) !== (a.pinned ? 1 : 0)) return (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0);
     const va = counts.get(a.id) ?? 0;
     const vb = counts.get(b.id) ?? 0;
     if (vb !== va) return vb - va;
@@ -53,7 +56,8 @@ export function QAStream({ slide, responses }: { slide: Slide; responses: Respon
     <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2">
       {sorted.map((q, i) => {
         const v = counts.get(q.id) ?? 0;
-        const top = i === 0 && v > 0;
+        const top = (q.pinned ?? false) || (i === 0 && v > 0);
+        const answered = q.status === "answered";
         return (
           <li
             key={q.id}
@@ -61,9 +65,14 @@ export function QAStream({ slide, responses }: { slide: Slide; responses: Respon
             style={{
               border: "1px solid " + (top ? "rgba(0,113,227,0.4)" : "var(--line)"),
               background: top ? "rgba(0,113,227,0.06)" : "rgba(255,255,255,0.02)",
+              opacity: answered ? 0.6 : 1,
             }}
           >
-            <div className="flex-1 text-base leading-snug">{q.value_text}</div>
+            <div className="flex-1 text-base leading-snug">
+              {q.pinned && <span className="mr-2 text-xs" style={{ color: "var(--blue)" }}>📌</span>}
+              {answered && <span className="mr-2 text-xs" style={{ color: "var(--blue)" }}>✓</span>}
+              {q.value_text}
+            </div>
             {(cfg.upvotes ?? true) && (
               <div
                 className="flex flex-col items-center justify-center rounded-lg px-3 py-1 text-xs"

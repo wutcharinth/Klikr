@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import type { Presentation, Slide, MCQConfig, QuizConfig, WordCloudConfig, QAConfig, RatingConfig, ResponseRow } from "@/lib/types";
+import type { Presentation, Slide, MCQConfig, QuizConfig, WordCloudConfig, QAConfig, RatingConfig, RankingConfig, ResponseRow } from "@/lib/types";
 import { joinSession, submitResponse, sendReaction, toggleQuestionVote, submitQuestion } from "@/app/play/[code]/actions";
 import { KahootAudienceView } from "./KahootAudienceView";
 
@@ -113,12 +113,26 @@ export function AudienceView({
         <p className="text-[10px] uppercase tracking-[0.18em] muted-text">{currentSlide.type}</p>
         <h2 className="mt-1 text-2xl font-semibold tracking-tight">{currentSlide.question}</h2>
         {currentSlide.image_url ? (
-          <img
-            src={currentSlide.image_url}
-            alt=""
-            className="anim-fade-up mt-4 w-full max-h-56 object-cover rounded-xl"
-            style={{ border: "1px solid var(--line)" }}
-          />
+          <div className="anim-fade-up mt-4">
+            <img
+              src={currentSlide.image_url}
+              alt=""
+              className="w-full max-h-56 object-cover rounded-xl"
+              style={{ border: "1px solid var(--line)" }}
+            />
+            {currentSlide.image_credit && (
+              <p className="mt-1 text-[10px] muted-text">
+                Photo by{" "}
+                <a href={currentSlide.image_credit.photographer_url} target="_blank" rel="noopener noreferrer">
+                  {currentSlide.image_credit.photographer}
+                </a>{" "}
+                on{" "}
+                <a href="https://unsplash.com/?utm_source=klikr&utm_medium=referral" target="_blank" rel="noopener noreferrer">
+                  Unsplash
+                </a>
+              </p>
+            )}
+          </div>
         ) : null}
         <div className="mt-6">
           {currentSlide.type === "mcq" ? (
@@ -163,6 +177,13 @@ export function AudienceView({
           ) : null}
           {currentSlide.type === "rating" ? (
             <RatingInput
+              slide={currentSlide}
+              participantId={participant.id}
+              participantToken={participant.participantToken}
+            />
+          ) : null}
+          {currentSlide.type === "ranking" ? (
+            <RankingInput
               slide={currentSlide}
               participantId={participant.id}
               participantToken={participant.participantToken}
@@ -235,7 +256,72 @@ function MCQ({
   participantToken: string;
 }) {
   const cfg = slide.config as MCQConfig;
+  const multi = cfg.multi ?? false;
+  const max = cfg.max_choices ?? cfg.options.length;
   const [picked, setPicked] = useState<number | null>(null);
+  const [picks, setPicks] = useState<Set<number>>(new Set());
+  const [submitted, setSubmitted] = useState(false);
+
+  if (multi) {
+    const submit = async () => {
+      if (picks.size === 0 || submitted) return;
+      setSubmitted(true);
+      await submitResponse({
+        slideId: slide.id,
+        participantId,
+        participantToken,
+        valueText: JSON.stringify([...picks].sort((a, b) => a - b)),
+      });
+    };
+    return (
+      <div className="space-y-2">
+        {cfg.options.map((opt, i) => {
+          const isOn = picks.has(i);
+          const atCap = picks.size >= max && !isOn;
+          return (
+            <button
+              key={i}
+              type="button"
+              disabled={submitted || atCap}
+              onClick={() => {
+                setPicks((prev) => {
+                  const n = new Set(prev);
+                  if (n.has(i)) n.delete(i);
+                  else n.add(i);
+                  return n;
+                });
+              }}
+              className="press anim-fade-up w-full rounded-xl px-4 py-4 text-left text-base transition-all"
+              style={{
+                animationDelay: `${i * 60}ms`,
+                border: "1px solid " + (isOn ? "var(--blue)" : "var(--line)"),
+                background: isOn ? "rgba(0,113,227,0.10)" : "rgba(255,255,255,0.02)",
+                color: isOn ? "var(--blue)" : "var(--fg)",
+                opacity: atCap ? 0.4 : 1,
+              }}
+            >
+              <span className="mono mr-3 muted-text" style={{ fontSize: 12 }}>
+                {isOn ? "✓" : String.fromCharCode(65 + i)}
+              </span>
+              {opt}
+            </button>
+          );
+        })}
+        <div className="flex items-center justify-between text-xs muted-text">
+          <span className="mono">{picks.size}/{max}</span>
+          <button
+            disabled={submitted || picks.size === 0}
+            onClick={submit}
+            className="btn-primary press"
+            style={{ height: 40 }}
+          >
+            {submitted ? "Submitted" : "Submit"}
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-2">
       {cfg.options.map((opt, i) => (
@@ -269,6 +355,93 @@ function MCQ({
           <CheckBadge /> Answer locked in
         </div>
       )}
+    </div>
+  );
+}
+
+function RankingInput({
+  slide,
+  participantId,
+  participantToken,
+}: {
+  slide: Slide;
+  participantId: string;
+  participantToken: string;
+}) {
+  const cfg = slide.config as RankingConfig;
+  const [order, setOrder] = useState<number[]>(() => cfg.items.map((_, i) => i));
+  const [submitted, setSubmitted] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const move = (i: number, dir: -1 | 1) => {
+    const j = i + dir;
+    if (j < 0 || j >= order.length) return;
+    setOrder((prev) => {
+      const next = [...prev];
+      [next[i], next[j]] = [next[j], next[i]];
+      return next;
+    });
+  };
+
+  const submit = async () => {
+    if (submitted) return;
+    setError(null);
+    try {
+      setSubmitted(true);
+      await submitResponse({
+        slideId: slide.id,
+        participantId,
+        participantToken,
+        valueText: JSON.stringify(order),
+      });
+    } catch (e) {
+      setSubmitted(false);
+      setError(e instanceof Error ? e.message : String(e));
+    }
+  };
+
+  return (
+    <div className="space-y-3">
+      <p className="text-xs muted-text">Order from best (top) to worst (bottom).</p>
+      <ul className="space-y-2">
+        {order.map((idx, i) => (
+          <li
+            key={idx}
+            className="anim-fade-up flex items-center gap-3 rounded-xl px-3 py-3"
+            style={{
+              animationDelay: `${i * 50}ms`,
+              border: "1px solid var(--line)",
+              background: "rgba(255,255,255,0.02)",
+            }}
+          >
+            <span className="mono w-6 text-center text-sm muted-text" style={{ fontVariantNumeric: "tabular-nums" }}>{i + 1}</span>
+            <span className="flex-1 text-base">{cfg.items[idx]}</span>
+            <button
+              type="button"
+              disabled={i === 0 || submitted}
+              onClick={() => move(i, -1)}
+              className="press btn-ghost px-2 py-1 text-sm disabled:opacity-30"
+              aria-label="Move up"
+            >↑</button>
+            <button
+              type="button"
+              disabled={i === order.length - 1 || submitted}
+              onClick={() => move(i, 1)}
+              className="press btn-ghost px-2 py-1 text-sm disabled:opacity-30"
+              aria-label="Move down"
+            >↓</button>
+          </li>
+        ))}
+      </ul>
+      {error && <p className="text-xs" style={{ color: "var(--danger, #fca5a5)" }}>{error}</p>}
+      <button
+        disabled={submitted}
+        onClick={submit}
+        className="btn-primary press w-full"
+        style={{ height: 48 }}
+      >
+        {submitted ? "Submitted" : "Submit ranking"}
+      </button>
     </div>
   );
 }
@@ -450,13 +623,20 @@ function OpenInput({
 }) {
   const [text, setText] = useState("");
   const [sent, setSent] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   return (
     <form
       onSubmit={async (e) => {
         e.preventDefault();
         if (!text.trim() || sent) return;
+        setError(null);
         setSent(true);
-        await submitResponse({ slideId: slide.id, participantId, participantToken, valueText: text.trim() });
+        try {
+          await submitResponse({ slideId: slide.id, participantId, participantToken, valueText: text.trim() });
+        } catch (err) {
+          setSent(false);
+          setError(err instanceof Error ? err.message : String(err));
+        }
       }}
       className="space-y-3"
     >
@@ -470,6 +650,7 @@ function OpenInput({
         style={{ height: "auto", minHeight: 120, padding: "12px" }}
         placeholder="Your response…"
       />
+      {error && <p className="text-xs" style={{ color: "var(--danger, #fca5a5)" }}>{error}</p>}
       <button disabled={!text.trim() || sent} className="btn-primary press w-full" style={{ height: 48 }}>
         {sent ? "Sent" : "Submit"}
       </button>
@@ -495,6 +676,8 @@ function QAInput({
   const [voteCounts, setVoteCounts] = useState<Map<string, number>>(new Map());
   const [myVotes, setMyVotes] = useState<Set<string>>(new Set());
   const [busy, setBusy] = useState(false);
+  const [pendingHint, setPendingHint] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -530,12 +713,17 @@ function QAInput({
     return () => { cancelled = true; supabase.removeChannel(channel); };
   }, [supabase, slide.id, participantId]);
 
-  const sortedQs = [...questions].sort((a, b) => {
-    const va = voteCounts.get(a.id) ?? 0;
-    const vb = voteCounts.get(b.id) ?? 0;
-    if (vb !== va) return vb - va;
-    return a.created_at < b.created_at ? -1 : 1;
-  });
+  // Audience only ever sees approved questions; pending/rejected/flagged stay in the presenter tray.
+  // Pinned items float to the top, then upvotes, then time.
+  const sortedQs = [...questions]
+    .filter((q) => (q.status ?? "approved") === "approved")
+    .sort((a, b) => {
+      if ((b.pinned ? 1 : 0) !== (a.pinned ? 1 : 0)) return (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0);
+      const va = voteCounts.get(a.id) ?? 0;
+      const vb = voteCounts.get(b.id) ?? 0;
+      if (vb !== va) return vb - va;
+      return a.created_at < b.created_at ? -1 : 1;
+    });
 
   return (
     <div className="space-y-4">
@@ -545,9 +733,14 @@ function QAInput({
           const t = text.trim();
           if (!t || busy) return;
           setBusy(true);
+          setError(null);
           try {
-            await submitQuestion({ slideId: slide.id, participantId, participantToken, text: t });
+            const result = await submitQuestion({ slideId: slide.id, participantId, participantToken, text: t });
             setText("");
+            setPendingHint(result.status === "pending" ? "Question sent — awaiting approval." : null);
+            setTimeout(() => setPendingHint(null), 4000);
+          } catch (err) {
+            setError(err instanceof Error ? err.message : String(err));
           } finally { setBusy(false); }
         }}
         className="space-y-2"
@@ -564,6 +757,12 @@ function QAInput({
         <button disabled={!text.trim() || busy} className="btn-primary press w-full" style={{ height: 44 }}>
           {busy ? "Sending…" : "Ask"}
         </button>
+        {pendingHint && (
+          <p className="anim-fade-in text-xs" style={{ color: "var(--blue)" }}>{pendingHint}</p>
+        )}
+        {error && (
+          <p className="text-xs" style={{ color: "var(--danger, #fca5a5)" }}>{error}</p>
+        )}
       </form>
 
       <div className="space-y-2">

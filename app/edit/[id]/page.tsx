@@ -79,8 +79,8 @@ export default async function EditPage({ params }: { params: Promise<{ id: strin
         </div>
       </div>
 
-      <div className="mt-10 grid grid-cols-1 gap-8 md:grid-cols-[260px_1fr]">
-        <aside>
+      <div className="mt-10 grid grid-cols-1 gap-8 md:grid-cols-[260px_1fr] md:items-start">
+        <aside className="md:sticky md:top-6 md:max-h-[calc(100vh-3rem)] md:overflow-y-auto md:pr-2">
           <div className="text-[10px] uppercase tracking-[0.18em] muted-text">
             Slides ({slides?.length ?? 0})
           </div>
@@ -99,7 +99,7 @@ export default async function EditPage({ params }: { params: Promise<{ id: strin
 
           <div className="mt-6 text-[10px] uppercase tracking-[0.18em] muted-text">Add slide</div>
           <div className="mt-2 space-y-2">
-            {(["mcq", "wordcloud", "open", "qa", "quiz", "rating", "embed"] as SlideType[]).map((t) => (
+            {(["mcq", "wordcloud", "open", "qa", "quiz", "rating", "ranking", "embed"] as SlideType[]).map((t) => (
               <form
                 key={t}
                 action={async () => {
@@ -149,6 +149,7 @@ function labelFor(t: SlideType) {
     quiz: "Quiz",
     qa: "Q&A (upvoted)",
     rating: "Rating / NPS",
+    ranking: "Ranking",
     embed: "Embed PPT/Slides",
   } as Record<SlideType, string>)[t];
 }

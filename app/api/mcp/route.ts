@@ -30,12 +30,12 @@ const TOOLS = [
   },
   {
     name: "klikr_add_slide",
-    description: "Append a slide to a presentation. type is one of 'mcq' | 'wordcloud' | 'open' | 'quiz' | 'qa' | 'rating'. Pass type-specific config (options, time_limit_s, scale, etc.) or omit it to use sensible defaults.",
+    description: "Append a slide to a presentation. type is one of 'mcq' | 'wordcloud' | 'open' | 'quiz' | 'qa' | 'rating' | 'ranking'. Pass type-specific config (options, items, time_limit_s, scale, etc.) or omit it to use sensible defaults.",
     inputSchema: {
       type: "object",
       properties: {
         presentation_id: { type: "string" },
-        type: { type: "string", enum: ["mcq", "wordcloud", "open", "quiz", "qa", "rating"] },
+        type: { type: "string", enum: ["mcq", "wordcloud", "open", "quiz", "qa", "rating", "ranking"] },
         question: { type: "string" },
         config: { type: "object" },
       },
@@ -93,9 +93,10 @@ const DEFAULT_CONFIG: Record<SlideType, SlideConfig> = {
   wordcloud: { max_words_per_participant: 3 },
   open: {},
   quiz: { options: ["Right", "Wrong"], correct_index: 0, time_limit_s: 20 },
-  qa: { upvotes: true },
+  qa: { upvotes: true, moderation: "off" },
   rating: { scale: 5, min_label: "Poor", max_label: "Great" },
   embed: { url: "", provider: "google-slides" },
+  ranking: { items: ["Item A", "Item B", "Item C"] },
 };
 
 type RpcRequest = { jsonrpc: "2.0"; id?: number | string | null; method: string; params?: unknown };
