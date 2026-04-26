@@ -42,7 +42,7 @@ export default async function Landing() {
           Got a code? Drop it in.
         </h1>
         <p className="anim-fade-up delay-300 mt-4 max-w-md text-base muted-text">
-          Type the six letters your host shared and you're in. No app, no signup.
+          Type the six letters your host shared and you're in. <span className="whitespace-nowrap">No app, no signup.</span>
         </p>
 
         <JoinForm action={joinAction} />
