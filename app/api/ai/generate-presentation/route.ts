@@ -70,7 +70,7 @@ Return ONLY JSON, no prose, matching this exact schema:
 
 export async function POST(req: Request) {
   if (!aiConfigured()) {
-    return NextResponse.json({ error: "AI not configured. Add ANTHROPIC_API_KEY to enable." }, { status: 503 });
+    return NextResponse.json({ error: "AI not configured. Add GOOGLE_GENAI_API_KEY to enable." }, { status: 503 });
   }
 
   const supabase = await createClient();
@@ -87,19 +87,19 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "AI monthly budget reached. Try again next month." }, { status: 429 });
   }
 
+  let body: { prompt: string };
+  try {
+    body = PromptSchema.parse(await req.json());
+  } catch {
+    return NextResponse.json({ error: "Invalid prompt" }, { status: 400 });
+  }
+
   const credits = await consumeCredits(u.user.id, "generate-presentation");
   if (!credits.ok) {
     return NextResponse.json(
       { error: `Out of AI credits. Need ${credits.cost}, have ${credits.balance}. Top up at /credits.` },
       { status: 402 }
     );
-  }
-
-  let body: { prompt: string };
-  try {
-    body = PromptSchema.parse(await req.json());
-  } catch {
-    return NextResponse.json({ error: "Invalid prompt" }, { status: 400 });
   }
 
   const result = await generate({

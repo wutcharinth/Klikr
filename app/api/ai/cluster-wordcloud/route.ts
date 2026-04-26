@@ -42,7 +42,15 @@ export async function POST(req: Request) {
   if (!slide) return NextResponse.json({ error: "Slide not found" }, { status: 404 });
   if (slide.type !== "wordcloud") return NextResponse.json({ error: "Only word cloud slides" }, { status: 400 });
   const { data: pres } = await supabase.from("presentations").select("owner_id").eq("id", slide.presentation_id).single();
-  if (pres?.owner_id !== u.user.id) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  if (pres?.owner_id !== u.user.id) {
+    const { data: editor } = await supabase
+      .from("presentation_editors")
+      .select("user_id")
+      .eq("presentation_id", slide.presentation_id)
+      .eq("user_id", u.user.id)
+      .maybeSingle();
+    if (!editor) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
 
   const { data: rows, count } = await supabase
     .from("responses")

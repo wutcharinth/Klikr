@@ -9,7 +9,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start -p ${PORT:-3000}",
-    "lint": "next lint",
+    "lint": "eslint .",
     "migrate": "node scripts/migrate.mjs"
   },
   "dependencies": {
@@ -24,7 +24,6 @@
     "react-dom": "latest",
     "react-tagcloud": "latest",
     "recharts": "latest",
-    "xlsx": "^0.18.5",
     "zod": "latest"
   },
   "devDependencies": {
@@ -39,8 +38,11 @@
     "eslint-config-next": "latest",
     "pg": "^8.20.0",
     "playwright": "^1.59.1",
-    "postcss": "latest",
+    "postcss": "^8.5.10",
     "tailwindcss": "^3",
     "typescript": "latest"
+  },
+  "overrides": {
+    "postcss": "^8.5.10"
   }
 }

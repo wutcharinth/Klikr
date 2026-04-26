@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { Sparkles, BarChart3 } from "lucide-react";
+import { BarChart3 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { createPresentation, deletePresentation } from "./actions";
 import { logout } from "../(auth)/actions";
@@ -30,8 +30,8 @@ export default async function Dashboard({ searchParams }: { searchParams?: Searc
   const sp = (await searchParams) ?? {};
 
   const { data: presentations } = await supabase
-    .from("presentations")
-    .select("id, title, code, state, created_at")
+    .from("editable_presentations")
+    .select("id, title, code, state, created_at, is_owner")
     .order("created_at", { ascending: false });
 
   return (
@@ -80,18 +80,26 @@ export default async function Dashboard({ searchParams }: { searchParams?: Searc
                 <BarChart3 className="h-3.5 w-3.5" />
               </Link>
               <Link href={`/present/${p.id}`} className="btn-primary">Present</Link>
-              <a href={`/api/export/${p.id}`} download className="btn-ghost text-xs muted-text" title="Export CSV">CSV</a>
-              <a href={`/api/export/${p.id}?format=xlsx`} className="btn-ghost text-xs muted-text" title="Export Excel">XLSX</a>
-              <a href={`/api/export/${p.id}?format=pdf`} className="btn-ghost text-xs muted-text" title="Export PDF">PDF</a>
-              <SaveAsTemplateButton presentationId={p.id} presentationTitle={p.title} />
-              <form
-                action={async () => {
-                  "use server";
-                  await deletePresentation(p.id);
-                }}
-              >
-                <button className="btn-ghost text-xs muted-text" aria-label="Delete">Delete</button>
-              </form>
+              {p.is_owner ? (
+                <>
+                  <a href={`/api/export/${p.id}`} download className="btn-ghost text-xs muted-text" title="Export CSV">CSV</a>
+                  <a href={`/api/export/${p.id}?format=xlsx`} className="btn-ghost text-xs muted-text" title="Export Excel">XLSX</a>
+                  <a href={`/api/export/${p.id}?format=pdf`} className="btn-ghost text-xs muted-text" title="Export PDF">PDF</a>
+                  <SaveAsTemplateButton presentationId={p.id} presentationTitle={p.title} />
+                  <form
+                    action={async () => {
+                      "use server";
+                      await deletePresentation(p.id);
+                    }}
+                  >
+                    <button className="btn-ghost text-xs muted-text" aria-label="Delete">Delete</button>
+                  </form>
+                </>
+              ) : (
+                <span className="rounded-full border border-[var(--line)] px-2 py-1 text-[10px] uppercase tracking-[0.14em] muted-text">
+                  Editor
+                </span>
+              )}
             </div>
           </li>
         ))}

@@ -4,7 +4,7 @@
 // Anthropic helper so AI routes don't need to change.
 
 import { GoogleGenAI } from "@google/genai";
-import { createClient as createServerSupabase } from "@/lib/supabase/server";
+import { createServiceClient } from "@/lib/supabase/service";
 
 export const AI_MODEL = "gemini-2.5-flash";
 
@@ -58,7 +58,7 @@ export function rateLimitOk(userId: string): boolean {
 }
 
 export async function monthlyUsdSpend(): Promise<number> {
-  const supabase = await createServerSupabase();
+  const supabase = createServiceClient();
   const since = new Date();
   since.setUTCDate(1);
   since.setUTCHours(0, 0, 0, 0);
@@ -138,7 +138,7 @@ export async function logUsage(opts: {
   result: GenerateResult;
   credits?: number;
 }): Promise<void> {
-  const supabase = await createServerSupabase();
+  const supabase = createServiceClient();
   await supabase.from("ai_usage").insert({
     user_id: opts.userId,
     route: opts.route,

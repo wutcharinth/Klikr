@@ -78,6 +78,7 @@ export type Presentation = {
 export type Participant = {
   id: string;
   presentation_id: string;
+  participant_token?: string;
   nickname: string;
   score: number;
   created_at: string;

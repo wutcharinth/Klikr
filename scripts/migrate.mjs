@@ -15,7 +15,12 @@ if (!url) {
   process.exit(1);
 }
 
-const client = new pg.Client({ connectionString: url, ssl: url.includes("localhost") ? false : { rejectUnauthorized: false } });
+const ssl =
+  process.env.PGSSLMODE === "disable" || url.includes("localhost")
+    ? false
+    : { rejectUnauthorized: false };
+
+const client = new pg.Client({ connectionString: url, ssl });
 await client.connect();
 
 await client.query(`

@@ -47,7 +47,15 @@ export async function POST(req: Request) {
     .select("owner_id")
     .eq("id", slide.presentation_id)
     .single();
-  if (pres?.owner_id !== u.user.id) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  if (pres?.owner_id !== u.user.id) {
+    const { data: editor } = await supabase
+      .from("presentation_editors")
+      .select("user_id")
+      .eq("presentation_id", slide.presentation_id)
+      .eq("user_id", u.user.id)
+      .maybeSingle();
+    if (!editor) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
 
   // Cache hit?
   const { data: responses, count } = await supabase

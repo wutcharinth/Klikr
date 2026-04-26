@@ -15,7 +15,16 @@ export default async function AnalyticsPage({ params }: { params: Params }) {
   if (!u.user) redirect("/login");
 
   const { data: pres } = await supabase.from("presentations").select("*").eq("id", id).maybeSingle();
-  if (!pres || pres.owner_id !== u.user.id) notFound();
+  if (!pres) notFound();
+  if (pres.owner_id !== u.user.id) {
+    const { data: editorRow } = await supabase
+      .from("presentation_editors")
+      .select("user_id")
+      .eq("presentation_id", id)
+      .eq("user_id", u.user.id)
+      .maybeSingle();
+    if (!editorRow) notFound();
+  }
 
   const [{ data: slides }, { data: participants }, { data: responses }] = await Promise.all([
     supabase.from("slides").select("*").eq("presentation_id", id).order("position"),

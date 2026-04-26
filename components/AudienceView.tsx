@@ -6,7 +6,12 @@ import type { Presentation, Slide, MCQConfig, QuizConfig, WordCloudConfig, QACon
 import { joinSession, submitResponse, sendReaction, toggleQuestionVote, submitQuestion } from "@/app/play/[code]/actions";
 import { KahootAudienceView } from "./KahootAudienceView";
 
-type LocalParticipant = { id: string; nickname: string; presentationId: string };
+type LocalParticipant = {
+  id: string;
+  nickname: string;
+  presentationId: string;
+  participantToken: string;
+};
 
 const STORAGE_KEY = (presentationId: string) => `klikr:participant:${presentationId}`;
 
@@ -26,7 +31,12 @@ export function AudienceView({
     const raw = localStorage.getItem(STORAGE_KEY(presentation.id));
     if (raw) {
       try {
-        setParticipant(JSON.parse(raw));
+        const stored = JSON.parse(raw) as Partial<LocalParticipant>;
+        if (stored.id && stored.nickname && stored.participantToken) {
+          setParticipant(stored as LocalParticipant);
+        } else {
+          localStorage.removeItem(STORAGE_KEY(presentation.id));
+        }
       } catch {}
     }
     setLoaded(true);
@@ -57,6 +67,7 @@ export function AudienceView({
             id: p.id,
             nickname: p.nickname,
             presentationId: presentation.id,
+            participantToken: p.participant_token,
           };
           localStorage.setItem(STORAGE_KEY(presentation.id), JSON.stringify(local));
           setParticipant(local);
@@ -111,33 +122,59 @@ export function AudienceView({
         ) : null}
         <div className="mt-6">
           {currentSlide.type === "mcq" ? (
-            <MCQ slide={currentSlide} participantId={participant.id} />
+            <MCQ slide={currentSlide} participantId={participant.id} participantToken={participant.participantToken} />
           ) : null}
           {currentSlide.type === "quiz" ? (
             currentSlide.kahoot_mode ? (
-              <KahootAudienceView slide={currentSlide} participantId={participant.id} />
+              <KahootAudienceView
+                slide={currentSlide}
+                participantId={participant.id}
+                participantToken={participant.participantToken}
+              />
             ) : (
-              <Quiz slide={currentSlide} participantId={participant.id} startedAt={slideStartedAt} />
+              <Quiz
+                slide={currentSlide}
+                participantId={participant.id}
+                participantToken={participant.participantToken}
+                startedAt={slideStartedAt}
+              />
             )
           ) : null}
           {currentSlide.type === "embed" ? (
             <p className="text-sm muted-text">Look at the host's screen — there's nothing to tap on this one.</p>
           ) : null}
           {currentSlide.type === "wordcloud" ? (
-            <WordCloudInput slide={currentSlide} participantId={participant.id} />
+            <WordCloudInput
+              slide={currentSlide}
+              participantId={participant.id}
+              participantToken={participant.participantToken}
+            />
           ) : null}
           {currentSlide.type === "open" ? (
-            <OpenInput slide={currentSlide} participantId={participant.id} />
+            <OpenInput slide={currentSlide} participantId={participant.id} participantToken={participant.participantToken} />
           ) : null}
           {currentSlide.type === "qa" ? (
-            <QAInput slide={currentSlide} participantId={participant.id} supabase={supabase} />
+            <QAInput
+              slide={currentSlide}
+              participantId={participant.id}
+              participantToken={participant.participantToken}
+              supabase={supabase}
+            />
           ) : null}
           {currentSlide.type === "rating" ? (
-            <RatingInput slide={currentSlide} participantId={participant.id} />
+            <RatingInput
+              slide={currentSlide}
+              participantId={participant.id}
+              participantToken={participant.participantToken}
+            />
           ) : null}
         </div>
       </div>
-      <ReactionsBar presentationId={presentation.id} participantId={participant.id} />
+      <ReactionsBar
+        presentationId={presentation.id}
+        participantId={participant.id}
+        participantToken={participant.participantToken}
+      />
     </Stage>
   );
 }
@@ -188,7 +225,15 @@ function NicknameForm({ onJoin }: { onJoin: (n: string) => Promise<void> }) {
   );
 }
 
-function MCQ({ slide, participantId }: { slide: Slide; participantId: string }) {
+function MCQ({
+  slide,
+  participantId,
+  participantToken,
+}: {
+  slide: Slide;
+  participantId: string;
+  participantToken: string;
+}) {
   const cfg = slide.config as MCQConfig;
   const [picked, setPicked] = useState<number | null>(null);
   return (
@@ -199,7 +244,7 @@ function MCQ({ slide, participantId }: { slide: Slide; participantId: string }) 
           disabled={picked !== null}
           onClick={async () => {
             setPicked(i);
-            await submitResponse({ slideId: slide.id, participantId, valueIndex: i });
+            await submitResponse({ slideId: slide.id, participantId, participantToken, valueIndex: i });
           }}
           className={
             "press anim-fade-up w-full rounded-xl px-4 py-4 text-left text-base transition-all duration-200 "
@@ -240,10 +285,12 @@ function CheckBadge() {
 function Quiz({
   slide,
   participantId,
+  participantToken,
   startedAt,
 }: {
   slide: Slide;
   participantId: string;
+  participantToken: string;
   startedAt: number | null;
 }) {
   const cfg = slide.config as QuizConfig;
@@ -284,6 +331,7 @@ function Quiz({
             await submitResponse({
               slideId: slide.id,
               participantId,
+              participantToken,
               valueIndex: i,
               responseMs: elapsedMs,
             });
@@ -316,7 +364,15 @@ function Quiz({
   );
 }
 
-function WordCloudInput({ slide, participantId }: { slide: Slide; participantId: string }) {
+function WordCloudInput({
+  slide,
+  participantId,
+  participantToken,
+}: {
+  slide: Slide;
+  participantId: string;
+  participantToken: string;
+}) {
   const cfg = slide.config as WordCloudConfig;
   const max = cfg.max_words_per_participant ?? 3;
   const [words, setWords] = useState<string[]>([]);
@@ -326,6 +382,7 @@ function WordCloudInput({ slide, participantId }: { slide: Slide; participantId:
     await submitResponse({
       slideId: slide.id,
       participantId,
+      participantToken,
       valueText: next.join(" "),
     });
   };
@@ -382,7 +439,15 @@ function WordCloudInput({ slide, participantId }: { slide: Slide; participantId:
   );
 }
 
-function OpenInput({ slide, participantId }: { slide: Slide; participantId: string }) {
+function OpenInput({
+  slide,
+  participantId,
+  participantToken,
+}: {
+  slide: Slide;
+  participantId: string;
+  participantToken: string;
+}) {
   const [text, setText] = useState("");
   const [sent, setSent] = useState(false);
   return (
@@ -391,7 +456,7 @@ function OpenInput({ slide, participantId }: { slide: Slide; participantId: stri
         e.preventDefault();
         if (!text.trim() || sent) return;
         setSent(true);
-        await submitResponse({ slideId: slide.id, participantId, valueText: text.trim() });
+        await submitResponse({ slideId: slide.id, participantId, participantToken, valueText: text.trim() });
       }}
       className="space-y-3"
     >
@@ -416,10 +481,12 @@ function OpenInput({ slide, participantId }: { slide: Slide; participantId: stri
 function QAInput({
   slide,
   participantId,
+  participantToken,
   supabase,
 }: {
   slide: Slide;
   participantId: string;
+  participantToken: string;
   supabase: ReturnType<typeof createClient>;
 }) {
   const cfg = slide.config as QAConfig;
@@ -479,7 +546,7 @@ function QAInput({
           if (!t || busy) return;
           setBusy(true);
           try {
-            await submitQuestion({ slideId: slide.id, participantId, text: t });
+            await submitQuestion({ slideId: slide.id, participantId, participantToken, text: t });
             setText("");
           } finally { setBusy(false); }
         }}
@@ -510,12 +577,17 @@ function QAInput({
               <div className="flex-1 text-sm leading-snug">{q.value_text}</div>
               {(cfg.upvotes ?? true) && (
                 <button
-                  type="button"
-                  onClick={async () => {
-                    setMyVotes((prev) => { const n = new Set(prev); n.has(q.id) ? n.delete(q.id) : n.add(q.id); return n; });
-                    setVoteCounts((prev) => { const n = new Map(prev); n.set(q.id, (n.get(q.id) ?? 0) + (mine ? -1 : 1)); return n; });
-                    await toggleQuestionVote({ responseId: q.id, participantId });
-                  }}
+	                  type="button"
+	                  onClick={async () => {
+	                    setMyVotes((prev) => {
+	                      const n = new Set(prev);
+	                      if (n.has(q.id)) n.delete(q.id);
+	                      else n.add(q.id);
+	                      return n;
+	                    });
+	                    setVoteCounts((prev) => { const n = new Map(prev); n.set(q.id, (n.get(q.id) ?? 0) + (mine ? -1 : 1)); return n; });
+	                    await toggleQuestionVote({ responseId: q.id, participantId, participantToken });
+	                  }}
                   className="press flex flex-col items-center justify-center rounded-lg px-3 py-1 text-xs"
                   style={{
                     background: mine ? "rgba(0,113,227,0.12)" : "rgba(255,255,255,0.04)",
@@ -538,7 +610,15 @@ function QAInput({
 }
 
 // ----------------- Rating slide -----------------
-function RatingInput({ slide, participantId }: { slide: Slide; participantId: string }) {
+function RatingInput({
+  slide,
+  participantId,
+  participantToken,
+}: {
+  slide: Slide;
+  participantId: string;
+  participantToken: string;
+}) {
   const cfg = slide.config as RatingConfig;
   const [picked, setPicked] = useState<number | null>(null);
   const range = cfg.scale === 5 ? [1, 2, 3, 4, 5] : [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
@@ -551,7 +631,7 @@ function RatingInput({ slide, participantId }: { slide: Slide; participantId: st
             disabled={picked !== null}
             onClick={async () => {
               setPicked(n);
-              await submitResponse({ slideId: slide.id, participantId, valueIndex: n });
+              await submitResponse({ slideId: slide.id, participantId, participantToken, valueIndex: n });
             }}
             className="press anim-fade-up rounded-lg text-base font-semibold transition-all"
             style={{
@@ -583,13 +663,21 @@ function RatingInput({ slide, participantId }: { slide: Slide; participantId: st
 // ----------------- Reactions bar -----------------
 const REACTION_EMOJI = ["👏", "❤️", "🎉", "😂", "🔥", "💡"];
 
-function ReactionsBar({ presentationId, participantId }: { presentationId: string; participantId: string }) {
+function ReactionsBar({
+  presentationId,
+  participantId,
+  participantToken,
+}: {
+  presentationId: string;
+  participantId: string;
+  participantToken: string;
+}) {
   const [pulses, setPulses] = useState<{ id: number; emoji: string }[]>([]);
   const send = (e: string) => {
     const id = Date.now() + Math.random();
     setPulses((p) => [...p, { id, emoji: e }]);
     setTimeout(() => setPulses((p) => p.filter((x) => x.id !== id)), 800);
-    void sendReaction({ presentationId, participantId, emoji: e });
+    void sendReaction({ presentationId, participantId, participantToken, emoji: e });
   };
   return (
     <div className="relative mt-6">

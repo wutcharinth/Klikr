@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect, notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { createServiceClient } from "@/lib/supabase/service";
 import { AI_MONTHLY_CAP_USD, monthlyUsdSpend } from "@/lib/ai";
 import { Users, Activity, Sparkles, Coins } from "lucide-react";
 import NavBar from "@/components/NavBar";
@@ -16,6 +17,7 @@ export default async function AdminPage() {
 
   const { data: me } = await supabase.from("profiles").select("is_admin").eq("id", u.user.id).maybeSingle();
   if (!me?.is_admin) notFound();
+  const adminSupabase = createServiceClient();
 
   const dayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
   const monthAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
@@ -32,22 +34,22 @@ export default async function AdminPage() {
     { data: topTemplates },
     { data: tierBreakdown },
   ] = await Promise.all([
-    supabase.from("profiles").select("id", { count: "exact", head: true }),
-    supabase.from("presentations").select("id", { count: "exact", head: true }),
-    supabase.from("responses").select("id", { count: "exact", head: true }),
-    supabase.from("participants").select("id", { count: "exact", head: true }),
-    supabase
+    adminSupabase.from("profiles").select("id", { count: "exact", head: true }),
+    adminSupabase.from("presentations").select("id", { count: "exact", head: true }),
+    adminSupabase.from("responses").select("id", { count: "exact", head: true }),
+    adminSupabase.from("participants").select("id", { count: "exact", head: true }),
+    adminSupabase
       .from("presentations")
       .select("id", { count: "exact", head: true })
       .gte("created_at", dayAgo),
-    supabase
+    adminSupabase
       .from("presentations")
       .select("id", { count: "exact", head: true })
       .gte("created_at", monthAgo),
-    supabase.from("ai_usage").select("id", { count: "exact", head: true }).gte("created_at", monthAgo),
+    adminSupabase.from("ai_usage").select("id", { count: "exact", head: true }).gte("created_at", monthAgo),
     monthlyUsdSpend(),
-    supabase.from("templates").select("slug, title, usage_count").order("usage_count", { ascending: false }).limit(10),
-    supabase.from("profiles").select("plan_tier"),
+    adminSupabase.from("templates").select("slug, title, usage_count").order("usage_count", { ascending: false }).limit(10),
+    adminSupabase.from("profiles").select("plan_tier"),
   ]);
 
   const breakdown: Record<string, number> = { free: 0, basic: 0, pro: 0 };

@@ -12,7 +12,15 @@ const TILES = [
   { color: "#26890C", Icon: Square },
 ];
 
-export function KahootAudienceView({ slide, participantId }: { slide: Slide; participantId: string }) {
+export function KahootAudienceView({
+  slide,
+  participantId,
+  participantToken,
+}: {
+  slide: Slide;
+  participantId: string;
+  participantToken: string;
+}) {
   const [picked, setPicked] = useState<number | null>(null);
 
   if (picked !== null) {
@@ -36,7 +44,7 @@ export function KahootAudienceView({ slide, participantId }: { slide: Slide; par
           onClick={async () => {
             setPicked(i);
             if (typeof navigator !== "undefined" && "vibrate" in navigator) navigator.vibrate(50);
-            await submitResponse({ slideId: slide.id, participantId, valueIndex: i });
+            await submitResponse({ slideId: slide.id, participantId, participantToken, valueIndex: i });
           }}
           className="aspect-square flex items-center justify-center rounded-2xl transition-transform active:scale-95"
           style={{ background: tile.color }}

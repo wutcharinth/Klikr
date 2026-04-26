@@ -27,19 +27,19 @@ export async function POST(req: Request) {
   if (!rateLimitOk(u.user.id)) return NextResponse.json({ error: "Rate limit" }, { status: 429 });
   if (!(await withinMonthlyCap())) return NextResponse.json({ error: "AI budget reached" }, { status: 429 });
 
+  let body: z.infer<typeof ReqSchema>;
+  try {
+    body = ReqSchema.parse(await req.json());
+  } catch {
+    return NextResponse.json({ error: "Invalid input" }, { status: 400 });
+  }
+
   const credits = await consumeCredits(u.user.id, "suggest-options");
   if (!credits.ok) {
     return NextResponse.json(
       { error: `Out of AI credits. Need ${credits.cost}, have ${credits.balance}.` },
       { status: 402 }
     );
-  }
-
-  let body: z.infer<typeof ReqSchema>;
-  try {
-    body = ReqSchema.parse(await req.json());
-  } catch {
-    return NextResponse.json({ error: "Invalid input" }, { status: 400 });
   }
 
   const count = body.count ?? 4;

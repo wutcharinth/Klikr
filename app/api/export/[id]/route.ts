@@ -1,5 +1,4 @@
 import { NextRequest } from "next/server";
-import * as XLSX from "xlsx";
 import { createClient } from "@/lib/supabase/server";
 import { can } from "@/lib/plans";
 
@@ -38,15 +37,19 @@ async function loadData(id: string): Promise<ExportData | null> {
     .single();
   if (!presentation || presentation.owner_id !== userData.user.id) return null;
 
-  const [{ data: slides }, { data: participants }, { data: responses }, { data: votes }] = await Promise.all([
+  const [{ data: slides }, { data: participants }, { data: responses }] = await Promise.all([
     supabase.from("slides").select("id, position, type, question").eq("presentation_id", id).order("position"),
     supabase.from("participants").select("id, nickname, score, created_at").eq("presentation_id", id),
     supabase
       .from("responses")
       .select("id, slide_id, participant_id, value_text, value_index, response_ms, created_at, slides!inner(presentation_id)")
       .eq("slides.presentation_id", id),
-    supabase.from("question_votes").select("response_id, participant_id"),
   ]);
+
+  const responseIds = ((responses ?? []) as { id: string }[]).map((r) => r.id);
+  const { data: votes } = responseIds.length
+    ? await supabase.from("question_votes").select("response_id, participant_id").in("response_id", responseIds)
+    : { data: [] as { response_id: string }[] };
 
   const voteCounts = new Map<string, number>();
   for (const v of (votes ?? []) as { response_id: string }[]) {
@@ -74,7 +77,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     if (!(await can("export_xlsx"))) {
       return new Response("Excel export is a Basic feature.", { status: 402 });
     }
-    return xlsxResponse(data);
+    return await xlsxResponse(data);
   }
   if (format === "pdf") {
     if (!(await can("export_pdf"))) {
@@ -123,51 +126,54 @@ function csvResponse({ presentation, slides, participants, responses, voteCounts
   });
 }
 
-function xlsxResponse({ presentation, slides, participants, responses, voteCounts }: ExportData): Response {
-  const wb = XLSX.utils.book_new();
-
-  // Summary sheet
-  const summary = [
-    ["Title", presentation.title],
-    ["Code", presentation.code],
-    ["Slides", slides.length],
-    ["Participants", participants.length],
-    ["Responses", responses.length],
+async function xlsxResponse({ presentation, slides, participants, responses, voteCounts }: ExportData): Promise<Response> {
+  const sheets: { name: string; rows: unknown[][] }[] = [
+    {
+      name: "Summary",
+      rows: [
+        ["Title", presentation.title],
+        ["Code", presentation.code],
+        ["Slides", slides.length],
+        ["Participants", participants.length],
+        ["Responses", responses.length],
+      ],
+    },
+    {
+      name: "Participants",
+      rows: [
+        ["Nickname", "Score", "JoinedAt"],
+        ...participants.map((p) => [p.nickname, p.score, p.created_at]),
+      ],
+    },
   ];
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(summary), "Summary");
 
-  // Participants sheet
-  const partSheet = participants.map((p) => ({
-    Nickname: p.nickname,
-    Score: p.score,
-    JoinedAt: p.created_at,
-  }));
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(partSheet), "Participants");
-
-  // One sheet per slide
   const partById = new Map(participants.map((p) => [p.id, p]));
   for (const s of slides) {
-    const rows = responses
-      .filter((r) => r.slide_id === s.id)
-      .map((r) => {
-        const p = partById.get(r.participant_id);
-        return {
-          Participant: p?.nickname ?? "",
-          Text: r.value_text ?? "",
-          OptionIndex: r.value_index ?? "",
-          ResponseMs: r.response_ms ?? "",
-          Upvotes: voteCounts.get(r.id) ?? 0,
-          CreatedAt: r.created_at,
-        };
-      });
-    const name = `${String(s.position + 1).padStart(2, "0")}. ${s.type}`.slice(0, 31);
-    const ws = XLSX.utils.json_to_sheet(rows.length > 0 ? rows : [{ Participant: "(no responses)" }]);
-    // Put question text at top
-    XLSX.utils.sheet_add_aoa(ws, [[s.question || `Slide ${s.position + 1}`]], { origin: "A1" });
-    XLSX.utils.book_append_sheet(wb, ws, name);
+    const slideRows = responses.filter((r) => r.slide_id === s.id);
+    sheets.push({
+      name: `${String(s.position + 1).padStart(2, "0")}. ${s.type}`.slice(0, 31),
+      rows: [
+        [s.question || `Slide ${s.position + 1}`],
+        [],
+        ["Participant", "Text", "OptionIndex", "ResponseMs", "Upvotes", "CreatedAt"],
+        ...(slideRows.length === 0
+          ? [["(no responses)"]]
+          : slideRows.map((r) => {
+              const p = partById.get(r.participant_id);
+              return [
+                p?.nickname ?? "",
+                r.value_text ?? "",
+                r.value_index ?? "",
+                r.response_ms ?? "",
+                voteCounts.get(r.id) ?? 0,
+                r.created_at,
+              ];
+            })),
+      ],
+    });
   }
 
-  const buffer = XLSX.write(wb, { type: "buffer", bookType: "xlsx" }) as Buffer;
+  const buffer = makeXlsx(sheets);
   const safe = (presentation.title || "klikr").replace(/[^a-z0-9-_]+/gi, "_");
   return new Response(new Uint8Array(buffer), {
     headers: {
@@ -175,6 +181,147 @@ function xlsxResponse({ presentation, slides, participants, responses, voteCount
       "content-disposition": `attachment; filename="${safe}-${presentation.code}.xlsx"`,
     },
   });
+}
+
+function makeXlsx(sheets: { name: string; rows: unknown[][] }[]): Buffer {
+  const sheetDefs = sheets.map((s, i) => ({ ...s, id: i + 1 }));
+  const entries = [
+    {
+      name: "[Content_Types].xml",
+      data: `<?xml version="1.0" encoding="UTF-8"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+  <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+  <Default Extension="xml" ContentType="application/xml"/>
+  <Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>
+  ${sheetDefs.map((s) => `<Override PartName="/xl/worksheets/sheet${s.id}.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>`).join("")}
+</Types>`,
+    },
+    {
+      name: "_rels/.rels",
+      data: `<?xml version="1.0" encoding="UTF-8"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>
+</Relationships>`,
+    },
+    {
+      name: "xl/workbook.xml",
+      data: `<?xml version="1.0" encoding="UTF-8"?>
+<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  <sheets>${sheetDefs.map((s) => `<sheet name="${escapeHtml(s.name)}" sheetId="${s.id}" r:id="rId${s.id}"/>`).join("")}</sheets>
+</workbook>`,
+    },
+    {
+      name: "xl/_rels/workbook.xml.rels",
+      data: `<?xml version="1.0" encoding="UTF-8"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  ${sheetDefs.map((s) => `<Relationship Id="rId${s.id}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet${s.id}.xml"/>`).join("")}
+</Relationships>`,
+    },
+    ...sheetDefs.map((s) => ({
+      name: `xl/worksheets/sheet${s.id}.xml`,
+      data: sheetXml(s.rows),
+    })),
+  ];
+
+  return zip(entries.map((e) => ({ name: e.name, data: Buffer.from(e.data, "utf8") })));
+}
+
+function sheetXml(rows: unknown[][]): string {
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+  <sheetData>
+    ${rows.map((row, rIdx) => `<row r="${rIdx + 1}">${row.map((value, cIdx) => cellXml(value, cIdx, rIdx)).join("")}</row>`).join("")}
+  </sheetData>
+</worksheet>`;
+}
+
+function cellXml(value: unknown, col: number, row: number): string {
+  const ref = `${columnName(col)}${row + 1}`;
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return `<c r="${ref}"><v>${value}</v></c>`;
+  }
+  return `<c r="${ref}" t="inlineStr"><is><t>${escapeHtml(String(value ?? ""))}</t></is></c>`;
+}
+
+function columnName(index: number): string {
+  let n = index + 1;
+  let out = "";
+  while (n > 0) {
+    const r = (n - 1) % 26;
+    out = String.fromCharCode(65 + r) + out;
+    n = Math.floor((n - 1) / 26);
+  }
+  return out;
+}
+
+function zip(entries: { name: string; data: Buffer }[]): Buffer {
+  const files: Buffer[] = [];
+  const central: Buffer[] = [];
+  let offset = 0;
+
+  for (const entry of entries) {
+    const name = Buffer.from(entry.name);
+    const crc = crc32(entry.data);
+    const local = Buffer.alloc(30);
+    local.writeUInt32LE(0x04034b50, 0);
+    local.writeUInt16LE(20, 4);
+    local.writeUInt16LE(0, 6);
+    local.writeUInt16LE(0, 8);
+    local.writeUInt16LE(0, 10);
+    local.writeUInt16LE(0, 12);
+    local.writeUInt32LE(crc, 14);
+    local.writeUInt32LE(entry.data.length, 18);
+    local.writeUInt32LE(entry.data.length, 22);
+    local.writeUInt16LE(name.length, 26);
+    local.writeUInt16LE(0, 28);
+    files.push(local, name, entry.data);
+
+    const dir = Buffer.alloc(46);
+    dir.writeUInt32LE(0x02014b50, 0);
+    dir.writeUInt16LE(20, 4);
+    dir.writeUInt16LE(20, 6);
+    dir.writeUInt16LE(0, 8);
+    dir.writeUInt16LE(0, 10);
+    dir.writeUInt16LE(0, 12);
+    dir.writeUInt16LE(0, 14);
+    dir.writeUInt32LE(crc, 16);
+    dir.writeUInt32LE(entry.data.length, 20);
+    dir.writeUInt32LE(entry.data.length, 24);
+    dir.writeUInt16LE(name.length, 28);
+    dir.writeUInt16LE(0, 30);
+    dir.writeUInt16LE(0, 32);
+    dir.writeUInt16LE(0, 34);
+    dir.writeUInt16LE(0, 36);
+    dir.writeUInt32LE(0, 38);
+    dir.writeUInt32LE(offset, 42);
+    central.push(dir, name);
+    offset += local.length + name.length + entry.data.length;
+  }
+
+  const centralSize = central.reduce((sum, b) => sum + b.length, 0);
+  const end = Buffer.alloc(22);
+  end.writeUInt32LE(0x06054b50, 0);
+  end.writeUInt16LE(0, 4);
+  end.writeUInt16LE(0, 6);
+  end.writeUInt16LE(entries.length, 8);
+  end.writeUInt16LE(entries.length, 10);
+  end.writeUInt32LE(centralSize, 12);
+  end.writeUInt32LE(offset, 16);
+  end.writeUInt16LE(0, 20);
+
+  return Buffer.concat([...files, ...central, end]);
+}
+
+const CRC_TABLE = new Uint32Array(256).map((_, i) => {
+  let c = i;
+  for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
+  return c >>> 0;
+});
+
+function crc32(buf: Buffer): number {
+  let c = 0xffffffff;
+  for (const byte of buf) c = CRC_TABLE[(c ^ byte) & 0xff] ^ (c >>> 8);
+  return (c ^ 0xffffffff) >>> 0;
 }
 
 function pdfResponse({ presentation, slides, participants, responses }: ExportData): Response {

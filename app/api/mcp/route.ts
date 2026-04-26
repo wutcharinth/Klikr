@@ -162,6 +162,34 @@ export async function POST(req: NextRequest) {
     if (!user) throw new Error("Authentication required: send Authorization: Bearer <supabase_access_token>");
     return user;
   };
+  const requirePresentationAccess = async (presentationId: string) => {
+    const u = requireAuth();
+    const { data: pres, error } = await supabase
+      .from("presentations")
+      .select("owner_id")
+      .eq("id", presentationId)
+      .maybeSingle();
+    if (error) throw error;
+    if (!pres) throw new Error("Presentation not found");
+    if (pres.owner_id === u.id) return;
+    const { data: editor } = await supabase
+      .from("presentation_editors")
+      .select("user_id")
+      .eq("presentation_id", presentationId)
+      .eq("user_id", u.id)
+      .maybeSingle();
+    if (!editor) throw new Error("Forbidden");
+  };
+  const requireSlideAccess = async (slideId: string) => {
+    const { data: slide, error } = await supabase
+      .from("slides")
+      .select("presentation_id")
+      .eq("id", slideId)
+      .maybeSingle();
+    if (error) throw error;
+    if (!slide) throw new Error("Slide not found");
+    await requirePresentationAccess(slide.presentation_id);
+  };
 
   try {
     switch (name) {
@@ -205,6 +233,7 @@ export async function POST(req: NextRequest) {
       case "klikr_add_slide": {
         requireAuth();
         const presentationId = String(args.presentation_id);
+        await requirePresentationAccess(presentationId);
         const type = String(args.type) as SlideType;
         const question = String(args.question ?? "");
         const config = (args.config as SlideConfig | undefined) ?? DEFAULT_CONFIG[type];
@@ -229,6 +258,7 @@ export async function POST(req: NextRequest) {
       case "klikr_advance_slide": {
         requireAuth();
         const presentationId = String(args.presentation_id);
+        await requirePresentationAccess(presentationId);
         const direction = String(args.direction ?? "next") as "next" | "prev";
 
         const { data: slides } = await supabase
@@ -272,6 +302,7 @@ export async function POST(req: NextRequest) {
       case "klikr_end_presentation": {
         requireAuth();
         const presentationId = String(args.presentation_id);
+        await requirePresentationAccess(presentationId);
         const { error } = await supabase
           .from("presentations")
           .update({ state: "closed" })
@@ -282,6 +313,7 @@ export async function POST(req: NextRequest) {
 
       case "klikr_get_responses": {
         const slideId = String(args.slide_id);
+        await requireSlideAccess(slideId);
         const { data: responses, error } = await supabase
           .from("responses")
           .select("id, value_text, value_index, response_ms, created_at, participant_id")
@@ -303,6 +335,7 @@ export async function POST(req: NextRequest) {
 
       case "klikr_get_leaderboard": {
         const presentationId = String(args.presentation_id);
+        await requirePresentationAccess(presentationId);
         const { data, error } = await supabase
           .from("participants")
           .select("nickname, score, created_at")

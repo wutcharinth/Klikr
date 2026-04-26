@@ -1,7 +1,7 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
-import type { Slide, QuizConfig } from "@/lib/types";
+import type { Slide } from "@/lib/types";
 
 export async function startPresentation(presentationId: string) {
   const supabase = await createClient();
@@ -87,29 +87,7 @@ async function scoreQuizSlide(
   slide: Pick<Slide, "id" | "type" | "config">,
 ) {
   const supabase = await createClient();
-  const cfg = slide.config as QuizConfig;
-  const timeLimitMs = (cfg.time_limit_s ?? 20) * 1000;
-  const { data: correctResponses } = await supabase
-    .from("responses")
-    .select("participant_id, response_ms")
-    .eq("slide_id", slide.id)
-    .eq("value_index", cfg.correct_index);
-  if (!correctResponses) return;
-
-  for (const r of correctResponses) {
-    const ms = Math.max(0, Math.min(timeLimitMs, r.response_ms ?? timeLimitMs));
-    const points = Math.round(1000 * (1 - ms / timeLimitMs));
-    if (points <= 0) continue;
-    const { data: cur } = await supabase
-      .from("participants")
-      .select("score")
-      .eq("id", r.participant_id)
-      .single();
-    if (!cur) continue;
-    await supabase
-      .from("participants")
-      .update({ score: cur.score + points })
-      .eq("id", r.participant_id);
-  }
+  const { error } = await supabase.rpc("score_quiz_slide", { p_slide_id: slide.id });
+  if (error) throw error;
   void presentationId;
 }

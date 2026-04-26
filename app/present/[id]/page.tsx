@@ -19,7 +19,16 @@ export default async function PresentPage({
     .select("*")
     .eq("id", id)
     .single<Presentation>();
-  if (!presentation || presentation.owner_id !== userData.user.id) notFound();
+  if (!presentation) notFound();
+  if (presentation.owner_id !== userData.user.id) {
+    const { data: editorRow } = await supabase
+      .from("presentation_editors")
+      .select("user_id")
+      .eq("presentation_id", id)
+      .eq("user_id", userData.user.id)
+      .maybeSingle();
+    if (!editorRow) notFound();
+  }
 
   const { data: slides } = await supabase
     .from("slides")
