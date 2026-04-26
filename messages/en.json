@@ -177,7 +177,16 @@
     "title": "Run a real session right here.",
     "intro": "A poll, a word cloud, a quick Q&A, and a quiz with a podium. Tap through it like you're hosting one — sample answers come in so the room feels alive.",
     "startDemo": "Start the demo",
+    "openFullDemo": "Open full-screen demo",
     "orPickTemplate": "Or pick a template",
+    "previewTitle": "What you'll see",
+    "previewIntro": "Tap through every slide format with sample audience activity.",
+    "previews": [
+      { "title": "Multiple choice", "body": "Tap an option — the bar grows live." },
+      { "title": "Word clouds", "body": "Submit a word, watch popular ones grow biggest." },
+      { "title": "Open responses", "body": "Free text answers stream in from the room." },
+      { "title": "Quiz with podium", "body": "Timed questions, score for speed, top three on the podium." }
+    ],
     "readyTitle": "Ready to host your own?",
     "readyBody": "Pick a template — you'll be presenting in under a minute.",
     "browseTemplates": "Browse templates →",
