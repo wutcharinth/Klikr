@@ -16,39 +16,60 @@ export default function LocaleSwitcher() {
     });
   }
 
+  // Mobile: show only the OTHER locale as a one-tap toggle.
+  // Desktop: show both as a pill segment.
+  const other: "en" | "th" = locale === "en" ? "th" : "en";
+  const otherLabel = other === "en" ? "EN" : "ไทย";
+
   return (
-    <div
-      className="inline-flex items-center gap-0.5 rounded-full p-0.5 text-xs"
-      style={{ background: "var(--pale)", border: "1px solid var(--line)" }}
-      aria-label="Language"
-    >
-      <Globe className="ml-1.5 h-3 w-3 muted-text" aria-hidden />
+    <>
+      {/* Mobile compact: globe + tap-to-switch label */}
       <button
         type="button"
-        onClick={() => setLocale("en")}
+        onClick={() => setLocale(other)}
         disabled={isPending}
-        className="rounded-full px-2 py-0.5 transition-colors"
-        style={
-          locale === "en"
-            ? { background: "var(--white)", color: "var(--ink)", fontWeight: 600 }
-            : { color: "var(--neutral)" }
-        }
+        className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs sm:hidden"
+        style={{ background: "var(--pale)", border: "1px solid var(--line)", color: "var(--ink)" }}
+        aria-label={`Switch to ${otherLabel}`}
       >
-        EN
+        <Globe className="h-3 w-3 muted-text" aria-hidden />
+        <span className="font-medium">{otherLabel}</span>
       </button>
-      <button
-        type="button"
-        onClick={() => setLocale("th")}
-        disabled={isPending}
-        className="rounded-full px-2 py-0.5 transition-colors"
-        style={
-          locale === "th"
-            ? { background: "var(--white)", color: "var(--ink)", fontWeight: 600 }
-            : { color: "var(--neutral)" }
-        }
+
+      {/* Desktop segmented pill */}
+      <div
+        className="hidden items-center gap-0.5 rounded-full p-0.5 text-xs sm:inline-flex"
+        style={{ background: "var(--pale)", border: "1px solid var(--line)" }}
+        aria-label="Language"
       >
-        ไทย
-      </button>
-    </div>
+        <Globe className="ml-1.5 h-3 w-3 muted-text" aria-hidden />
+        <button
+          type="button"
+          onClick={() => setLocale("en")}
+          disabled={isPending}
+          className="rounded-full px-2 py-0.5 transition-colors"
+          style={
+            locale === "en"
+              ? { background: "var(--white)", color: "var(--ink)", fontWeight: 600 }
+              : { color: "var(--neutral)" }
+          }
+        >
+          EN
+        </button>
+        <button
+          type="button"
+          onClick={() => setLocale("th")}
+          disabled={isPending}
+          className="rounded-full px-2 py-0.5 transition-colors"
+          style={
+            locale === "th"
+              ? { background: "var(--white)", color: "var(--ink)", fontWeight: 600 }
+              : { color: "var(--neutral)" }
+          }
+        >
+          ไทย
+        </button>
+      </div>
+    </>
   );
 }

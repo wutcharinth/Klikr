@@ -125,7 +125,7 @@ function TemplateCard({
     >
       <div
         className="flex h-36 items-center justify-center text-2xl font-semibold tracking-tight"
-        style={{ background: cardGradient(t.category), color: "var(--white)" }}
+        style={{ background: cardGradient(t.category), color: "var(--white-fixed)" }}
       >
         <span className="px-6 text-center">{t.title}</span>
       </div>

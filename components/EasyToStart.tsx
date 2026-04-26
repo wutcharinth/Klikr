@@ -122,17 +122,18 @@ function Card({
         opacity: visible ? 1 : 0,
         transform: visible ? "translateY(0)" : "translateY(28px)",
         transition: `opacity 0.7s ${index * 0.12}s, transform 0.7s ${index * 0.12}s, box-shadow 0.4s, translate 0.4s`,
+        color: "#1d1d1f",
       }}
     >
       <div className="flex h-44 items-center justify-center overflow-hidden">
         <Illust playing={visible || hover} />
       </div>
-      <h3 className="mt-4 text-2xl font-semibold tracking-tight">{title}</h3>
-      <p className="mt-2 text-sm muted-text">{body}</p>
+      <h3 className="mt-4 text-2xl font-semibold tracking-tight" style={{ color: "#1d1d1f" }}>{title}</h3>
+      <p className="mt-2 text-sm" style={{ color: "#6e6e73" }}>{body}</p>
       <Link
         href={href}
         className="mt-6 inline-flex w-fit items-center gap-1.5 rounded-full px-4 py-2 text-sm font-medium transition-all"
-        style={{ background: "#ece6dd", color: "var(--ink)" }}
+        style={{ background: "#ece6dd", color: "#1d1d1f" }}
       >
         {cta}
         <span style={{ display: "inline-block", transition: "transform 0.25s", transform: hover ? "translateX(3px)" : "none" }}>→</span>

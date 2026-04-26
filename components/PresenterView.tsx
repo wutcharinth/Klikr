@@ -14,6 +14,7 @@ import { ReactionOverlay } from "./ReactionOverlay";
 import { EmbedSlide } from "./EmbedSlide";
 import { KahootPresenterView } from "./KahootPresenterView";
 import { QuizPodium } from "./QuizPodium";
+import { QrCode } from "./QrCode";
 import type { EmbedConfig } from "@/lib/types";
 
 export function PresenterView({
@@ -268,23 +269,41 @@ function Lobby({
   slidesCount: number;
   onStart: () => void;
 }) {
+  const [origin, setOrigin] = useState("");
+  useEffect(() => setOrigin(window.location.origin), []);
+  const joinUrl = origin ? `${origin}/play/${presentation.code}` : `/play/${presentation.code}`;
+  const joinHost = origin ? new URL(origin).host : "klikr.app";
+
   return (
-    <div className="relative panel p-14 text-center overflow-hidden">
+    <div className="relative panel p-6 text-center overflow-hidden sm:p-14">
       <div className="orb orb-1" style={{ opacity: 0.25 }} />
       <div className="orb orb-2" style={{ opacity: 0.18 }} />
       <div className="anim-fade-up pill"><span className="live-dot" /> Lobby</div>
       <p className="anim-fade-up delay-200 mt-6 text-sm muted-text">Audience joins at</p>
-      <p className="anim-fade-up delay-200 mt-1 text-base">
-        <span className="muted-text">{typeof window !== "undefined" ? window.location.host : "klikr.app"} / </span>
+      <p className="anim-fade-up delay-200 mt-1 text-base break-all">
+        <span className="muted-text">{joinHost} / </span>
         <span className="mono">{presentation.code}</span>
       </p>
 
-      <p className="anim-pop delay-300 mono mt-14 text-8xl font-bold tracking-[0.18em]"
-         style={{ background: "linear-gradient(120deg, var(--fg) 30%, var(--blue) 100%)", WebkitBackgroundClip: "text", backgroundClip: "text", color: "transparent" }}>
-        {presentation.code}
-      </p>
+      <div className="mt-10 flex flex-col items-center justify-center gap-8 sm:mt-12 sm:flex-row sm:gap-12">
+        <p
+          className="anim-pop delay-300 mono text-6xl font-bold tracking-[0.18em] sm:text-8xl"
+          style={{
+            background: "linear-gradient(120deg, var(--fg) 30%, var(--blue) 100%)",
+            WebkitBackgroundClip: "text",
+            backgroundClip: "text",
+            color: "transparent",
+          }}
+        >
+          {presentation.code}
+        </p>
+        <div className="anim-pop delay-300 flex flex-col items-center gap-2">
+          <QrCode value={joinUrl} size={180} />
+          <p className="text-[10px] uppercase tracking-[0.18em] muted-text">Scan to join</p>
+        </div>
+      </div>
 
-      <div className="mt-14">
+      <div className="mt-12 sm:mt-14">
         <p className="text-[10px] uppercase tracking-[0.18em] muted-text">
           Joined · {participants.length}
         </p>

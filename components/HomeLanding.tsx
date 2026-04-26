@@ -71,8 +71,8 @@ export async function HomeLanding() {
   return (
     <section
       aria-labelledby="home-landing-heading"
-      className="relative overflow-hidden border-t py-20 sm:py-28"
-      style={{ borderColor: "var(--line)", background: "rgba(255,255,255,0.4)" }}
+      className="surface-tint relative overflow-hidden border-t py-20 sm:py-28"
+      style={{ borderColor: "var(--line)" }}
     >
       <script
         type="application/ld+json"

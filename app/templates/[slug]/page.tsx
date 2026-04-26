@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import type { Template, TemplateSlide } from "@/lib/types";
 import { applyTemplate } from "../actions";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Sparkles } from "lucide-react";
 import NavBar from "@/components/NavBar";
 import ApplyTemplateForm from "@/components/ApplyTemplateForm";
 

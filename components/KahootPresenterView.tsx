@@ -1,8 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { Triangle, Diamond, Circle, Square } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { Triangle, Diamond, Circle, Square, Volume2, VolumeX } from "lucide-react";
 import type { Slide, ResponseRow, QuizConfig } from "@/lib/types";
+
+const MUSIC_SRC = "/audio/quiz-pulse.mp3";
+const MUSIC_PREF_KEY = "klikr-quiz-music";
 
 const TILES = [
   { color: "#E21B3C", Icon: Triangle, label: "Triangle" },
@@ -46,7 +49,10 @@ export function KahootPresenterView({
           <p className="text-[11px] uppercase tracking-wider muted-text">Quiz</p>
           <h2 className="mt-1 text-3xl font-semibold tracking-tight">{slide.question}</h2>
         </div>
-        <TimerRing remaining={remaining} progress={progress} color={ringColor} expired={expired} />
+        <div className="flex items-center gap-3">
+          <MusicToggle active={!expired} />
+          <TimerRing remaining={remaining} progress={progress} color={ringColor} expired={expired} />
+        </div>
       </div>
 
       {slide.image_url && (
@@ -87,6 +93,61 @@ export function KahootPresenterView({
         {expired && <span>Time's up — {counts[cfg.correct_index]} got it right</span>}
       </div>
     </div>
+  );
+}
+
+function MusicToggle({ active }: { active: boolean }) {
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const [enabled, setEnabled] = useState(false);
+  const [hydrated, setHydrated] = useState(false);
+
+  useEffect(() => {
+    const stored = typeof window !== "undefined" ? localStorage.getItem(MUSIC_PREF_KEY) : null;
+    setEnabled(stored !== "off");
+    setHydrated(true);
+  }, []);
+
+  useEffect(() => {
+    const a = audioRef.current;
+    if (!a || !hydrated) return;
+    if (enabled && active) {
+      a.volume = 0.35;
+      const p = a.play();
+      if (p && typeof p.catch === "function") p.catch(() => {});
+    } else {
+      a.pause();
+      if (!active) a.currentTime = 0;
+    }
+  }, [enabled, active, hydrated]);
+
+  const toggle = () => {
+    setEnabled((v) => {
+      const next = !v;
+      if (typeof window !== "undefined") {
+        localStorage.setItem(MUSIC_PREF_KEY, next ? "on" : "off");
+      }
+      return next;
+    });
+  };
+
+  return (
+    <>
+      <button
+        type="button"
+        onClick={toggle}
+        title={enabled ? "Mute quiz music" : "Play quiz music"}
+        aria-label={enabled ? "Mute quiz music" : "Play quiz music"}
+        className="flex h-9 w-9 items-center justify-center rounded-full transition-colors"
+        style={{
+          background: enabled ? "rgba(0,113,227,0.12)" : "transparent",
+          border: "1px solid var(--line)",
+          color: enabled ? "var(--blue)" : "var(--muted)",
+        }}
+      >
+        {enabled ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />}
+      </button>
+      <audio ref={audioRef} src={MUSIC_SRC} loop preload="auto" />
+    </>
   );
 }
 

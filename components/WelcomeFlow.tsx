@@ -97,7 +97,7 @@ function Audience({ onNext }: { onNext: () => void }) {
         className="flex h-44 w-44 flex-col items-center justify-center rounded-2xl"
         style={{
           background: "linear-gradient(135deg,#0071E3,#00C2FF)",
-          color: "var(--white)",
+          color: "var(--white-fixed)",
         }}
       >
         <QrCode className="h-12 w-12" />

@@ -212,7 +212,11 @@ function PromoBanner({
           <strong>{promoStrong}</strong> {promoRest}
         </span>
       </div>
-      <Link href="/login" className="btn-dark text-xs" style={{ padding: "6px 14px" }}>
+      <Link
+        href="/login"
+        className="inline-flex shrink-0 items-center justify-center rounded-full text-xs font-medium transition-colors"
+        style={{ background: "#1d1d1f", color: "#ffffff", padding: "6px 14px" }}
+      >
         {startFree}
       </Link>
     </div>
@@ -257,7 +261,7 @@ function TierCard({
       {tier.highlight && (
         <span
           className="absolute -top-3 left-6 rounded-full px-3 py-1 text-[10px] font-semibold uppercase tracking-wider"
-          style={{ background: "var(--blue)", color: "var(--white)" }}
+          style={{ background: "var(--blue)", color: "var(--white-fixed)" }}
         >
           {mostPopular}
         </span>

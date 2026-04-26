@@ -59,7 +59,10 @@ export default function UseCaseTabs() {
   return (
     <section className="mx-auto max-w-6xl px-6 py-20">
       <div className="flex justify-center">
-        <div className="inline-flex rounded-full p-1" style={{ background: "var(--ink)" }}>
+        <div
+          className="inline-flex rounded-full p-1"
+          style={{ background: "rgba(0,0,0,0.85)", border: "1px solid rgba(255,255,255,0.08)" }}
+        >
           {(["business", "education"] as Audience[]).map((a) => (
             <button
               key={a}
@@ -69,8 +72,8 @@ export default function UseCaseTabs() {
               }}
               className="rounded-full px-5 py-1.5 text-sm font-medium transition-colors"
               style={{
-                background: audience === a ? "var(--white)" : "transparent",
-                color: audience === a ? "var(--ink)" : "rgba(255,255,255,0.7)",
+                background: audience === a ? "#ffffff" : "transparent",
+                color: audience === a ? "#1d1d1f" : "rgba(255,255,255,0.75)",
               }}
             >
               {a === "business" ? t("business") : t("education")}
@@ -155,21 +158,28 @@ function Stage({
       <div
         key={useCase.stageTitle}
         className="anim-fade-up mx-auto h-full max-w-md rounded-2xl bg-white p-7 shadow-2xl"
-        style={{ border: "8px solid #1a1a1f", animationDuration: "0.6s" }}
+        style={{ border: "8px solid #1a1a1f", animationDuration: "0.6s", color: "#1d1d1f" }}
       >
         <div className="flex items-center justify-between">
-          <Sparkles className="h-4 w-4 animate-pulse" style={{ color: "var(--blue)" }} />
-          <span className="inline-flex items-center gap-1.5 text-[10px] uppercase tracking-wider muted-text">
+          <Sparkles className="h-4 w-4 animate-pulse" style={{ color: "#0071e3" }} />
+          <span
+            className="inline-flex items-center gap-1.5 text-[10px] uppercase tracking-wider"
+            style={{ color: "#6e6e73" }}
+          >
             <span className="live-dot" /> {liveLabel}
           </span>
         </div>
-        <h3 className="mt-6 text-xl font-semibold tracking-tight">{useCase.stageTitle}</h3>
+        <h3 className="mt-6 text-xl font-semibold tracking-tight" style={{ color: "#1d1d1f" }}>
+          {useCase.stageTitle}
+        </h3>
         <div className="mt-6 space-y-5">
           {animated.map((row, i) => (
             <div key={row.label} className="anim-fade-up" style={{ animationDelay: `${0.1 + i * 0.12}s`, animationDuration: "0.55s" }}>
               <div className="flex items-baseline justify-between text-sm">
-                <span>{row.label}</span>
-                <span className="mono text-xs muted-text">{row.displayed.toFixed(1)}</span>
+                <span style={{ color: "#1d1d1f" }}>{row.label}</span>
+                <span className="mono text-xs" style={{ color: "#6e6e73" }}>
+                  {row.displayed.toFixed(1)}
+                </span>
               </div>
               <div className="mt-1.5 h-2 w-full overflow-hidden rounded-full" style={{ background: "rgba(0,0,0,0.06)" }}>
                 <div
@@ -184,15 +194,18 @@ function Stage({
             </div>
           ))}
         </div>
-        <div className="mt-7 flex items-center justify-between text-[10px] muted-text">
+        <div className="mt-7 flex items-center justify-between text-[10px]" style={{ color: "#6e6e73" }}>
           <span>{agreeMin}</span>
           <span>{agreeMax}</span>
         </div>
         <div className="mt-3 flex items-center justify-between text-[10px]">
-          <span className="muted-text">
+          <span style={{ color: "#6e6e73" }}>
             <span className="live-dot mr-1" /> {answeredFn(answered)}
           </span>
-          <span className="rounded-full px-2 py-0.5 mono tabular-nums" style={{ background: "var(--pale)", color: "var(--ink)" }}>
+          <span
+            className="rounded-full px-2 py-0.5 mono tabular-nums"
+            style={{ background: "#f5f5f7", color: "#1d1d1f" }}
+          >
             {answered} / {respondents}
           </span>
         </div>

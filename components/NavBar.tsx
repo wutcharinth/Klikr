@@ -29,7 +29,7 @@ export default async function NavBar({
 
   return (
     <nav className="flex items-center justify-between gap-2 sm:gap-6">
-      <div className="flex min-w-0 items-center gap-3 sm:gap-6">
+      <div className="flex shrink-0 items-center gap-3 sm:gap-6">
         <Link href={homeHref} className="group inline-flex shrink-0 items-center gap-2.5">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
@@ -48,18 +48,21 @@ export default async function NavBar({
           <ResourcesMenu activeDemo={active === "demo"} activeAbout={active === "about"} />
         </div>
       </div>
-      <div className="flex shrink-0 items-center gap-2 sm:gap-3 text-sm">
+      <div className="flex shrink-0 items-center gap-1.5 sm:gap-3 text-sm">
         <LocaleSwitcher />
         <ThemeToggle />
         {signedIn ? (
           <>
             <Link href="/credits" className={`hidden sm:inline-block text-sm transition-colors ${active === "credits" ? "text-[var(--ink)] font-medium" : "muted-text hover:text-[var(--ink)]"}`}>{t("credits")}</Link>
-            <Link href="/dashboard" className="btn-primary">{t("myDashboard")}</Link>
+            <Link href="/dashboard" className="btn-primary text-xs sm:text-sm" style={{ padding: "8px 14px" }}>{t("myDashboard")}</Link>
           </>
         ) : (
           <>
             <Link href="/login" className="hidden sm:inline-block muted-text hover:text-[var(--ink)]">{t("login")}</Link>
-            <Link href="/login" className="btn-primary">{t("signupFree")}</Link>
+            <Link href="/login" className="btn-primary text-xs sm:text-sm" style={{ padding: "8px 14px" }}>
+              <span className="sm:hidden">{t("signupShort")}</span>
+              <span className="hidden sm:inline">{t("signupFree")}</span>
+            </Link>
           </>
         )}
       </div>

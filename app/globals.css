@@ -11,6 +11,7 @@
   --black: #000000;
   --pale: #f5f5f7;
   --white: #ffffff;
+  --white-fixed: #ffffff; /* stays #fff in dark mode, for text on colored bg */
   --ink: #1d1d1f;
 
   /* Action blues */
@@ -58,9 +59,37 @@
   --accent: var(--blue-bright);
   color-scheme: dark;
 }
+/* Surface tint used by HomeLanding section overlay — light pearl in light mode,
+   subtle dark wash in dark mode so the text underneath stays readable. */
+.surface-tint { background: rgba(255,255,255,0.4); }
+:root[data-theme="dark"] .surface-tint { background: rgba(255,255,255,0.02); }
+
 :root[data-theme="dark"] .panel { background: var(--graphite-1); border-color: rgba(255,255,255,0.06); }
 :root[data-theme="dark"] .panel-soft { background: rgba(255,255,255,0.04); }
 :root[data-theme="dark"] ::selection { background: rgba(41,151,255,0.28); }
+
+/* btn-primary keeps true-white text on its blue background in dark mode
+   (--white is repurposed as a surface token in the dark palette). */
+:root[data-theme="dark"] .btn-primary { color: #ffffff; }
+:root[data-theme="dark"] .input {
+  background: rgba(255,255,255,0.06);
+  border-color: rgba(255,255,255,0.18);
+  color: var(--fg);
+}
+:root[data-theme="dark"] .input::placeholder { color: rgba(255,255,255,0.45); }
+:root[data-theme="dark"] .capsule,
+:root[data-theme="dark"] .pill {
+  background: rgba(255,255,255,0.05);
+  border-color: rgba(255,255,255,0.10);
+  color: var(--muted);
+}
+:root[data-theme="dark"] .btn-ghost {
+  color: var(--fg);
+  border-color: rgba(255,255,255,0.18);
+}
+:root[data-theme="dark"] .btn-ghost:hover { background: rgba(255,255,255,0.06); }
+:root[data-theme="dark"] .btn-link { color: var(--blue-bright); }
+:root[data-theme="dark"] .btn-link:hover { color: #5fb1ff; }
 
 @layer base {
   html {

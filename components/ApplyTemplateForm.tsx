@@ -60,7 +60,7 @@ export default function ApplyTemplateForm({ action, poolSize, defaultCount }: Pr
             className="flex w-full items-center justify-between rounded-xl px-4 py-2.5 text-sm transition-colors"
             style={{
               background: shuffle ? "var(--blue)" : "var(--white)",
-              color: shuffle ? "var(--white)" : "var(--ink)",
+              color: shuffle ? "var(--white-fixed)" : "var(--ink)",
               border: "1px solid var(--line)",
             }}
           >
