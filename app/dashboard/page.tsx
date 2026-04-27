@@ -36,12 +36,18 @@ export default async function Dashboard({ searchParams }: { searchParams?: Searc
 
   const sp = (await searchParams) ?? {};
 
-  const { data: presentations } = await supabase
+  const { data: presentations, error: presentationsErr } = await supabase
     .from("editable_presentations")
     .select("id, title, code, state, created_at, last_started_at, pinned, is_owner")
     .order("pinned", { ascending: false })
     .order("last_started_at", { ascending: false, nullsFirst: false })
     .order("created_at", { ascending: false });
+
+  if (presentationsErr) {
+    // Don't trap the user in a blank screen — surface the failure and log it.
+    console.error("dashboard: editable_presentations query failed", presentationsErr);
+  }
+  const rows = presentations ?? [];
 
   return (
     <main className="mx-auto max-w-4xl px-6 py-12">
@@ -83,9 +89,25 @@ export default async function Dashboard({ searchParams }: { searchParams?: Searc
         </div>
       </section>
 
+      {presentationsErr && (
+        <div
+          className="mt-6 rounded-xl border p-4 text-sm"
+          style={{
+            background: "rgba(239,68,68,0.08)",
+            borderColor: "rgba(239,68,68,0.35)",
+            color: "#fca5a5",
+          }}
+        >
+          <p className="font-medium">Couldn't load your presentations.</p>
+          <p className="mt-1 text-xs opacity-80">
+            {presentationsErr.message ?? "Database query failed."}
+          </p>
+        </div>
+      )}
+
       <ul className="mt-8 space-y-3">
-        {presentations?.length === 0 && <EmptyDashboard />}
-        {presentations?.map((p, i) => (
+        {!presentationsErr && rows.length === 0 && <EmptyDashboard />}
+        {rows.map((p, i) => (
           <li
             key={p.id}
             className="row-stagger panel p-5 flex items-center justify-between gap-4"
