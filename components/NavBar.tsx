@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import LocaleSwitcher from "./LocaleSwitcher";
 import ThemeToggle from "./ThemeToggle";
 import { AI_ENABLED } from "@/lib/featureFlags";
+import { isAdminEmail } from "@/lib/admin";
 
 export default async function NavBar({
   active,
@@ -15,6 +16,20 @@ export default async function NavBar({
   const { data } = await supabase.auth.getUser();
   const signedIn = Boolean(data.user);
   const homeHref = signedIn ? "/dashboard" : "/";
+
+  let isAdmin = false;
+  if (signedIn && data.user) {
+    if (isAdminEmail(data.user.email)) {
+      isAdmin = true;
+    } else {
+      const { data: prof } = await supabase
+        .from("profiles")
+        .select("is_admin")
+        .eq("id", data.user.id)
+        .maybeSingle();
+      isAdmin = Boolean(prof?.is_admin);
+    }
+  }
 
   const link = (href: string, label: string, key: typeof active) => (
     <Link
@@ -56,6 +71,16 @@ export default async function NavBar({
           <>
             {AI_ENABLED && (
               <Link href="/credits" className={`hidden sm:inline-block text-sm transition-colors ${active === "credits" ? "text-[var(--ink)] font-medium" : "muted-text hover:text-[var(--ink)]"}`}>{t("credits")}</Link>
+            )}
+            {isAdmin && (
+              <Link
+                href="/admin"
+                className={`hidden sm:inline-block text-sm transition-colors ${
+                  active === "admin" ? "text-[var(--ink)] font-medium" : "muted-text hover:text-[var(--ink)]"
+                }`}
+              >
+                Admin
+              </Link>
             )}
             <Link href="/dashboard" className="btn-primary text-xs sm:text-sm" style={{ padding: "8px 14px" }}>{t("myDashboard")}</Link>
           </>

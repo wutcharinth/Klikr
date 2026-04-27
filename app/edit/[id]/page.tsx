@@ -6,6 +6,7 @@ import { addSlide } from "./actions";
 import { SlideEditor } from "@/components/SlideEditor";
 import ThemeEditor from "@/components/ThemeEditor";
 import EditorsModal, { type Editor } from "@/components/EditorsModal";
+import { FeedbackWidget } from "@/components/FeedbackWidget";
 import { Sparkles } from "lucide-react";
 
 export default async function EditPage({ params }: { params: Promise<{ id: string }> }) {
@@ -137,6 +138,7 @@ export default async function EditPage({ params }: { params: Promise<{ id: strin
           )}
         </section>
       </div>
+      <FeedbackWidget persona="host" />
     </main>
   );
 }

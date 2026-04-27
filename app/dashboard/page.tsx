@@ -13,6 +13,7 @@ import SaveAsTemplateButton from "@/components/SaveAsTemplateButton";
 import AIGenerateButton from "@/components/AIGenerateButton";
 import EmptyDashboard from "@/components/EmptyDashboard";
 import NavBar from "@/components/NavBar";
+import { FeedbackWidget } from "@/components/FeedbackWidget";
 import { AI_ENABLED } from "@/lib/featureFlags";
 
 type SearchParams = Promise<{ ai?: string }>;
@@ -174,6 +175,7 @@ export default async function Dashboard({ searchParams }: { searchParams?: Searc
           </li>
         ))}
       </ul>
+      <FeedbackWidget persona="host" />
     </main>
   );
 }
