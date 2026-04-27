@@ -187,7 +187,21 @@ export function ScoreCard({
     return () => clearTimeout(t);
   }, [rankDelta]);
 
-  if (!me) return null;
+  // While we wait for the first fetch, render a placeholder so the audience
+  // never sees a blank reveal. Score and rank fill in as the data arrives.
+  if (!me) {
+    return (
+      <div
+        className="relative w-full max-w-sm overflow-visible rounded-2xl border border-slate-200 bg-slate-50 p-5 text-center dark:border-slate-700 dark:bg-slate-800"
+      >
+        <p className="text-[11px] uppercase tracking-[0.18em] muted-text">Your score</p>
+        <p className="mt-1 text-4xl font-bold tracking-tight" style={{ color: "var(--blue)", opacity: 0.4 }}>
+          —
+        </p>
+        <p className="mt-2 text-sm muted-text">Tallying scores…</p>
+      </div>
+    );
+  }
 
   const pct = total > 0 ? (rank ?? total) / total : 1;
   const encouragement = encouragementFor(pct, rank ?? total);

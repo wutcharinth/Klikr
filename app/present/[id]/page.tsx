@@ -3,7 +3,6 @@ import { redirect, notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import type { Presentation, Slide } from "@/lib/types";
 import { PresenterView } from "@/components/PresenterView";
-import { FeedbackWidget } from "@/components/FeedbackWidget";
 import { headers } from "next/headers";
 
 export default async function PresentPage({
@@ -64,7 +63,6 @@ export default async function PresentPage({
           displayJoinUrl={displayJoinUrl}
         />
       </div>
-      <FeedbackWidget persona="host" />
     </main>
   );
 }

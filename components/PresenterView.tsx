@@ -19,6 +19,7 @@ import { KahootPresenterView } from "./KahootPresenterView";
 import { QuizPodium } from "./QuizPodium";
 import { QrCode } from "./QrCode";
 import { PresenterMusicToggle } from "./PresenterMusicToggle";
+import { FeedbackWidget } from "./FeedbackWidget";
 import type { EmbedConfig, QAConfig } from "@/lib/types";
 
 export function PresenterView({
@@ -152,6 +153,7 @@ export function PresenterView({
           onToggleMode={toggleMode}
           onStart={() => startPresentation(presentation.id)}
         />
+        <FeedbackWidget persona="host" />
       </ThemedShell>
     );
   }
@@ -195,6 +197,7 @@ export function PresenterView({
             <QuizPodium participants={participants} presentationId={presentation.id} />
           ) : null}
         </div>
+        <FeedbackWidget persona="host" />
       </ThemedShell>
     );
   }

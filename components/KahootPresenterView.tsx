@@ -95,23 +95,34 @@ export function KahootPresenterView({
                   className="absolute inset-y-0 left-0 z-0"
                   style={{
                     width: `${pct}%`,
-                    background: "rgba(255,255,255,0.18)",
-                    transition: "width 700ms cubic-bezier(0.22, 1, 0.36, 1)",
+                    background: "rgba(255,255,255,0.32)",
+                    transition: "width 900ms cubic-bezier(0.22, 1, 0.36, 1)",
                   }}
                   aria-hidden
                 />
               )}
               <tile.Icon className="relative z-10 h-8 w-8 flex-none" />
               <div className="relative z-10 min-w-0 flex-1">
-                <p className="text-xl font-semibold">{opt}</p>
+                <div className="flex items-baseline gap-3">
+                  <p className="text-xl font-semibold">{opt}</p>
+                  {expired && total > 0 && (
+                    <span
+                      className="mono text-2xl font-bold leading-none"
+                      style={{ fontVariantNumeric: "tabular-nums" }}
+                    >
+                      {Math.round(pct)}%
+                    </span>
+                  )}
+                </div>
                 <p className="mt-1 text-xs opacity-90">
                   {counts[i]} vote{counts[i] === 1 ? "" : "s"}
-                  {expired && total > 0 && <span className="ml-2 opacity-80">· {Math.round(pct)}%</span>}
                 </p>
               </div>
               {expired && isCorrect && (
                 <>
-                  <span className="relative z-10 rounded-full bg-white/25 px-2 py-0.5 text-[10px] font-bold uppercase">Correct</span>
+                  <span className="relative z-10 rounded-full bg-white px-3 py-1 text-xs font-bold uppercase tracking-wider" style={{ color: "#16a34a" }}>
+                    ✓ Correct
+                  </span>
                   <ConfettiBurst />
                 </>
               )}
@@ -135,10 +146,41 @@ export function KahootPresenterView({
         </div>
       )}
 
-      <div className="flex items-center justify-between text-sm muted-text">
-        <span>{total} {total === 1 ? "answer" : "answers"} in</span>
-        {expired && <span>Time's up — {counts[cfg.correct_index]} got it right</span>}
-      </div>
+      {expired ? (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl panel-soft px-5 py-4">
+          <div className="flex items-center gap-3">
+            <div
+              className="flex h-10 w-10 items-center justify-center rounded-full"
+              style={{ background: "rgba(34,197,94,0.15)", color: "#22c55e" }}
+              aria-hidden
+            >
+              <span className="text-lg font-bold">✓</span>
+            </div>
+            <div className="leading-tight">
+              <p className="text-2xl font-bold tracking-tight">
+                <span className="mono count-bump inline-block" style={{ fontVariantNumeric: "tabular-nums", color: "#22c55e" }}>
+                  {counts[cfg.correct_index]}
+                </span>
+                <span className="muted-text"> / {total}</span>
+              </p>
+              <p className="text-[11px] uppercase tracking-[0.18em] muted-text">got it right</p>
+            </div>
+          </div>
+          <div className="leading-tight text-right">
+            <p className="mono text-xl font-semibold" style={{ fontVariantNumeric: "tabular-nums" }}>
+              {total > 0 ? `${Math.round((counts[cfg.correct_index] / total) * 100)}%` : "0%"}
+            </p>
+            <p className="text-[11px] uppercase tracking-[0.18em] muted-text">accuracy</p>
+          </div>
+        </div>
+      ) : (
+        <div className="flex items-center justify-between text-sm muted-text">
+          <span>
+            <span className="mono count-bump inline-block" style={{ fontVariantNumeric: "tabular-nums" }}>{total}</span>{" "}
+            {total === 1 ? "answer" : "answers"} in
+          </span>
+        </div>
+      )}
     </div>
   );
 }
