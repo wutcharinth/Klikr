@@ -501,6 +501,20 @@ function QuizConfigEditor({
           className="input w-32"
         />
       </label>
+      <label className="block">
+        <span className="mb-2 block text-xs muted-text">
+          Explanation <span className="ml-1 opacity-60">(shown after the answer is revealed — optional)</span>
+        </span>
+        <textarea
+          rows={3}
+          value={value.explanation ?? ""}
+          onChange={(e) => onChange({ ...value, explanation: e.target.value })}
+          onBlur={onCommit}
+          maxLength={500}
+          placeholder="Why is the correct answer correct? Add context, a fun fact, or a follow-up."
+          className="input w-full resize-none"
+        />
+      </label>
     </div>
   );
 }

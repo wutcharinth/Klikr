@@ -74,25 +74,44 @@ export function KahootPresenterView({
           const isCorrect = expired && cfg.correct_index === i;
           const isWrong = expired && cfg.correct_index !== i;
           const tile = TILES[i];
+          // Reveal-time tile colours: green for correct, red for wrong, ignore
+          // the original Kahoot palette so the right answer is unmistakable.
+          const revealBg = isCorrect ? "#22c55e" : isWrong ? "#ef4444" : tile.color;
+          const pct = total > 0 ? (counts[i] / total) * 100 : 0;
           return (
             <div
               key={i}
               className="relative flex items-center gap-4 overflow-hidden rounded-2xl p-5 text-white transition-all"
               style={{
-                background: tile.color,
-                opacity: isWrong ? 0.4 : 1,
+                background: revealBg,
+                opacity: isWrong ? 0.55 : 1,
                 transform: isCorrect ? "scale(1.02)" : "scale(1)",
-                boxShadow: isCorrect ? "0 0 0 4px rgba(255,255,255,0.6)" : "none",
+                boxShadow: isCorrect ? "0 0 0 4px rgba(255,255,255,0.65)" : "none",
               }}
             >
-              <tile.Icon className="h-8 w-8 flex-none" />
-              <div className="min-w-0 flex-1">
+              {/* Vote-share fill that grows in once the answer is revealed. */}
+              {expired && (
+                <span
+                  className="absolute inset-y-0 left-0 z-0"
+                  style={{
+                    width: `${pct}%`,
+                    background: "rgba(255,255,255,0.18)",
+                    transition: "width 700ms cubic-bezier(0.22, 1, 0.36, 1)",
+                  }}
+                  aria-hidden
+                />
+              )}
+              <tile.Icon className="relative z-10 h-8 w-8 flex-none" />
+              <div className="relative z-10 min-w-0 flex-1">
                 <p className="text-xl font-semibold">{opt}</p>
-                <p className="mt-1 text-xs opacity-80">{counts[i]} vote{counts[i] === 1 ? "" : "s"}</p>
+                <p className="mt-1 text-xs opacity-90">
+                  {counts[i]} vote{counts[i] === 1 ? "" : "s"}
+                  {expired && total > 0 && <span className="ml-2 opacity-80">· {Math.round(pct)}%</span>}
+                </p>
               </div>
               {expired && isCorrect && (
                 <>
-                  <span className="rounded-full bg-white/20 px-2 py-0.5 text-[10px] font-bold uppercase">Correct</span>
+                  <span className="relative z-10 rounded-full bg-white/25 px-2 py-0.5 text-[10px] font-bold uppercase">Correct</span>
                   <ConfettiBurst />
                 </>
               )}
@@ -100,6 +119,21 @@ export function KahootPresenterView({
           );
         })}
       </div>
+
+      {expired && cfg.explanation && cfg.explanation.trim().length > 0 && (
+        <div
+          className="rounded-xl p-4 text-sm anim-fade-up"
+          style={{
+            background: "rgba(34, 197, 94, 0.10)",
+            border: "1px solid rgba(34, 197, 94, 0.3)",
+          }}
+        >
+          <p className="text-[10px] uppercase tracking-[0.18em]" style={{ color: "#22c55e" }}>
+            Why
+          </p>
+          <p className="mt-1 leading-snug">{cfg.explanation}</p>
+        </div>
+      )}
 
       <div className="flex items-center justify-between text-sm muted-text">
         <span>{total} {total === 1 ? "answer" : "answers"} in</span>

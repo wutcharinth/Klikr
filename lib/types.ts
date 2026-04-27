@@ -18,6 +18,9 @@ export type QuizConfig = {
   options: string[];
   correct_index: number;
   time_limit_s: number;
+  /** Optional commentary shown after the answer is revealed — for the host
+   *  to elaborate on why the correct answer is correct. */
+  explanation?: string;
 };
 
 export type QAConfig = {

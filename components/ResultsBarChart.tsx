@@ -119,7 +119,23 @@ export function QuizCountdown({
 
   if (expired) {
     return (
-      <ResultsBarChart slide={slide} responses={responses} highlightCorrect fill />
+      <div className="flex min-h-0 flex-1 flex-col gap-4">
+        <ResultsBarChart slide={slide} responses={responses} highlightCorrect fill />
+        {cfg.explanation && cfg.explanation.trim().length > 0 && (
+          <div
+            className="rounded-xl p-4 text-sm anim-fade-up"
+            style={{
+              background: "rgba(34, 197, 94, 0.10)",
+              border: "1px solid rgba(34, 197, 94, 0.3)",
+            }}
+          >
+            <p className="text-[10px] uppercase tracking-[0.18em]" style={{ color: "#22c55e" }}>
+              Why
+            </p>
+            <p className="mt-1 leading-snug">{cfg.explanation}</p>
+          </div>
+        )}
+      </div>
     );
   }
 
