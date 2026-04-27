@@ -110,7 +110,7 @@ export default async function AdminPage({ searchParams }: { searchParams?: Searc
       .select("slug, title, usage_count")
       .order("usage_count", { ascending: false })
       .limit(10),
-    adminSupabase.from("profiles").select("plan_tier"),
+    adminSupabase.from("profiles").select("id, plan_tier"),
     adminSupabase.from("slides").select("type"),
     adminSupabase
       .from("app_feedback")
@@ -120,6 +120,38 @@ export default async function AdminPage({ searchParams }: { searchParams?: Searc
     adminSupabase.from("app_feedback").select("id", { count: "exact", head: true }),
     adminSupabase.from("app_feedback").select("rating").gte("created_at", since),
   ]);
+
+  // Host emails per tier — service role can read auth.users via admin API.
+  const { data: usersList } = await adminSupabase.auth.admin.listUsers({ perPage: 1000 });
+  const emailById = new Map<string, string>();
+  for (const u of usersList?.users ?? []) {
+    if (u.email) emailById.set(u.id, u.email);
+  }
+  const hostsByTier: Record<string, { id: string; email: string }[]> = { free: [], basic: [], pro: [] };
+  for (const row of (tierBreakdown ?? []) as { id?: string; plan_tier: string }[]) {
+    const tier = row.plan_tier ?? "free";
+    if (!hostsByTier[tier]) hostsByTier[tier] = [];
+    if (row.id) {
+      hostsByTier[tier].push({ id: row.id, email: emailById.get(row.id) ?? "(no email)" });
+    }
+  }
+
+  // Page views in the window
+  const { count: pageViewsTotal } = await adminSupabase
+    .from("page_views")
+    .select("id", { count: "exact", head: true })
+    .gte("created_at", since);
+  const { data: pageViewRows } = await adminSupabase
+    .from("page_views")
+    .select("path")
+    .gte("created_at", since);
+  const pageViewCounts: Record<string, number> = {};
+  for (const r of (pageViewRows ?? []) as { path: string }[]) {
+    pageViewCounts[r.path] = (pageViewCounts[r.path] ?? 0) + 1;
+  }
+  const topPages = Object.entries(pageViewCounts)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 20);
 
   // Plan breakdown
   const breakdown: Record<string, number> = { free: 0, basic: 0, pro: 0 };
@@ -264,6 +296,7 @@ export default async function AdminPage({ searchParams }: { searchParams?: Searc
           value={feedbackTotal ?? 0}
           subtitle={fbAvg !== null ? `${fbAvg.toFixed(1)}★ in ${days}d` : undefined}
         />
+        <Kpi title={`Page views · ${days}d`} value={pageViewsTotal ?? 0} />
       </section>
 
       {/* Trends */}
@@ -279,12 +312,29 @@ export default async function AdminPage({ searchParams }: { searchParams?: Searc
         <div>
           <h2 className="text-sm uppercase tracking-[0.18em] muted-text">Plan breakdown</h2>
           <div className="mt-3 grid gap-3 sm:grid-cols-3">
-            {(["free", "basic", "pro"] as const).map((t) => (
-              <div key={t} className="panel-soft p-4">
-                <p className="text-xs muted-text capitalize">{t}</p>
-                <p className="mt-1 text-2xl font-semibold">{breakdown[t]?.toLocaleString() ?? 0}</p>
-              </div>
-            ))}
+            {(["free", "basic", "pro"] as const).map((t) => {
+              const list = hostsByTier[t] ?? [];
+              return (
+                <details key={t} className="panel-soft p-4">
+                  <summary className="cursor-pointer list-none">
+                    <p className="text-xs muted-text capitalize">{t}</p>
+                    <p className="mt-1 text-2xl font-semibold">{breakdown[t]?.toLocaleString() ?? 0}</p>
+                    <p className="mt-1 text-[11px] muted-text">click to expand emails</p>
+                  </summary>
+                  <ul className="mt-3 max-h-72 space-y-1 overflow-auto pr-1 text-[11px]">
+                    {list.length === 0 ? (
+                      <li className="muted-text">No users.</li>
+                    ) : (
+                      list.map((u) => (
+                        <li key={u.id} className="truncate" title={u.email}>
+                          {u.email}
+                        </li>
+                      ))
+                    )}
+                  </ul>
+                </details>
+              );
+            })}
           </div>
         </div>
         <div>
@@ -309,6 +359,28 @@ export default async function AdminPage({ searchParams }: { searchParams?: Searc
             )}
           </div>
         </div>
+      </section>
+
+      {/* Top pages */}
+      <section className="mt-10">
+        <h2 className="text-sm uppercase tracking-[0.18em] muted-text">
+          Top pages · last {days} days
+        </h2>
+        {topPages.length === 0 ? (
+          <p className="mt-3 text-sm muted-text">No page views yet.</p>
+        ) : (
+          <div className="panel mt-3 divide-y" style={{ background: "var(--white)" }}>
+            {topPages.map(([path, count], i) => (
+              <div key={path} className="flex items-center justify-between p-3 text-sm">
+                <span className="truncate">
+                  <span className="muted-text mono mr-3">{i + 1}.</span>
+                  {path}
+                </span>
+                <span className="mono muted-text shrink-0 ml-4">{count.toLocaleString()} views</span>
+              </div>
+            ))}
+          </div>
+        )}
       </section>
 
       {/* Recent feedback */}

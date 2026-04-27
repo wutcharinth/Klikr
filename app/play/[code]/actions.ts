@@ -245,3 +245,27 @@ export async function sendReaction(input: {
   });
   if (error) throw error;
 }
+
+/** Audience post-session feedback on the Klikr app experience. Inserts via the
+ *  service-role client because audience sessions are anonymous and the RLS
+ *  policy on app_feedback requires auth.uid() to be set. */
+export async function submitAudienceFeedback(input: {
+  rating: number;
+  comment: string;
+  pagePath: string;
+}) {
+  const rating = Math.max(1, Math.min(5, Math.round(input.rating)));
+  if (Number.isNaN(rating)) return { error: "invalid_rating" };
+  const comment = (input.comment ?? "").trim().slice(0, 2000);
+
+  const svc = createServiceClient();
+  const { error } = await svc.from("app_feedback").insert({
+    user_id: null,
+    persona: "audience",
+    rating,
+    comment,
+    page_path: input.pagePath?.slice(0, 200) ?? null,
+  });
+  if (error) return { error: error.message };
+  return { ok: true as const };
+}

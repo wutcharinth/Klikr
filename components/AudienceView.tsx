@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/client";
 import type { Presentation, Slide, MCQConfig, QuizConfig, WordCloudConfig, QAConfig, RatingConfig, RankingConfig, ResponseRow } from "@/lib/types";
 import { joinSession, submitResponse, sendReaction, toggleQuestionVote, submitQuestion } from "@/app/play/[code]/actions";
 import { KahootAudienceView } from "./KahootAudienceView";
+import { AudienceAppFeedback } from "./AudienceAppFeedback";
 
 type LocalParticipant = {
   id: string;
@@ -90,6 +91,7 @@ export function AudienceView({
       <Stage>
         <h2 className="text-2xl font-semibold">Session ended</h2>
         <p className="mt-2 text-slate-500">Thanks for playing!</p>
+        <AudienceAppFeedback />
       </Stage>
     );
   }
