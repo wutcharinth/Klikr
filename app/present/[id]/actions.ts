@@ -12,12 +12,14 @@ export async function startPresentation(presentationId: string) {
     .order("position", { ascending: true })
     .limit(1);
   const first = slides?.[0]?.id ?? null;
+  const now = new Date().toISOString();
   const { error } = await supabase
     .from("presentations")
     .update({
       state: "active",
       current_slide_id: first,
-      current_slide_started_at: new Date().toISOString(),
+      current_slide_started_at: now,
+      last_started_at: now,
     })
     .eq("id", presentationId);
   if (error) throw error;

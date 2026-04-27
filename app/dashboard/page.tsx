@@ -1,8 +1,13 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { BarChart3, FilePlus2, LayoutTemplate } from "lucide-react";
+import { BarChart3, FilePlus2, LayoutTemplate, Pin, PinOff, Copy } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
-import { createPresentation, deletePresentation } from "./actions";
+import {
+  createPresentation,
+  deletePresentation,
+  duplicatePresentation,
+  setPinned,
+} from "./actions";
 import { logout } from "../(auth)/actions";
 import SaveAsTemplateButton from "@/components/SaveAsTemplateButton";
 import AIGenerateButton from "@/components/AIGenerateButton";
@@ -32,7 +37,9 @@ export default async function Dashboard({ searchParams }: { searchParams?: Searc
 
   const { data: presentations } = await supabase
     .from("editable_presentations")
-    .select("id, title, code, state, created_at, is_owner")
+    .select("id, title, code, state, created_at, last_started_at, pinned, is_owner")
+    .order("pinned", { ascending: false })
+    .order("last_started_at", { ascending: false, nullsFirst: false })
     .order("created_at", { ascending: false });
 
   return (
@@ -78,15 +85,36 @@ export default async function Dashboard({ searchParams }: { searchParams?: Searc
       <ul className="mt-8 space-y-3">
         {presentations?.length === 0 && <EmptyDashboard />}
         {presentations?.map((p) => (
-          <li key={p.id} className="panel p-5 flex items-center justify-between">
+          <li key={p.id} className="panel p-5 flex items-center justify-between gap-4">
             <div className="min-w-0">
-              <Link href={`/edit/${p.id}`} className="font-medium hover:underline truncate">
-                {p.title}
-              </Link>
-              <div className="mt-1 flex items-center gap-3 text-xs muted-text">
+              <div className="flex items-center gap-2 min-w-0">
+                {p.pinned && (
+                  <Pin
+                    className="h-3.5 w-3.5 shrink-0"
+                    style={{ color: "var(--blue)", fill: "var(--blue)" }}
+                    aria-label="Pinned"
+                  />
+                )}
+                <Link href={`/edit/${p.id}`} className="font-medium hover:underline truncate">
+                  {p.title}
+                </Link>
+              </div>
+              <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs muted-text">
                 <span className="mono">{p.code}</span>
                 <span>·</span>
                 <StatePill state={p.state} />
+                <span>·</span>
+                <span title={`Created ${new Date(p.created_at).toLocaleString()}`}>
+                  Created {formatRelative(p.created_at)}
+                </span>
+                {p.last_started_at && (
+                  <>
+                    <span>·</span>
+                    <span title={`Last presented ${new Date(p.last_started_at).toLocaleString()}`}>
+                      Last presented {formatRelative(p.last_started_at)}
+                    </span>
+                  </>
+                )}
               </div>
             </div>
             <div className="flex items-center gap-2">
@@ -96,6 +124,34 @@ export default async function Dashboard({ searchParams }: { searchParams?: Searc
               <Link href={`/present/${p.id}`} className="btn-primary">Present</Link>
               {p.is_owner ? (
                 <>
+                  <form
+                    action={async () => {
+                      "use server";
+                      await setPinned(p.id, !p.pinned);
+                    }}
+                  >
+                    <button
+                      className="btn-ghost text-xs muted-text"
+                      title={p.pinned ? "Unpin" : "Pin to top"}
+                      aria-label={p.pinned ? "Unpin" : "Pin"}
+                    >
+                      {p.pinned ? <PinOff className="h-3.5 w-3.5" /> : <Pin className="h-3.5 w-3.5" />}
+                    </button>
+                  </form>
+                  <form
+                    action={async () => {
+                      "use server";
+                      await duplicatePresentation(p.id);
+                    }}
+                  >
+                    <button
+                      className="btn-ghost text-xs muted-text"
+                      title="Duplicate"
+                      aria-label="Duplicate"
+                    >
+                      <Copy className="h-3.5 w-3.5" />
+                    </button>
+                  </form>
                   <a href={`/api/export/${p.id}`} download className="btn-ghost text-xs muted-text" title="Export CSV">CSV</a>
                   <a href={`/api/export/${p.id}?format=xlsx`} className="btn-ghost text-xs muted-text" title="Export Excel">XLSX</a>
                   <a href={`/api/export/${p.id}?format=pdf`} className="btn-ghost text-xs muted-text" title="Export PDF">PDF</a>
@@ -120,6 +176,20 @@ export default async function Dashboard({ searchParams }: { searchParams?: Searc
       </ul>
     </main>
   );
+}
+
+function formatRelative(iso: string): string {
+  const then = new Date(iso).getTime();
+  const diffSec = Math.round((Date.now() - then) / 1000);
+  if (diffSec < 60) return "just now";
+  const diffMin = Math.round(diffSec / 60);
+  if (diffMin < 60) return `${diffMin}m ago`;
+  const diffHr = Math.round(diffMin / 60);
+  if (diffHr < 24) return `${diffHr}h ago`;
+  const diffDay = Math.round(diffHr / 24);
+  if (diffDay < 14) return `${diffDay}d ago`;
+  // For older entries, show the calendar date — relative units stop being useful.
+  return new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
 }
 
 function StatePill({ state }: { state: string }) {
