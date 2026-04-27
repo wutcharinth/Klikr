@@ -439,20 +439,8 @@
   100% { opacity: 0;    transform: scale(1.18); }
 }
 
-/* Lobby code letters: cascade in with a slight bounce. */
-.code-letter {
-  display: inline-block;
-  opacity: 0;
-  transform: translateY(20px) scale(0.7);
-  animation: codeLetter 0.7s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
-}
-@keyframes codeLetter {
-  to { opacity: 1; transform: translateY(0) scale(1); }
-}
-
 @media (prefers-reduced-motion: reduce) {
   .qr-halo::before, .qr-halo::after { animation: none !important; opacity: 0 !important; }
-  .code-letter { animation: none !important; opacity: 1 !important; transform: none !important; }
 }
 
 @media (prefers-reduced-motion: reduce) {

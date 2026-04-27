@@ -3,7 +3,6 @@ import { redirect, notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import type { Presentation, Slide } from "@/lib/types";
 import { PresenterView } from "@/components/PresenterView";
-import { QrCode } from "@/components/QrCode";
 import { headers } from "next/headers";
 
 export default async function PresentPage({
@@ -51,21 +50,18 @@ export default async function PresentPage({
 
   return (
     <main className="flex h-screen flex-col overflow-hidden px-4 py-3 lg:px-8 lg:py-4">
-      <div className="mb-3 flex items-start justify-between gap-4">
-        <Link href={`/edit/${presentation.id}`} className="mt-2 text-xs muted-text hover:text-[var(--fg)]">
+      <div className="mb-3">
+        <Link href={`/edit/${presentation.id}`} className="text-xs muted-text hover:text-[var(--fg)]">
           ← Edit
         </Link>
-        <div className="flex items-center gap-3">
-          <div className="text-right leading-tight">
-            <div className="text-[10px] uppercase tracking-[0.18em] muted-text">Join at</div>
-            <div className="mono text-sm">{displayJoinUrl}</div>
-            <div className="mono text-2xl font-semibold tracking-[0.22em]">{presentation.code}</div>
-          </div>
-          <QrCode value={joinUrl} size={88} />
-        </div>
       </div>
       <div className="flex min-h-0 flex-1 flex-col">
-        <PresenterView presentation={presentation} slides={slides ?? []} />
+        <PresenterView
+          presentation={presentation}
+          slides={slides ?? []}
+          joinUrl={joinUrl}
+          displayJoinUrl={displayJoinUrl}
+        />
       </div>
     </main>
   );

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { Moon, Sun } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import type { Presentation, Slide, ResponseRow, Participant } from "@/lib/types";
 import { startPresentation, moveSlide, endPresentation } from "@/app/present/[id]/actions";
@@ -23,14 +24,37 @@ import type { EmbedConfig, QAConfig } from "@/lib/types";
 export function PresenterView({
   presentation: initialPresentation,
   slides,
+  joinUrl,
+  displayJoinUrl,
 }: {
   presentation: Presentation;
   slides: Slide[];
+  joinUrl: string;
+  displayJoinUrl: string;
 }) {
   const supabase = useMemo(() => createClient(), []);
   const [presentation, setPresentation] = useState(initialPresentation);
   const [responses, setResponses] = useState<ResponseRow[]>([]);
   const [participants, setParticipants] = useState<Participant[]>([]);
+  const [modeOverride, setModeOverride] = useState<"light" | "dark" | null>(null);
+
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem(`klikr-present-mode-${initialPresentation.id}`);
+      if (stored === "light" || stored === "dark") setModeOverride(stored);
+    } catch {}
+  }, [initialPresentation.id]);
+
+  const effectiveMode: "light" | "dark" =
+    modeOverride ?? (presentation.theme?.mode === "dark" ? "dark" : "light");
+
+  function toggleMode() {
+    const next: "light" | "dark" = effectiveMode === "dark" ? "light" : "dark";
+    setModeOverride(next);
+    try {
+      localStorage.setItem(`klikr-present-mode-${initialPresentation.id}`, next);
+    } catch {}
+  }
 
   const currentSlide = slides.find((s) => s.id === presentation.current_slide_id) ?? null;
 
@@ -103,14 +127,24 @@ export function PresenterView({
     };
   }, [supabase, currentSlide]);
 
+  const themeForShell: Presentation["theme"] = {
+    ...(presentation.theme ?? {}),
+    mode: effectiveMode,
+  };
+
   if (presentation.state === "lobby") {
     return (
-      <Lobby
-        presentation={presentation}
-        participants={participants}
-        slidesCount={slides.length}
-        onStart={() => startPresentation(presentation.id)}
-      />
+      <ThemedShell theme={themeForShell}>
+        <Lobby
+          presentation={presentation}
+          participants={participants}
+          slidesCount={slides.length}
+          joinUrl={joinUrl}
+          mode={effectiveMode}
+          onToggleMode={toggleMode}
+          onStart={() => startPresentation(presentation.id)}
+        />
+      </ThemedShell>
     );
   }
 
@@ -119,7 +153,7 @@ export function PresenterView({
 
   if (presentation.state === "closed") {
     return (
-      <ThemedShell theme={presentation.theme}>
+      <ThemedShell theme={themeForShell}>
         <div className="flex flex-1 flex-col gap-6">
           <div className="panel p-12 text-center">
             <div className="pill"><span className="live-dot" /> Session complete</div>
@@ -153,8 +187,16 @@ export function PresenterView({
   const qaCfg = currentSlide.type === "qa" ? (currentSlide.config as QAConfig) : null;
 
   return (
-    <ThemedShell theme={presentation.theme}>
+    <ThemedShell theme={themeForShell}>
       <div className="flex min-h-0 flex-1 flex-col gap-4">
+        <div className="flex items-start justify-end gap-3">
+          <div className="text-right leading-tight">
+            <div className="text-[10px] uppercase tracking-[0.18em] muted-text">Join at</div>
+            <div className="mono text-sm">{displayJoinUrl}</div>
+            <div className="mono text-2xl font-semibold tracking-[0.22em]">{presentation.code}</div>
+          </div>
+          <QrCode value={joinUrl} size={88} />
+        </div>
         <div className="flex min-h-0 flex-1 flex-col gap-4 rounded-2xl px-2 py-3 sm:px-6 sm:py-5">
           <div className="flex items-center justify-between">
             <div className="mono text-[11px] uppercase tracking-[0.2em] muted-text">
@@ -171,6 +213,7 @@ export function PresenterView({
                 ⬇ CSV
               </a>
               <PresenterMusicToggle />
+              <ModeToggleButton mode={effectiveMode} onToggle={toggleMode} />
               <span className="flex items-center gap-2"><span className="live-dot" /> live</span>
             </div>
           </div>
@@ -333,6 +376,32 @@ function QAModerationTray({ responses, qaCfg }: { responses: ResponseRow[]; qaCf
   );
 }
 
+function ModeToggleButton({
+  mode,
+  onToggle,
+}: {
+  mode: "light" | "dark";
+  onToggle: () => void;
+}) {
+  const Icon = mode === "dark" ? Sun : Moon;
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      title={mode === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+      aria-label={mode === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+      className="flex h-8 w-8 items-center justify-center rounded-full transition-colors"
+      style={{
+        background: "transparent",
+        border: "1px solid var(--line)",
+        color: "var(--muted)",
+      }}
+    >
+      <Icon className="h-3.5 w-3.5" />
+    </button>
+  );
+}
+
 function ThemedShell({ theme, children }: { theme: Presentation["theme"]; children: React.ReactNode }) {
   const accent = theme?.accent_color;
   const dark = theme?.mode === "dark";
@@ -360,25 +429,32 @@ function Lobby({
   presentation,
   participants,
   slidesCount,
+  joinUrl,
+  mode,
+  onToggleMode,
   onStart,
 }: {
   presentation: Presentation;
   participants: Participant[];
   slidesCount: number;
+  joinUrl: string;
+  mode: "light" | "dark";
+  onToggleMode: () => void;
   onStart: () => void;
 }) {
-  const [origin, setOrigin] = useState("");
-  useEffect(() => setOrigin(window.location.origin), []);
-  const joinUrl = origin ? `${origin}/play/${presentation.code}` : `/play/${presentation.code}`;
-  const joinHost = origin ? new URL(origin).host : "klikr.app";
-
   const code = presentation.code;
+  let joinHost = "klikrapp.com";
+  try {
+    joinHost = new URL(joinUrl).host.replace(/^www\./, "");
+  } catch {}
+
   return (
     <div className="relative panel p-6 text-center overflow-hidden sm:p-14">
       <div className="orb orb-1 float-slow" style={{ opacity: 0.3 }} />
       <div className="orb orb-2 float-slow" style={{ opacity: 0.22 }} />
 
-      <div className="absolute right-4 top-4 z-10">
+      <div className="absolute right-4 top-4 z-10 flex items-center gap-2">
+        <ModeToggleButton mode={mode} onToggle={onToggleMode} />
         <PresenterMusicToggle />
       </div>
 
@@ -389,27 +465,18 @@ function Lobby({
         <span className="mono">{code}</span>
       </p>
 
-      <div className="mt-10 flex flex-col items-center justify-center gap-8 sm:mt-12 sm:flex-row sm:gap-10">
+      <div className="mt-10 flex flex-col items-center justify-center gap-6 sm:mt-12">
+        <div className="anim-pop qr-halo float-slow">
+          <QrCode value={joinUrl} size={360} />
+        </div>
+        <p className="text-xs uppercase tracking-[0.18em] muted-text">Scan to join</p>
         <p
-          className="mono headline-shine text-6xl font-bold tracking-[0.18em] sm:text-8xl"
+          className="anim-pop mono headline-shine text-5xl font-bold sm:text-7xl"
+          style={{ letterSpacing: "0.22em", animationDelay: "300ms" }}
           aria-label={code}
         >
-          {code.split("").map((ch, i) => (
-            <span
-              key={i}
-              className="code-letter"
-              style={{ animationDelay: `${300 + i * 80}ms` }}
-            >
-              {ch}
-            </span>
-          ))}
+          {code}
         </p>
-        <div className="anim-pop delay-300 flex flex-col items-center gap-3">
-          <div className="qr-halo float-slow">
-            <QrCode value={joinUrl} size={280} />
-          </div>
-          <p className="text-xs uppercase tracking-[0.18em] muted-text">Scan to join</p>
-        </div>
       </div>
 
       <div className="mt-12 sm:mt-14">

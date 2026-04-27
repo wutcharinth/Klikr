@@ -16,8 +16,12 @@ export function QrCode({
 
   useEffect(() => {
     if (!canvasRef.current || !value) return;
+    // Match the canvas pixel buffer to the rendered CSS area (size minus the
+    // 10px padding on each side) so the QR's internal quiet zone aligns
+    // pixel-for-pixel with the rounded white container — no scaling artifacts.
+    const innerSize = Math.max(0, size - 20);
     QRCode.toCanvas(canvasRef.current, value, {
-      width: size,
+      width: innerSize,
       margin: 1,
       color: { dark: "#0a0a0a", light: "#ffffff" },
       errorCorrectionLevel: "M",
