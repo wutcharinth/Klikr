@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Moon, Sun } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import type { Presentation, Slide, ResponseRow, Participant } from "@/lib/types";
@@ -495,10 +495,64 @@ function Lobby({
     joinHost = new URL(joinUrl).host.replace(/^www\./, "");
   } catch {}
 
+  // Detect newly-joined participants and push them as toast pop-ups. The first
+  // render seeds the "seen" set so we don't toast people who were already in
+  // the room when the host arrived.
+  const seenRef = useRef<Set<string> | null>(null);
+  const [toasts, setToasts] = useState<{ id: string; nickname: string; key: number }[]>([]);
+  const [latestId, setLatestId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (seenRef.current === null) {
+      seenRef.current = new Set(participants.map((p) => p.id));
+      return;
+    }
+    const seen = seenRef.current;
+    const fresh = participants.filter((p) => !seen.has(p.id));
+    if (fresh.length === 0) return;
+    fresh.forEach((p) => seen.add(p.id));
+    setLatestId(fresh[fresh.length - 1].id);
+    setToasts((prev) => [
+      ...prev,
+      ...fresh.map((p) => ({ id: p.id, nickname: p.nickname, key: Date.now() + Math.random() })),
+    ]);
+  }, [participants]);
+
+  // Auto-dismiss each toast after ~3.2s.
+  useEffect(() => {
+    if (toasts.length === 0) return;
+    const oldest = toasts[0];
+    const t = setTimeout(() => {
+      setToasts((prev) => prev.filter((x) => x.key !== oldest.key));
+    }, 3200);
+    return () => clearTimeout(t);
+  }, [toasts]);
+
   return (
     <div className="relative panel p-6 text-center overflow-hidden sm:p-14">
       <div className="orb orb-1 float-slow" style={{ opacity: 0.3 }} />
       <div className="orb orb-2 float-slow" style={{ opacity: 0.22 }} />
+
+      {/* Join toasts — stack at the top, newest on top, auto-dismiss after 3.2s. */}
+      <div className="pointer-events-none absolute inset-x-0 top-4 z-20 flex flex-col items-center gap-2">
+        {toasts.map((t) => (
+          <div
+            key={t.key}
+            className="join-toast flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium shadow-lg"
+            style={{
+              background: "var(--blue)",
+              color: "#fff",
+              boxShadow: "0 12px 28px -12px rgba(0,113,227,0.55)",
+            }}
+          >
+            <span aria-hidden>👋</span>
+            <span className="truncate max-w-[260px]">
+              <span className="font-semibold">{t.nickname}</span>{" "}
+              <span style={{ opacity: 0.85 }}>joined</span>
+            </span>
+          </div>
+        ))}
+      </div>
 
       <div className="absolute right-4 top-4 z-10 flex items-center gap-2">
         <ModeToggleButton mode={mode} onToggle={onToggleMode} />
@@ -542,20 +596,24 @@ function Lobby({
           </span>
         </p>
         <ul className="mt-5 flex flex-wrap justify-center gap-2">
-          {participants.map((p, i) => (
-            <li
-              key={p.id}
-              className="row-enter rounded-full px-3 py-1.5 text-sm font-medium"
-              style={{
-                background: "rgba(0, 113, 227, .14)",
-                border: "1px solid rgba(0, 113, 227, .35)",
-                color: "var(--blue)",
-                animationDelay: `${Math.min(i, 12) * 60}ms`,
-              }}
-            >
-              {p.nickname}
-            </li>
-          ))}
+          {participants.map((p, i) => {
+            const isLatest = p.id === latestId;
+            return (
+              <li
+                key={p.id}
+                className={`${isLatest ? "anim-pop" : "row-enter"} rounded-full px-3 py-1.5 text-sm font-medium`}
+                style={{
+                  background: isLatest ? "rgba(0, 113, 227, .22)" : "rgba(0, 113, 227, .14)",
+                  border: "1px solid rgba(0, 113, 227, .35)",
+                  color: "var(--blue)",
+                  animationDelay: isLatest ? "0ms" : `${Math.min(i, 12) * 60}ms`,
+                  boxShadow: isLatest ? "0 0 0 4px rgba(0,113,227,0.18)" : undefined,
+                }}
+              >
+                {p.nickname}
+              </li>
+            );
+          })}
           {participants.length === 0 && (
             <li className="text-xs muted-text">No one yet.</li>
           )}

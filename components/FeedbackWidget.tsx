@@ -1,8 +1,11 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { MessageSquarePlus, Star, X } from "lucide-react";
 import { submitFeedback } from "@/app/feedback/actions";
+
+const HIDE_KEY = "klikr:feedback-bubble-hidden-until";
+const HIDE_DAYS = 30;
 
 export function FeedbackWidget({ persona = "host" }: { persona?: "host" | "audience" | "admin" }) {
   const [open, setOpen] = useState(false);
@@ -12,6 +15,36 @@ export function FeedbackWidget({ persona = "host" }: { persona?: "host" | "audie
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+  // Hidden by default until we've checked localStorage — avoids a flash
+  // when the user has previously dismissed the bubble.
+  const [hidden, setHidden] = useState(true);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const raw = window.localStorage.getItem(HIDE_KEY);
+    if (!raw) {
+      setHidden(false);
+      return;
+    }
+    const until = Number(raw);
+    if (!Number.isFinite(until) || until <= Date.now()) {
+      window.localStorage.removeItem(HIDE_KEY);
+      setHidden(false);
+      return;
+    }
+    setHidden(true);
+  }, []);
+
+  function dismiss(e: React.MouseEvent) {
+    e.stopPropagation();
+    if (typeof window !== "undefined") {
+      const until = Date.now() + HIDE_DAYS * 24 * 60 * 60 * 1000;
+      window.localStorage.setItem(HIDE_KEY, String(until));
+    }
+    setHidden(true);
+  }
+
+  if (hidden) return null;
 
   function close() {
     setOpen(false);
@@ -46,21 +79,38 @@ export function FeedbackWidget({ persona = "host" }: { persona?: "host" | "audie
 
   return (
     <>
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        title="Send feedback"
-        aria-label="Send feedback"
-        className="fixed bottom-5 right-5 z-40 flex h-11 items-center gap-2 rounded-full px-4 text-xs uppercase tracking-[0.16em] shadow-lg transition-transform hover:scale-105"
-        style={{
-          background: "var(--blue)",
-          color: "#fff",
-          boxShadow: "0 10px 24px -10px rgba(0,113,227,.55)",
-        }}
-      >
-        <MessageSquarePlus className="h-4 w-4" />
-        Feedback
-      </button>
+      <div className="group fixed bottom-5 right-5 z-40">
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          title="Send feedback"
+          aria-label="Send feedback"
+          className="flex h-11 items-center gap-2 rounded-full px-4 text-xs uppercase tracking-[0.16em] shadow-lg transition-transform hover:scale-105"
+          style={{
+            background: "var(--blue)",
+            color: "#fff",
+            boxShadow: "0 10px 24px -10px rgba(0,113,227,.55)",
+          }}
+        >
+          <MessageSquarePlus className="h-4 w-4" />
+          Feedback
+        </button>
+        <button
+          type="button"
+          onClick={dismiss}
+          aria-label="Hide feedback bubble for 30 days"
+          title="Hide for 30 days"
+          className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full opacity-0 transition-opacity group-hover:opacity-100 focus:opacity-100"
+          style={{
+            background: "var(--ink)",
+            color: "#fff",
+            border: "1.5px solid var(--white)",
+            boxShadow: "0 2px 6px rgba(0,0,0,0.25)",
+          }}
+        >
+          <X className="h-3 w-3" strokeWidth={2.5} />
+        </button>
+      </div>
 
       {open && (
         <div
