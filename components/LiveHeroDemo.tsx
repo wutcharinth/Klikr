@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useState } from "react";
 
 type Scene =
   | "intro"
@@ -170,16 +170,8 @@ const WORDS = [
 ];
 
 function WordCloudScene({ tick }: { tick: number }) {
-  // Track which words have already mounted in this scene's lifetime so
-  // existing words don't re-animate when new ones appear.
-  const seenRef = useRef<Set<string>>(new Set());
   const visible = Math.min(WORDS.length, 3 + tick * 2);
   const slice = WORDS.slice(0, visible);
-
-  // Lock in newly visible words; subsequent renders won't re-animate them.
-  for (const w of slice) {
-    if (!seenRef.current.has(w.t)) seenRef.current.add(w.t);
-  }
 
   return (
     <>
@@ -187,9 +179,7 @@ function WordCloudScene({ tick }: { tick: number }) {
       <h3 className="mt-1 text-lg font-semibold tracking-tight">One word for today?</h3>
       <div className="mt-5 flex h-[170px] flex-wrap content-center items-center justify-center gap-x-3 gap-y-1 text-center">
         {slice.map((w, i) => {
-          // Words that were already on screen at the previous tick keep
-          // a static class — only freshly-added words run the fly-in.
-          const isNew = !wasSeenBefore(seenRef.current, w.t, slice);
+          const isNew = i >= Math.max(0, visible - 2);
           return (
             <span
               key={w.t}
@@ -211,15 +201,6 @@ function WordCloudScene({ tick }: { tick: number }) {
       </p>
     </>
   );
-}
-
-// A word is "new this tick" if the stored Set didn't contain it before this
-// render appended it. Since we mutate above, we approximate by treating the
-// last two entries of `slice` as the freshly-added ones — they're appended in
-// order and `tick * 2` controls the growth, so the suffix is always new.
-function wasSeenBefore(_seen: Set<string>, word: string, slice: { t: string }[]): boolean {
-  const idx = slice.findIndex((s) => s.t === word);
-  return idx < slice.length - 2;
 }
 
 // ---------- Promo intro scenes ----------
@@ -400,9 +381,7 @@ const QA_QUESTIONS = [
 ];
 
 function QAScene({ tick }: { tick: number }) {
-  const seenRef = useRef<Set<number>>(new Set());
   const visible = Math.min(QA_QUESTIONS.length, 2 + tick);
-  for (let i = 0; i < visible; i++) seenRef.current.add(i);
 
   return (
     <>

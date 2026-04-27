@@ -47,7 +47,6 @@ export default async function NavBar({
     <nav className="flex items-center justify-between gap-2 sm:gap-6">
       <div className="flex shrink-0 items-center gap-3 sm:gap-6">
         <Link href={homeHref} className="group inline-flex shrink-0 items-center gap-2.5">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src="/brand/klikr-logo.png"
             alt=""

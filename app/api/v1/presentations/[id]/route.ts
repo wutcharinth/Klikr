@@ -26,7 +26,14 @@ export async function GET(req: Request, { params }: Ctx) {
   if (!data || data.owner_id !== auth.userId) {
     return NextResponse.json({ error: "Not found." }, { status: 404 });
   }
-  const { owner_id: _o, ...presentation } = data;
+  const presentation = {
+    id: data.id,
+    title: data.title,
+    code: data.code,
+    state: data.state,
+    current_slide_id: data.current_slide_id,
+    created_at: data.created_at,
+  };
   return NextResponse.json({ presentation });
 }
 

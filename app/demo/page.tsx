@@ -49,7 +49,6 @@ export default async function DemoPage() {
                 className="overflow-hidden"
                 style={{ background: "#0b0b0c", aspectRatio: "16 / 10" }}
               >
-                {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={PREVIEW_IMAGES[i]}
                   alt={p.title}

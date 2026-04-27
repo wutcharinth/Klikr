@@ -97,7 +97,6 @@ export function UnsplashPicker({
               style={{ border: "1px solid var(--line)" }}
               title={`Photo by ${p.photographer} on Unsplash`}
             >
-              {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={p.thumb}
                 alt={p.alt}

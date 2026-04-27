@@ -110,10 +110,10 @@ await ctx.addCookies([
 
 // Better: use Supabase auth helper via injecting localStorage
 await page.goto(`${BASE}/login`, { waitUntil: "networkidle" });
-await page.evaluate((tok) => {
+await page.evaluate(() => {
   // Supabase ssr stores session in cookie sb-<project>-auth-token. The right approach is via signInWithPassword in client — but signup is removed.
   // Fallback: rely on Postgrest queries via raw cookies. Instead, set raw cookies that @supabase/ssr expects.
-}, token);
+});
 
 // Easier path: just use unauthenticated screenshots for dashboard/editor by creating a public-readable view.
 // Skip dashboard and editor — they require auth.

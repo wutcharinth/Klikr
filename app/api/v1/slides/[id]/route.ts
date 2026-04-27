@@ -75,6 +75,15 @@ async function fetchOwnedSlide(svc: ReturnType<typeof createServiceClient>, id: 
   // PostgREST returns the joined row inline; check ownership then strip it.
   const ownerId = (data as unknown as { presentations: { owner_id: string } }).presentations?.owner_id;
   if (ownerId !== userId) return null;
-  const { presentations: _p, ...slide } = data as unknown as Record<string, unknown> & { presentations: unknown };
-  return slide;
+  return {
+    id: data.id,
+    presentation_id: data.presentation_id,
+    position: data.position,
+    type: data.type,
+    question: data.question,
+    config: data.config,
+    image_url: data.image_url,
+    kahoot_mode: data.kahoot_mode,
+    created_at: data.created_at,
+  };
 }

@@ -11,8 +11,6 @@ export async function generateMetadata() {
   };
 }
 
-const USD_TO_THB = 35;
-
 type Money = { usd: number; label: { en: string; th: string } };
 
 const PRICES = {

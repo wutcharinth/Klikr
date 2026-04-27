@@ -78,7 +78,7 @@ export async function saveAsTemplate(formData: FormData) {
 
   const slug = `${title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")}-${Date.now().toString(36)}`;
 
-  const { data, error } = await supabase.rpc("save_as_template", {
+    const { error } = await supabase.rpc("save_as_template", {
     p_presentation_id: presentationId,
     p_owner_id: userData.user.id,
     p_slug: slug,

@@ -70,7 +70,6 @@ export default async function AboutPage() {
           {shots.map((s, i) => (
             <figure key={s.title} className="space-y-3">
               <div className="overflow-hidden rounded-2xl" style={{ background: "#0b0b0c", border: "1px solid var(--line)", aspectRatio: "16 / 10" }}>
-                {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={shotImages[i]} alt={s.title} className="block h-full w-full" style={{ objectFit: "contain", padding: "3%" }} />
               </div>
               <figcaption>
