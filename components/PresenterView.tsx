@@ -166,13 +166,18 @@ export function PresenterView({
           <div className="panel p-12 text-center">
             <div className="pill"><span className="live-dot" /> Session complete</div>
             <h2 className="mt-6 text-3xl font-semibold tracking-tight">Thanks for playing.</h2>
-            <a
-              href={`/api/export/${presentation.id}/csv`}
-              download
-              className="btn-ghost mt-6 text-sm"
-            >
-              ⬇ Export CSV
-            </a>
+            <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
+              <a
+                href={`/api/export/${presentation.id}/csv`}
+                download
+                className="btn-ghost text-sm"
+              >
+                ⬇ Export CSV
+              </a>
+              <a href="/dashboard" className="btn-primary text-sm">
+                Back to dashboard
+              </a>
+            </div>
           </div>
           {hadAnyKahoot ? (
             <QuizPodium participants={participants} presentationId={presentation.id} />
