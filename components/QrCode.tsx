@@ -33,8 +33,10 @@ export function QrCode({
         padding: 10,
         background: "#ffffff",
         borderRadius: 14,
-        boxShadow: "0 6px 22px -10px rgba(0,0,0,.45)",
-        display: "inline-block",
+        boxShadow: "0 8px 28px -16px rgba(0,0,0,.55)",
+        boxSizing: "border-box",
+        display: "block",
+        flexShrink: 0,
       }}
     >
       <canvas ref={canvasRef} style={{ width: "100%", height: "100%", display: "block" }} />

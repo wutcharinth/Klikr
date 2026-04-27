@@ -372,38 +372,56 @@ function Lobby({
   const joinUrl = origin ? `${origin}/play/${presentation.code}` : `/play/${presentation.code}`;
   const joinHost = origin ? new URL(origin).host : "klikr.app";
 
+  const code = presentation.code;
   return (
     <div className="relative panel p-6 text-center overflow-hidden sm:p-14">
-      <div className="orb orb-1" style={{ opacity: 0.25 }} />
-      <div className="orb orb-2" style={{ opacity: 0.18 }} />
-      <div className="anim-fade-up pill"><span className="live-dot" /> Lobby</div>
+      <div className="orb orb-1 float-slow" style={{ opacity: 0.3 }} />
+      <div className="orb orb-2 float-slow" style={{ opacity: 0.22 }} />
+
+      <div className="absolute right-4 top-4 z-10">
+        <PresenterMusicToggle />
+      </div>
+
+      <div className="anim-fade-up pill"><span className="live-dot pulse-ring" /> Lobby</div>
       <p className="anim-fade-up delay-200 mt-6 text-sm muted-text">Audience joins at</p>
       <p className="anim-fade-up delay-200 mt-1 text-base break-all">
         <span className="muted-text">{joinHost} / </span>
-        <span className="mono">{presentation.code}</span>
+        <span className="mono">{code}</span>
       </p>
 
       <div className="mt-10 flex flex-col items-center justify-center gap-8 sm:mt-12 sm:flex-row sm:gap-10">
         <p
-          className="anim-pop delay-300 mono text-6xl font-bold tracking-[0.18em] sm:text-8xl"
-          style={{
-            background: "linear-gradient(120deg, var(--fg) 30%, var(--blue) 100%)",
-            WebkitBackgroundClip: "text",
-            backgroundClip: "text",
-            color: "transparent",
-          }}
+          className="mono headline-shine text-6xl font-bold tracking-[0.18em] sm:text-8xl"
+          aria-label={code}
         >
-          {presentation.code}
+          {code.split("").map((ch, i) => (
+            <span
+              key={i}
+              className="code-letter"
+              style={{ animationDelay: `${300 + i * 80}ms` }}
+            >
+              {ch}
+            </span>
+          ))}
         </p>
         <div className="anim-pop delay-300 flex flex-col items-center gap-3">
-          <QrCode value={joinUrl} size={280} />
+          <div className="qr-halo float-slow">
+            <QrCode value={joinUrl} size={280} />
+          </div>
           <p className="text-xs uppercase tracking-[0.18em] muted-text">Scan to join</p>
         </div>
       </div>
 
       <div className="mt-12 sm:mt-14">
         <p className="text-[10px] uppercase tracking-[0.18em] muted-text">
-          Joined · {participants.length}
+          Joined ·{" "}
+          <span
+            key={participants.length}
+            className="anim-pop mono"
+            style={{ display: "inline-block", color: "var(--blue)" }}
+          >
+            {participants.length}
+          </span>
         </p>
         <ul className="mt-4 flex flex-wrap justify-center gap-2">
           {participants.map((p, i) => (
