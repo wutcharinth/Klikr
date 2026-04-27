@@ -156,16 +156,28 @@ export function PresenterView({
     );
   }
 
-  const hadAnyKahoot = slides.some((s) => s.type === "quiz" && s.kahoot_mode);
   const hasAnyQuiz = slides.some((s) => s.type === "quiz");
 
   if (presentation.state === "closed") {
+    const startedAt = new Date(presentation.created_at).getTime();
+    const durationMs = Math.max(0, Date.now() - startedAt);
+    const durMins = Math.floor(durationMs / 60000);
+    const durSecs = Math.floor((durationMs % 60000) / 1000);
+    const durationLabel = durMins > 0 ? `${durMins}m ${durSecs}s` : `${durSecs}s`;
+    const playerLabel = `${participants.length} player${participants.length === 1 ? "" : "s"}`;
+    const slideLabel = `${slides.length} slide${slides.length === 1 ? "" : "s"}`;
     return (
       <ThemedShell theme={themeForShell}>
         <div className="flex flex-1 flex-col gap-6">
           <div className="panel p-12 text-center">
             <div className="pill"><span className="live-dot" /> Session complete</div>
             <h2 className="mt-6 text-3xl font-semibold tracking-tight">Thanks for playing.</h2>
+            <p
+              className="mono mt-3 text-[11px] uppercase tracking-[0.18em] muted-text"
+              style={{ fontVariantNumeric: "tabular-nums" }}
+            >
+              {playerLabel} · {slideLabel} · {durationLabel}
+            </p>
             <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
               <a
                 href={`/api/export/${presentation.id}/csv`}
@@ -179,10 +191,8 @@ export function PresenterView({
               </a>
             </div>
           </div>
-          {hadAnyKahoot ? (
+          {hasAnyQuiz ? (
             <QuizPodium participants={participants} presentationId={presentation.id} />
-          ) : hasAnyQuiz ? (
-            <Leaderboard participants={participants} />
           ) : null}
         </div>
       </ThemedShell>
@@ -519,27 +529,28 @@ function Lobby({
         </p>
       </div>
 
-      <div className="mt-12 sm:mt-14">
-        <p className="text-[10px] uppercase tracking-[0.18em] muted-text">
-          Joined ·{" "}
-          <span
-            key={participants.length}
-            className="anim-pop mono"
-            style={{ display: "inline-block", color: "var(--blue)" }}
-          >
+      <div className="relative z-10 mt-12 sm:mt-14">
+        <p className="text-xs uppercase tracking-[0.18em] muted-text">
+          In the room
+        </p>
+        <p className="mt-1 text-3xl font-bold tracking-tight" style={{ color: "var(--blue)" }}>
+          <span key={participants.length} className="count-bump inline-block">
             {participants.length}
+          </span>{" "}
+          <span className="text-base font-medium muted-text">
+            {participants.length === 1 ? "person joined" : "people joined"}
           </span>
         </p>
-        <ul className="mt-4 flex flex-wrap justify-center gap-2">
+        <ul className="mt-5 flex flex-wrap justify-center gap-2">
           {participants.map((p, i) => (
             <li
               key={p.id}
-              className="anim-pop rounded-full px-3 py-1 text-sm"
+              className="row-enter rounded-full px-3 py-1.5 text-sm font-medium"
               style={{
-                background: "rgba(0, 113, 227, .10)",
-                border: "1px solid rgba(0, 113, 227, .25)",
+                background: "rgba(0, 113, 227, .14)",
+                border: "1px solid rgba(0, 113, 227, .35)",
                 color: "var(--blue)",
-                animationDelay: `${i * 80}ms`,
+                animationDelay: `${Math.min(i, 12) * 60}ms`,
               }}
             >
               {p.nickname}

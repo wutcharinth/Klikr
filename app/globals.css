@@ -510,11 +510,41 @@
   50%      { transform: translateY(-4px); }
 }
 
+/* Audience post-quiz reveal: shake on wrong, ripple ring on correct. */
+.shake-once { animation: shakeOnce 0.55s cubic-bezier(0.36, 0.07, 0.19, 0.97) both; }
+@keyframes shakeOnce {
+  0%, 100% { transform: translateX(0); }
+  10%, 30%, 50%, 70%, 90% { transform: translateX(-6px); }
+  20%, 40%, 60%, 80%      { transform: translateX(6px); }
+}
+@keyframes rippleOut {
+  0%   { opacity: 0.6; transform: scale(1); }
+  100% { opacity: 0;   transform: scale(1.6); }
+}
+
+/* Score-delta float — "+250 pts" rises and fades above the score number when
+   the audience's score increases after a correct answer. */
+.points-float { animation: pointsFloatUp 1.2s cubic-bezier(0.2, 0.8, 0.2, 1) forwards; opacity: 0; }
+@keyframes pointsFloatUp {
+  0%   { opacity: 0; transform: translate(-50%, 0)    scale(0.9); }
+  20%  { opacity: 1; }
+  100% { opacity: 0; transform: translate(-50%, -40px) scale(1.05); }
+}
+
+/* Rank-delta pill — "↑ 2" / "↓ 1" pops in next to the rank when it changes. */
+.rank-delta-pill { animation: rankPulse 0.45s cubic-bezier(0.34, 1.56, 0.64, 1); }
+@keyframes rankPulse {
+  0%   { transform: scale(0.6);  opacity: 0; }
+  60%  { transform: scale(1.15); opacity: 1; }
+  100% { transform: scale(1);    opacity: 1; }
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .start-pulse, .start-pulse::after, .count-bump, .burst-particle, .row-stagger, .hero-breathe {
+  .start-pulse, .start-pulse::after, .count-bump, .burst-particle, .row-stagger, .hero-breathe, .shake-once, .points-float, .rank-delta-pill {
     animation: none !important;
   }
   .row-stagger { opacity: 1; transform: none; }
+  .points-float { opacity: 0 !important; }
 }
 
 @media (prefers-reduced-motion: reduce) {

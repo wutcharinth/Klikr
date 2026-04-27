@@ -5,7 +5,8 @@ import { createClient } from "@/lib/supabase/client";
 import type { Presentation, Slide, MCQConfig, QuizConfig, WordCloudConfig, QAConfig, RatingConfig, RankingConfig, ResponseRow } from "@/lib/types";
 import { joinSession, submitResponse, sendReaction, toggleQuestionVote, submitQuestion } from "@/app/play/[code]/actions";
 import { KahootAudienceView } from "./KahootAudienceView";
-import { AudienceAppFeedback } from "./AudienceAppFeedback";
+import { RevealMedal, ScoreCard } from "./QuizFeedback";
+import { AudienceFinalResults } from "./AudienceFinalResults";
 
 type LocalParticipant = {
   id: string;
@@ -88,11 +89,12 @@ export function AudienceView({
 
   if (presentation.state === "closed") {
     return (
-      <Stage>
-        <h2 className="text-2xl font-semibold">Session ended</h2>
-        <p className="mt-2 text-slate-500">Thanks for playing!</p>
-        <AudienceAppFeedback />
-      </Stage>
+      <AudienceFinalResults
+        presentationId={presentation.id}
+        participantId={participant.id}
+        nickname={participant.nickname}
+        hasAnyQuiz={slides.some((s) => s.type === "quiz")}
+      />
     );
   }
 
@@ -146,12 +148,15 @@ export function AudienceView({
                 slide={currentSlide}
                 participantId={participant.id}
                 participantToken={participant.participantToken}
+                presentationId={presentation.id}
+                startedAt={slideStartedAt}
               />
             ) : (
               <Quiz
                 slide={currentSlide}
                 participantId={participant.id}
                 participantToken={participant.participantToken}
+                presentationId={presentation.id}
                 startedAt={slideStartedAt}
               />
             )
@@ -461,11 +466,13 @@ function Quiz({
   slide,
   participantId,
   participantToken,
+  presentationId,
   startedAt,
 }: {
   slide: Slide;
   participantId: string;
   participantToken: string;
+  presentationId: string;
   startedAt: number | null;
 }) {
   const cfg = slide.config as QuizConfig;
@@ -478,6 +485,41 @@ function Quiz({
   const elapsedMs = startedAt ? now - startedAt : 0;
   const remainingMs = Math.max(0, cfg.time_limit_s * 1000 - elapsedMs);
   const expired = remainingMs <= 0;
+
+  // Reset local state when host moves to a new slide (component instance may
+  // be reused if other quiz slides follow).
+  useEffect(() => {
+    setPicked(null);
+  }, [slide.id]);
+
+  // Pre-reveal: locked-in confirmation while waiting for the timer to expire.
+  if (picked !== null && !expired) {
+    return (
+      <div className="flex flex-col items-center justify-center py-12">
+        <div className="anim-pop flex items-center gap-2 text-base font-medium" style={{ color: "var(--blue)" }}>
+          <CheckBadge /> Locked in — submitted in {(elapsedMs / 1000).toFixed(1)}s
+        </div>
+        <p className="mt-3 text-sm muted-text">Hold tight for the result.</p>
+      </div>
+    );
+  }
+
+  // Post-reveal: show correct/wrong feedback + score card. Mirrors Kahoot mode.
+  if (expired) {
+    const isCorrect = picked !== null && picked === cfg.correct_index;
+    const didNotAnswer = picked === null;
+    return (
+      <div className="flex flex-col items-center gap-6 py-6">
+        <RevealMedal correct={isCorrect} skipped={didNotAnswer} confetti={isCorrect} />
+        <ScoreCard
+          presentationId={presentationId}
+          participantId={participantId}
+          slideId={slide.id}
+          correct={isCorrect}
+        />
+      </div>
+    );
+  }
 
   const pct = (remainingMs / (cfg.time_limit_s * 1000)) * 100;
   return (
@@ -527,14 +569,6 @@ function Quiz({
           {opt}
         </button>
       ))}
-      {picked !== null && (
-        <div className="anim-pop mt-4 flex items-center justify-center gap-2 text-sm" style={{ color: "var(--blue)" }}>
-          <CheckBadge /> Submitted in {(elapsedMs / 1000).toFixed(1)}s
-        </div>
-      )}
-      {expired && picked === null && (
-        <p className="anim-fade-in mt-3 text-center text-sm" style={{ color: "var(--danger, #fca5a5)" }}>Time's up.</p>
-      )}
     </div>
   );
 }
