@@ -6,21 +6,25 @@ import { Volume2, VolumeX, SkipForward } from "lucide-react";
 const TRACKS = [
   { label: "Pulse", src: "/audio/quiz-pulse.mp3" },
   { label: "Pulse alt", src: "/audio/quiz-pulse-alt.mp3" },
+  { label: "Prize button", src: "/audio/prize-button.mp3" },
+  { label: "Prize button 2", src: "/audio/prize-button-2.mp3" },
+  { label: "Prize round", src: "/audio/prize-round.mp3" },
+  { label: "Prize round 2", src: "/audio/prize-round-2.mp3" },
 ];
 const PREF_KEY = "klikr-presenter-music";
-const TRACK_KEY = "klikr-presenter-music-track";
 
 export function PresenterMusicToggle({ active = true }: { active?: boolean }) {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [enabled, setEnabled] = useState(false);
-  const [trackIdx, setTrackIdx] = useState(0);
+  // Randomize the starting track on every mount so each new present session
+  // begins with different music. The skip button still cycles deterministically
+  // from there.
+  const [trackIdx, setTrackIdx] = useState(() => Math.floor(Math.random() * TRACKS.length));
   const [hydrated, setHydrated] = useState(false);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
     setEnabled(localStorage.getItem(PREF_KEY) === "on");
-    const stored = parseInt(localStorage.getItem(TRACK_KEY) ?? "0", 10);
-    if (!Number.isNaN(stored) && stored >= 0 && stored < TRACKS.length) setTrackIdx(stored);
     setHydrated(true);
   }, []);
 
@@ -45,11 +49,7 @@ export function PresenterMusicToggle({ active = true }: { active?: boolean }) {
   };
 
   const nextTrack = () => {
-    setTrackIdx((i) => {
-      const next = (i + 1) % TRACKS.length;
-      if (typeof window !== "undefined") localStorage.setItem(TRACK_KEY, String(next));
-      return next;
-    });
+    setTrackIdx((i) => (i + 1) % TRACKS.length);
   };
 
   const track = TRACKS[trackIdx];
