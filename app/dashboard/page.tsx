@@ -85,8 +85,12 @@ export default async function Dashboard({ searchParams }: { searchParams?: Searc
 
       <ul className="mt-8 space-y-3">
         {presentations?.length === 0 && <EmptyDashboard />}
-        {presentations?.map((p) => (
-          <li key={p.id} className="panel p-5 flex items-center justify-between gap-4">
+        {presentations?.map((p, i) => (
+          <li
+            key={p.id}
+            className="row-stagger panel p-5 flex items-center justify-between gap-4"
+            style={{ animationDelay: `${Math.min(i, 8) * 50}ms` }}
+          >
             <div className="min-w-0">
               <div className="flex items-center gap-2 min-w-0">
                 {p.pinned && (

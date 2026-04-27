@@ -298,7 +298,22 @@ export function PresenterView({
                 </div>
 
                 <div className="mt-4 text-xs muted-text">
-                  <span className="mono text-[var(--fg)]">{responses.filter((r) => (r.status ?? "approved") !== "rejected").length}</span> responses
+                  {(() => {
+                    const visibleCount = responses.filter(
+                      (r) => (r.status ?? "approved") !== "rejected",
+                    ).length;
+                    return (
+                      <>
+                        <span
+                          key={visibleCount}
+                          className="mono count-bump text-[var(--fg)]"
+                        >
+                          {visibleCount}
+                        </span>{" "}
+                        responses
+                      </>
+                    );
+                  })()}
                 </div>
               </>
             )}
@@ -539,7 +554,9 @@ function Lobby({
       <button
         onClick={onStart}
         disabled={slidesCount === 0}
-        className="btn-primary mt-12 px-10 py-3 text-base"
+        className={`btn-primary mt-12 px-10 py-3 text-base ${
+          slidesCount > 0 && participants.length > 0 ? "start-pulse" : ""
+        }`}
       >
         {slidesCount === 0 ? "Add slides first" : "Start"}
       </button>

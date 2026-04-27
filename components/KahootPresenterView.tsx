@@ -91,7 +91,10 @@ export function KahootPresenterView({
                 <p className="mt-1 text-xs opacity-80">{counts[i]} vote{counts[i] === 1 ? "" : "s"}</p>
               </div>
               {expired && isCorrect && (
-                <span className="rounded-full bg-white/20 px-2 py-0.5 text-[10px] font-bold uppercase">Correct</span>
+                <>
+                  <span className="rounded-full bg-white/20 px-2 py-0.5 text-[10px] font-bold uppercase">Correct</span>
+                  <ConfettiBurst />
+                </>
               )}
             </div>
           );
@@ -106,6 +109,42 @@ export function KahootPresenterView({
   );
 }
 
+
+// Lightweight confetti — 18 colored particles fan out from the centre of the
+// correct tile. CSS-only so we can run dozens of these without hurting perf.
+function ConfettiBurst() {
+  const colors = ["#FFD166", "#06D6A0", "#118AB2", "#EF476F", "#F4A261", "#A8DADC"];
+  const particles = Array.from({ length: 18 }, (_, i) => {
+    const angle = (i / 18) * Math.PI * 2 + (Math.random() - 0.5) * 0.4;
+    const dist = 60 + Math.random() * 70;
+    return {
+      bx: Math.cos(angle) * dist,
+      by: Math.sin(angle) * dist,
+      color: colors[i % colors.length],
+      delay: Math.random() * 80,
+      size: 6 + Math.random() * 6,
+    };
+  });
+  return (
+    <span className="pointer-events-none absolute inset-0 overflow-visible" aria-hidden>
+      {particles.map((p, i) => (
+        <span
+          key={i}
+          className="burst-particle"
+          style={{
+            background: p.color,
+            width: p.size,
+            height: p.size,
+            animationDelay: `${p.delay}ms`,
+            // CSS custom properties consumed by the burstFly keyframe.
+            ["--bx" as string]: `${p.bx}px`,
+            ["--by" as string]: `${p.by}px`,
+          } as React.CSSProperties}
+        />
+      ))}
+    </span>
+  );
+}
 
 function TimerRing({ remaining, progress, color, expired }: { remaining: number; progress: number; color: string; expired: boolean }) {
   const r = 36;

@@ -59,7 +59,7 @@ export function LiveHeroDemo() {
   }, [sceneIdx]);
 
   return (
-    <div className="panel relative w-full max-w-md overflow-hidden p-5 sm:p-6">
+    <div className="hero-breathe panel relative w-full max-w-md overflow-hidden p-5 sm:p-6">
       <div className="orb orb-1" style={{ width: "70%", height: "70%", top: "-20%", right: "-20%", opacity: 0.3 }} />
 
       <div className="relative flex items-center justify-between">
