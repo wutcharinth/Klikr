@@ -310,7 +310,19 @@ export function PresenterView({
           </button>
           {isLast ? (
             <button
-              onClick={() => endPresentation(presentation.id)}
+              onClick={async () => {
+                if (!confirm("End the session for everyone?")) return;
+                // Optimistic local update so the UI flips even if the realtime
+                // event takes a moment (or doesn't fire at all).
+                setPresentation((p) => ({ ...p, state: "closed" }));
+                try {
+                  await endPresentation(presentation.id);
+                } catch (err) {
+                  console.error("endPresentation failed", err);
+                  alert("Could not end the session. Try again.");
+                  setPresentation((p) => ({ ...p, state: "active" }));
+                }
+              }}
               className="btn-ghost"
               style={{ color: "var(--danger)", borderColor: "rgba(252,165,165,.3)" }}
             >
