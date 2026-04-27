@@ -5,7 +5,7 @@ import { createClient } from "@/lib/supabase/client";
 import type { Presentation, Slide, ResponseRow, Participant } from "@/lib/types";
 import { startPresentation, moveSlide, endPresentation } from "@/app/present/[id]/actions";
 import { setQuestionStatus } from "@/app/play/[code]/actions";
-import { ResultsBarChart } from "./ResultsBarChart";
+import { ResultsBarChart, QuizCountdown } from "./ResultsBarChart";
 import { WordCloudView } from "./WordCloudView";
 import { OpenResponses } from "./OpenResponses";
 import { Leaderboard } from "./Leaderboard";
@@ -221,7 +221,11 @@ export function PresenterView({
                   {currentSlide.type === "wordcloud" && <WordCloudView responses={responses} />}
                   {currentSlide.type === "open" && <OpenResponses responses={responses} />}
                   {currentSlide.type === "quiz" && (
-                    <ResultsBarChart slide={currentSlide} responses={responses} highlightCorrect fill />
+                    <QuizCountdown
+                      slide={currentSlide}
+                      responses={responses}
+                      startedAt={presentation.current_slide_started_at}
+                    />
                   )}
                   {currentSlide.type === "qa" && (
                     <QAStream slide={currentSlide} responses={responses} />

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { BarChart3 } from "lucide-react";
+import { BarChart3, FilePlus2, LayoutTemplate } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { createPresentation, deletePresentation } from "./actions";
 import { logout } from "../(auth)/actions";
@@ -50,16 +50,27 @@ export default async function Dashboard({ searchParams }: { searchParams?: Searc
 
       <section className="mt-10">
         <h1 className="text-2xl font-semibold tracking-tight">Your presentations</h1>
-        <div className="mt-6 grid gap-3 md:grid-cols-[1fr_auto]">
-          <form action={createPresentation} className="panel p-2 flex gap-2">
-            <input
-              name="title"
-              placeholder="New presentation title…"
-              className="input flex-1 border-0 bg-transparent focus:bg-transparent"
-              required
-            />
-            <button className="btn-primary">+ Create</button>
+        <div className={`mt-6 grid gap-3 ${AI_ENABLED ? "sm:grid-cols-3" : "sm:grid-cols-2"}`}>
+          <form action={createPresentation}>
+            <input type="hidden" name="title" value="Untitled" />
+            <button className="panel flex w-full items-center gap-3 p-4 text-left transition hover:border-[var(--ink)]">
+              <FilePlus2 className="h-5 w-5 shrink-0" style={{ color: "var(--blue)" }} />
+              <span className="min-w-0">
+                <span className="block font-medium">Start from blank</span>
+                <span className="block text-xs muted-text">Empty deck, name it later</span>
+              </span>
+            </button>
           </form>
+          <Link
+            href="/templates"
+            className="panel flex w-full items-center gap-3 p-4 transition hover:border-[var(--ink)]"
+          >
+            <LayoutTemplate className="h-5 w-5 shrink-0" style={{ color: "var(--blue)" }} />
+            <span className="min-w-0">
+              <span className="block font-medium">Browse templates</span>
+              <span className="block text-xs muted-text">Polls, quizzes, icebreakers</span>
+            </span>
+          </Link>
           {AI_ENABLED && <AIGenerateButton autoOpen={sp?.ai === "1"} />}
         </div>
       </section>
