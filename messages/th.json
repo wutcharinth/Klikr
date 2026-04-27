@@ -208,6 +208,7 @@
     "categoryBusiness": "ธุรกิจ",
     "categoryWorkshops": "เวิร์กช็อป",
     "categorySurveys": "แบบสำรวจ",
+    "categoryRecognition": "ชื่นชมเพื่อน",
     "noMatches": "ไม่พบผลลัพธ์",
     "resultCount": "{count, plural, =0 {ไม่พบผลลัพธ์} other {# เทมเพลต}}",
     "noTemplatesFor": "ไม่พบเทมเพลตสำหรับ \"{query}\" ลองเปลี่ยนหมวดหรือล้างคำค้น",

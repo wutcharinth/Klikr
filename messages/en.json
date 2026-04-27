@@ -208,6 +208,7 @@
     "categoryBusiness": "Business",
     "categoryWorkshops": "Workshops",
     "categorySurveys": "Surveys",
+    "categoryRecognition": "Recognition",
     "noMatches": "No matches",
     "resultCount": "{count, plural, =0 {No matches} =1 {1 template} other {# templates}}",
     "noTemplatesFor": "No templates found for \"{query}\". Try a different category or clear the search.",

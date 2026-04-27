@@ -10,6 +10,7 @@ const CATEGORY_KEYS = [
   { key: "All", label: "categoryAll" },
   { key: "Icebreakers", label: "categoryIcebreakers" },
   { key: "Brainstorming", label: "categoryBrainstorming" },
+  { key: "Recognition", label: "categoryRecognition" },
   { key: "Classroom", label: "categoryClassroom" },
   { key: "Business", label: "categoryBusiness" },
   { key: "Workshops", label: "categoryWorkshops" },
@@ -170,6 +171,7 @@ function cardGradient(category: string): string {
     Business: "linear-gradient(135deg,#0071E3,#00C2FF)",
     Workshops: "linear-gradient(135deg,#11998E,#38EF7D)",
     Surveys: "linear-gradient(135deg,#F2994A,#F2C94C)",
+    Recognition: "linear-gradient(135deg,#A855F7,#EC4899)",
   };
   return map[category] ?? "linear-gradient(135deg,#1d1d1f,#3a3a3c)";
 }
