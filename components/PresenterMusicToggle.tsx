@@ -5,11 +5,13 @@ import { Volume2, VolumeX, SkipForward } from "lucide-react";
 
 const TRACKS = [
   { label: "Pulse", src: "/audio/quiz-pulse.mp3" },
-  { label: "Pulse alt", src: "/audio/quiz-pulse-alt.mp3" },
-  { label: "Prize button", src: "/audio/prize-button.mp3" },
-  { label: "Prize button 2", src: "/audio/prize-button-2.mp3" },
-  { label: "Prize round", src: "/audio/prize-round.mp3" },
-  { label: "Prize round 2", src: "/audio/prize-round-2.mp3" },
+  { label: "Heartbeat", src: "/audio/quiz-pulse-alt.mp3" },
+  { label: "Game Show", src: "/audio/prize-button.mp3" },
+  { label: "Showtime", src: "/audio/prize-button-2.mp3" },
+  { label: "Big Round", src: "/audio/prize-round.mp3" },
+  { label: "Final Round", src: "/audio/prize-round-2.mp3" },
+  { label: "Wheel Spin", src: "/audio/prize-wheel-bounce.mp3" },
+  { label: "Bounce Back", src: "/audio/prize-wheel-bounce-2.mp3" },
 ];
 const PREF_KEY = "klikr-presenter-music";
 
@@ -73,8 +75,8 @@ export function PresenterMusicToggle({ active = true }: { active?: boolean }) {
       <button
         type="button"
         onClick={nextTrack}
-        title={`Change music (now: ${track.label})`}
-        aria-label="Change music track"
+        title={`Skip — now playing ${track.label}`}
+        aria-label="Skip to next track"
         className="flex h-8 w-8 items-center justify-center rounded-full transition-colors"
         style={{
           background: "transparent",
@@ -84,6 +86,24 @@ export function PresenterMusicToggle({ active = true }: { active?: boolean }) {
       >
         <SkipForward className="h-3.5 w-3.5" />
       </button>
+      <select
+        value={trackIdx}
+        onChange={(e) => setTrackIdx(parseInt(e.target.value, 10))}
+        title="Choose a track"
+        aria-label="Choose music track"
+        className="h-8 rounded-full px-2 text-[11px] uppercase tracking-[0.14em] transition-colors"
+        style={{
+          background: "transparent",
+          border: "1px solid var(--line)",
+          color: enabled ? "var(--blue)" : "var(--muted)",
+        }}
+      >
+        {TRACKS.map((t, i) => (
+          <option key={t.src} value={i}>
+            {t.label}
+          </option>
+        ))}
+      </select>
       <audio ref={audioRef} src={track.src} loop preload="auto" />
     </>
   );
