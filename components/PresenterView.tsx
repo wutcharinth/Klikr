@@ -48,6 +48,14 @@ export function PresenterView({
   const effectiveMode: "light" | "dark" =
     modeOverride ?? (presentation.theme?.mode === "dark" ? "dark" : "light");
 
+  // Drive the global page theme so the entire viewport background flips —
+  // not just an inner panel. The dashboard / other pages reapply their own
+  // preference on mount, so we don't bother restoring on unmount.
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    document.documentElement.setAttribute("data-theme", effectiveMode);
+  }, [effectiveMode]);
+
   function toggleMode() {
     const next: "light" | "dark" = effectiveMode === "dark" ? "light" : "dark";
     setModeOverride(next);
@@ -403,20 +411,17 @@ function ModeToggleButton({
 }
 
 function ThemedShell({ theme, children }: { theme: Presentation["theme"]; children: React.ReactNode }) {
+  // Mode (light/dark) is now driven globally by data-theme on <html>, so this
+  // shell only handles the saved accent color and an optional brand logo.
   const accent = theme?.accent_color;
-  const dark = theme?.mode === "dark";
   const style: React.CSSProperties = {};
   if (accent) {
     (style as Record<string, string>)["--accent"] = accent;
     (style as Record<string, string>)["--blue"] = accent;
     (style as Record<string, string>)["--blue-hover"] = accent;
   }
-  if (dark) {
-    style.background = "var(--graphite-1)";
-    style.color = "var(--white)";
-  }
   return (
-    <div style={style} className={"flex flex-1 flex-col " + (dark ? "scene-dark rounded-2xl p-1" : "")}>
+    <div style={style} className="flex flex-1 flex-col">
       {theme?.logo_url && (
         <img src={theme.logo_url} alt="" className="mb-4 h-8 w-auto object-contain" />
       )}
@@ -465,14 +470,17 @@ function Lobby({
         <span className="mono">{code}</span>
       </p>
 
-      <div className="mt-10 flex flex-col items-center justify-center gap-6 sm:mt-12">
-        <div className="anim-pop qr-halo float-slow">
+      <div className="relative z-10 mt-10 flex flex-col items-center justify-center gap-6 sm:mt-12">
+        <div className="qr-halo float-slow">
           <QrCode value={joinUrl} size={360} />
         </div>
         <p className="text-xs uppercase tracking-[0.18em] muted-text">Scan to join</p>
         <p
-          className="anim-pop mono headline-shine text-5xl font-bold sm:text-7xl"
-          style={{ letterSpacing: "0.22em", animationDelay: "300ms" }}
+          className="mono text-5xl font-bold sm:text-7xl"
+          style={{
+            letterSpacing: "0.22em",
+            color: "var(--blue)",
+          }}
           aria-label={code}
         >
           {code}
