@@ -66,9 +66,18 @@ export function KahootAudienceView({
         <button
           key={i}
           onClick={async () => {
+            // Snapshot elapsed ms at the moment of tap (before any state
+            // updates) so the server can score by speed.
+            const elapsedMs = Math.max(0, Date.now() - start);
             setPicked(i);
             if (typeof navigator !== "undefined" && "vibrate" in navigator) navigator.vibrate(50);
-            await submitResponse({ slideId: slide.id, participantId, participantToken, valueIndex: i });
+            await submitResponse({
+              slideId: slide.id,
+              participantId,
+              participantToken,
+              valueIndex: i,
+              responseMs: elapsedMs,
+            });
           }}
           className="aspect-square flex items-center justify-center rounded-2xl transition-transform active:scale-95"
           style={{ background: tile.color }}
