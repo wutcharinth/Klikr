@@ -53,7 +53,21 @@ export default async function Landing() {
           </div>
 
           <h1 className="mt-6 text-5xl font-semibold tracking-tight sm:text-6xl">
-            <span className="headline-shine">{t("headline")}</span>
+            {(() => {
+              const headline = t("headline");
+              const splitIdx = headline.indexOf("? ");
+              if (splitIdx === -1) {
+                return <span className="headline-shine">{headline}</span>;
+              }
+              const first = headline.slice(0, splitIdx + 1);
+              const second = headline.slice(splitIdx + 2);
+              return (
+                <span className="headline-shine">
+                  <span className="block">{first}</span>
+                  <span className="block">{second}</span>
+                </span>
+              );
+            })()}
           </h1>
           <p className="anim-fade-up delay-300 mt-4 max-w-md text-base muted-text mx-auto lg:mx-0">
             {t("subhead")}<span className="whitespace-nowrap">{t("subheadNoSignup")}</span>
