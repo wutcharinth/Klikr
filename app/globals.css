@@ -303,9 +303,13 @@
 .hero-beat {
   position: absolute; inset: 0;
   opacity: 0;
-  transform: translateY(10px);
-  transition: none;
+  transform: translateY(0);
   animation: heroBeatCycle 12s ease-in-out infinite;
+}
+/* Beat 1 starts visible immediately — no blank flash on page load */
+.hero-beat-initial {
+  opacity: 1;
+  animation-name: heroBeatCycleFirst;
 }
 /* Stagger each beat: 0s, 3s, 6s, 9s */
 .hero-beat-1 { animation-delay: 0s; }
@@ -313,6 +317,14 @@
 .hero-beat-3 { animation-delay: 6s; }
 .hero-beat-4 { animation-delay: 9s; }
 
+/* First beat: starts visible, fades out at 25% */
+@keyframes heroBeatCycleFirst {
+  0%     { opacity: 1; transform: translateY(0); }
+  22%    { opacity: 1; transform: translateY(0); }
+  25%    { opacity: 0; transform: translateY(-6px); }
+  100%   { opacity: 0; transform: translateY(10px); }
+}
+/* Other beats: fade in at 3%, hold, fade out at 25% */
 @keyframes heroBeatCycle {
   0%     { opacity: 0; transform: translateY(10px); }
   3%     { opacity: 1; transform: translateY(0); }

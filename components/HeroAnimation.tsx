@@ -1,5 +1,3 @@
-"use client";
-
 import React from "react";
 
 /*
@@ -57,7 +55,7 @@ const pill = (label: string, dot = false) => (
 
 function BeatDashboard() {
   return (
-    <div className="hero-beat hero-beat-1">
+    <div className="hero-beat hero-beat-1 hero-beat-initial">
       <div style={{ fontSize: 14, fontWeight: 600, letterSpacing: "0.18em", textTransform: "uppercase", color: MUTED }}>
         Dashboard
       </div>
