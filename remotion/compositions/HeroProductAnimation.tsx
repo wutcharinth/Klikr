@@ -18,7 +18,7 @@ import { QrCard } from "../primitives/QrCard";
 import { Sparkle } from "../primitives/Sparkle";
 import { APPLE_OUT } from "../theme/easing";
 
-// 10s @ 30fps = 300 frames. Loop seamlessly.
+// 12s @ 30fps = 360 frames. Loop seamlessly.
 // Concept: silent room → engaged audience.
 
 export type HeroProductAnimationProps = {
@@ -43,7 +43,7 @@ export function HeroProductAnimation({
 
 function NavStrip({ theme }: { theme: RemotionTheme }) {
   const frame = useCurrentFrame();
-  const opacity = interpolate(frame, [0, 18], [0, 1], {
+  const opacity = interpolate(frame, [0, 8], [0, 1], {
     extrapolateLeft: "clamp",
     extrapolateRight: "clamp",
     easing: APPLE_OUT,
@@ -131,8 +131,8 @@ function Stage({ theme }: { theme: RemotionTheme }) {
         <BarsGrow theme={theme} />
       </Sequence>
 
-      {/* Beat 5 — closing badges + sparkles (frames 264–300) */}
-      <Sequence from={264} durationInFrames={36}>
+      {/* Beat 5 — closing badges + sparkles (frames 264–360) */}
+      <Sequence from={264} durationInFrames={96}>
         <ClosingBadges theme={theme} />
       </Sequence>
     </div>
@@ -145,7 +145,7 @@ function Stage({ theme }: { theme: RemotionTheme }) {
 
 function DashboardIntro({ theme }: { theme: RemotionTheme }) {
   const frame = useCurrentFrame();
-  const fade = interpolate(frame, [0, 24, 60, 84], [0, 1, 1, 0], {
+  const fade = interpolate(frame, [0, 8, 60, 84], [0, 1, 1, 0], {
     extrapolateLeft: "clamp",
     extrapolateRight: "clamp",
   });
@@ -522,7 +522,7 @@ const BADGES = ["Live results", "No signup", "AI-powered", "Everyone is engaged"
 
 function ClosingBadges({ theme }: { theme: RemotionTheme }) {
   const frame = useCurrentFrame();
-  const fade = interpolate(frame, [0, 12, 30, 36], [0, 1, 1, 0.4], {
+  const fade = interpolate(frame, [0, 12, 90, 96], [0, 1, 1, 0.4], {
     extrapolateLeft: "clamp",
     extrapolateRight: "clamp",
   });

@@ -34,6 +34,8 @@ export type RemotionShowcaseProps = {
   ariaLabel?: string;
   /** Skip the IntersectionObserver gate. Use for above-the-fold instances. */
   eager?: boolean;
+  /** Static React node rendered while the Player chunk is loading. */
+  placeholder?: React.ReactNode;
 };
 
 // Universal wrapper. Enforces:
@@ -55,12 +57,18 @@ export function RemotionShowcase({
   loop = true,
   ariaLabel,
   eager = false,
+  placeholder,
 }: RemotionShowcaseProps) {
   const wrapRef = useRef<HTMLDivElement | null>(null);
   const [reduced, setReduced] = useState(false);
   const [visible, setVisible] = useState(eager);
   const [theme, setTheme] = useState<RemotionTheme | null>(null);
+  const [playerReady, setPlayerReady] = useState(false);
   const playerRef = useRef<{ play: () => void; pause: () => void } | null>(null);
+  const setPlayerRef = (p: { play: () => void; pause: () => void } | null) => {
+    playerRef.current = p;
+    if (p && !playerReady) setPlayerReady(true);
+  };
 
   // prefers-reduced-motion
   useEffect(() => {
@@ -150,9 +158,26 @@ export function RemotionShowcase({
         />
       ) : null}
 
+      {/* Static placeholder — rendered immediately at SSR so users see content
+          while @remotion/player downloads. Fades out once the Player mounts. */}
+      {placeholder && !reduced ? (
+        <div
+          aria-hidden
+          style={{
+            position: "absolute",
+            inset: 0,
+            opacity: playerReady ? 0 : 1,
+            transition: "opacity 300ms ease",
+            pointerEvents: "none",
+          }}
+        >
+          {placeholder}
+        </div>
+      ) : null}
+
       {!reduced && visible ? (
         <Player
-          ref={playerRef as never}
+          ref={setPlayerRef as never}
           component={composition}
           inputProps={mergedInputProps}
           durationInFrames={durationInFrames}
