@@ -221,7 +221,7 @@ export function PresenterView({
   const quizExpired = isQuiz && expiredQuizSlideIds.has(currentSlide.id);
   const showQuizLeaderboard = isQuiz && leaderboardSlideId === currentSlide.id;
 
-  async function scoreQuizOnExpiry(slideId: string) {
+  async function scoreQuizOnExpiry(slideId: string, force = false) {
     setExpiredQuizSlideIds((prev) => {
       if (prev.has(slideId)) return prev;
       return new Set(prev).add(slideId);
@@ -229,7 +229,7 @@ export function PresenterView({
     if (scoredSlideIds.has(slideId)) return;
     setScoredSlideIds((prev) => new Set(prev).add(slideId));
     try {
-      await scoreActiveQuizSlide(presentation.id, slideId);
+      await scoreActiveQuizSlide(presentation.id, slideId, { force });
       await loadParticipants();
     } catch (err) {
       console.error("scoreActiveQuizSlide failed", err);
@@ -239,6 +239,29 @@ export function PresenterView({
         return next;
       });
     }
+  }
+
+  async function endQuizQuestionNow(slideId: string) {
+    await scoreQuizOnExpiry(slideId, true);
+  }
+
+  async function endSessionNow() {
+    if (!confirm("End the session for everyone?")) return;
+    // Optimistic local update so the UI flips even if the realtime
+    // event takes a moment (or doesn't fire at all).
+    setPresentation((p) => ({ ...p, state: "closed" }));
+    try {
+      await endPresentation(presentation.id);
+    } catch (err) {
+      console.error("endPresentation failed", err);
+      alert("Could not end the session. Try again.");
+      setPresentation((p) => ({ ...p, state: "active" }));
+    }
+  }
+
+  function goToNextSlide() {
+    setLeaderboardSlideId(null);
+    moveSlide(presentation.id, "next");
   }
 
   return (
@@ -381,28 +404,49 @@ export function PresenterView({
             ← Prev
           </button>
           {isQuiz && !showQuizLeaderboard ? (
-            <button
-              onClick={() => setLeaderboardSlideId(currentSlide.id)}
-              disabled={!quizExpired}
-              className="btn-primary disabled:opacity-40"
-            >
-              {quizExpired ? "Show leaderboard →" : "Waiting for timer"}
-            </button>
+            <div className="flex items-center gap-2">
+              {!quizExpired && (
+                <button
+                  onClick={() => endQuizQuestionNow(currentSlide.id)}
+                  className="btn-ghost"
+                  style={{ color: "var(--danger)", borderColor: "rgba(252,165,165,.3)" }}
+                >
+                  End question
+                </button>
+              )}
+              {quizExpired ? (
+                <>
+                  <button
+                    onClick={() => setLeaderboardSlideId(currentSlide.id)}
+                    className="btn-ghost"
+                  >
+                    Show leaderboard
+                  </button>
+                  {isLast ? (
+                    <button
+                      onClick={endSessionNow}
+                      className="btn-primary"
+                    >
+                      End session
+                    </button>
+                  ) : (
+                    <button
+                      onClick={goToNextSlide}
+                      className="btn-primary"
+                    >
+                      Next question →
+                    </button>
+                  )}
+                </>
+              ) : (
+                <button disabled className="btn-primary opacity-40">
+                  Waiting for timer
+                </button>
+              )}
+            </div>
           ) : isLast ? (
             <button
-              onClick={async () => {
-                if (!confirm("End the session for everyone?")) return;
-                // Optimistic local update so the UI flips even if the realtime
-                // event takes a moment (or doesn't fire at all).
-                setPresentation((p) => ({ ...p, state: "closed" }));
-                try {
-                  await endPresentation(presentation.id);
-                } catch (err) {
-                  console.error("endPresentation failed", err);
-                  alert("Could not end the session. Try again.");
-                  setPresentation((p) => ({ ...p, state: "active" }));
-                }
-              }}
+              onClick={endSessionNow}
               className="btn-ghost"
               style={{ color: "var(--danger)", borderColor: "rgba(252,165,165,.3)" }}
             >
@@ -410,10 +454,7 @@ export function PresenterView({
             </button>
           ) : (
             <button
-              onClick={() => {
-                setLeaderboardSlideId(null);
-                moveSlide(presentation.id, "next");
-              }}
+              onClick={goToNextSlide}
               className="btn-primary"
             >
               Next →

@@ -84,7 +84,7 @@ export async function endPresentation(presentationId: string) {
   if (error) throw error;
 }
 
-export async function scoreActiveQuizSlide(presentationId: string, slideId: string) {
+export async function scoreActiveQuizSlide(presentationId: string, slideId: string, options?: { force?: boolean }) {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("presentations")
@@ -102,7 +102,17 @@ export async function scoreActiveQuizSlide(presentationId: string, slideId: stri
   const cfg = slide.config as { time_limit_s?: number };
   const limitMs = Math.max(1, cfg.time_limit_s ?? 20) * 1000;
   const startedAt = data.current_slide_started_at ? new Date(data.current_slide_started_at).getTime() : 0;
-  if (!startedAt || Date.now() - startedAt < limitMs) return;
+  if (!options?.force && (!startedAt || Date.now() - startedAt < limitMs)) return;
+
+  if (options?.force) {
+    const forcedStartedAt = new Date(Date.now() - limitMs - 250).toISOString();
+    const { error: updateErr } = await supabase
+      .from("presentations")
+      .update({ current_slide_started_at: forcedStartedAt })
+      .eq("id", presentationId)
+      .eq("current_slide_id", slideId);
+    if (updateErr) throw updateErr;
+  }
 
   await scoreQuizSlide(presentationId, slide);
 }
