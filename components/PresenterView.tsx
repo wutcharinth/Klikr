@@ -20,7 +20,8 @@ import { QuizPodium } from "./QuizPodium";
 import { QrCode } from "./QrCode";
 import { PresenterMusicToggle } from "./PresenterMusicToggle";
 import { SessionStatusPill } from "./SessionStatusPill";
-import { Maximize2, Minimize2 } from "lucide-react";
+import { PresenterShortcutsHelp } from "./PresenterShortcutsHelp";
+import { Keyboard, Maximize2, Minimize2 } from "lucide-react";
 import type { EmbedConfig, QAConfig } from "@/lib/types";
 
 export function PresenterView({
@@ -43,6 +44,7 @@ export function PresenterView({
   const [expiredQuizSlideIds, setExpiredQuizSlideIds] = useState<Set<string>>(() => new Set());
   const [leaderboardSlideId, setLeaderboardSlideId] = useState<string | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [shortcutsOpen, setShortcutsOpen] = useState(false);
 
   // Track fullscreen state — handles user-driven Esc + button taps + keyboard.
   useEffect(() => {
@@ -91,6 +93,9 @@ export function PresenterView({
       } else if (e.key === "f" || e.key === "F") {
         e.preventDefault();
         toggleFullscreen();
+      } else if (e.key === "?" || (e.shiftKey && e.key === "/")) {
+        e.preventDefault();
+        setShortcutsOpen((v) => !v);
       }
     };
     window.addEventListener("keydown", handler);
@@ -350,6 +355,15 @@ export function PresenterView({
               <ModeToggleButton mode={effectiveMode} onToggle={toggleMode} />
               <button
                 type="button"
+                onClick={() => setShortcutsOpen(true)}
+                title="Keyboard shortcuts (?)"
+                aria-label="Show keyboard shortcuts"
+                className="hover:text-[var(--fg)]"
+              >
+                <Keyboard className="h-3.5 w-3.5" />
+              </button>
+              <button
+                type="button"
                 onClick={toggleFullscreen}
                 title={isFullscreen ? "Exit fullscreen (F)" : "Fullscreen (F)"}
                 aria-label={isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
@@ -531,6 +545,7 @@ export function PresenterView({
 
         <ReactionOverlay presentationId={presentation.id} />
       </div>
+      <PresenterShortcutsHelp open={shortcutsOpen} onClose={() => setShortcutsOpen(false)} />
     </ThemedShell>
   );
 }

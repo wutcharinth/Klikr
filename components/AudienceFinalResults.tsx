@@ -7,6 +7,7 @@ import type { Participant } from "@/lib/types";
 import { AudienceAppFeedback } from "./AudienceAppFeedback";
 import { encouragementFor } from "./QuizFeedback";
 import { getParticipantScores } from "@/app/play/[code]/actions";
+import { LogoMarkPlayer } from "./remotion/LogoMarkPlayer";
 
 const MEDAL = ["🥇", "🥈", "🥉"];
 const MEDAL_BG = ["#FFD54F", "#B0BEC5", "#D7864D"];
@@ -198,6 +199,11 @@ function FinalResultsBody({
 
       <div className="mt-8">
         <AudienceAppFeedback />
+      </div>
+
+      {/* Logo outro — branded close to the personal card. */}
+      <div className="mt-6 flex justify-center" aria-hidden>
+        <LogoMarkPlayer variant="outro" width={480} height={140} loop={false} />
       </div>
     </Stage>
   );

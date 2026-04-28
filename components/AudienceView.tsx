@@ -44,6 +44,10 @@ export function AudienceView({
     setLoaded(true);
   }, [presentation.id]);
 
+  // Track realtime connectivity so we can show a reconnect pill when the
+  // socket drops. SUBSCRIBED → connected, anything else → reconnecting.
+  const [connected, setConnected] = useState(true);
+
   useEffect(() => {
     const channel = supabase
       .channel(`audience-${presentation.id}`)
@@ -52,7 +56,9 @@ export function AudienceView({
         { event: "UPDATE", schema: "public", table: "presentations", filter: `id=eq.${presentation.id}` },
         (payload) => setPresentation((prev) => ({ ...prev, ...(payload.new as Presentation) })),
       )
-      .subscribe();
+      .subscribe((status) => {
+        setConnected(status === "SUBSCRIBED");
+      });
     return () => {
       supabase.removeChannel(channel);
     };
@@ -114,6 +120,21 @@ export function AudienceView({
 
   return (
     <Stage>
+      {!connected ? (
+        <div
+          className="anim-fade-up mb-4 flex items-center gap-2 rounded-full px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.16em]"
+          style={{ background: "rgba(245,158,11,0.10)", color: "#b45309", border: "1px solid rgba(245,158,11,0.35)" }}
+          role="status"
+          aria-live="polite"
+        >
+          <span
+            aria-hidden
+            style={{ width: 7, height: 7, borderRadius: 999, background: "#f59e0b", display: "inline-block" }}
+            className="live-dot"
+          />
+          Reconnecting…
+        </div>
+      ) : null}
       <div key={currentSlide.id} className="slide-enter">
         <p className="text-[10px] uppercase tracking-[0.18em] muted-text">{currentSlide.type}</p>
         <h2 className="mt-1 text-2xl font-semibold tracking-tight">{currentSlide.question}</h2>

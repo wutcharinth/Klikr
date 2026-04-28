@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Check, Sparkles, X } from "lucide-react";
 import { getLocale, getTranslations } from "next-intl/server";
 import NavBar from "@/components/NavBar";
+import { AIDeckGenerationMotion } from "@/components/remotion/AIDeckGenerationMotion";
 
 export async function generateMetadata() {
   const t = await getTranslations("plans");
@@ -95,6 +96,10 @@ export default async function PlansPage() {
         <p className="mt-3 text-[17px] text-[var(--neutral)]">
           {t("intro", { price: freePriceLabel })}
         </p>
+      </section>
+
+      <section className="mt-10 max-w-3xl">
+        <AIDeckGenerationMotion />
       </section>
 
       <section className="mt-10 grid gap-4 md:grid-cols-3">

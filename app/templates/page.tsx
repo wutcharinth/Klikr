@@ -5,6 +5,8 @@ import { createClient } from "@/lib/supabase/server";
 import type { Template } from "@/lib/types";
 import NavBar from "@/components/NavBar";
 import TemplateSearch from "@/components/TemplateSearch";
+import { QuizMotion } from "@/components/remotion/QuizMotion";
+import { PollMotion } from "@/components/remotion/PollMotion";
 
 export async function generateMetadata() {
   const t = await getTranslations("templates");
@@ -33,6 +35,11 @@ export default async function TemplatesPage() {
         <h1 className="text-4xl font-semibold tracking-tight">{t("title")}</h1>
         <p className="mt-3 text-[17px] text-[var(--neutral)]">{t("intro")}</p>
       </header>
+
+      <section className="mt-10 grid gap-5 sm:grid-cols-2">
+        <QuizMotion />
+        <PollMotion />
+      </section>
 
       {error ? (
         <div className="panel-soft mt-8 p-6 text-sm">
