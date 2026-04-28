@@ -110,11 +110,11 @@ export default async function AdminPage({ searchParams }: { searchParams?: Searc
       .select("slug, title, usage_count")
       .order("usage_count", { ascending: false })
       .limit(10),
-    adminSupabase.from("profiles").select("id, plan_tier"),
+    adminSupabase.from("profiles").select("id, plan_tier, onboarded_at, created_at"),
     adminSupabase.from("slides").select("type"),
     adminSupabase
       .from("app_feedback")
-      .select("id, rating, comment, persona, page_path, created_at")
+      .select("id, user_id, rating, comment, persona, page_path, created_at")
       .order("created_at", { ascending: false })
       .limit(20),
     adminSupabase.from("app_feedback").select("id", { count: "exact", head: true }),
@@ -128,13 +128,69 @@ export default async function AdminPage({ searchParams }: { searchParams?: Searc
     if (u.email) emailById.set(u.id, u.email);
   }
   const hostsByTier: Record<string, { id: string; email: string }[]> = { free: [], basic: [], pro: [] };
-  for (const row of (tierBreakdown ?? []) as { id?: string; plan_tier: string }[]) {
+  const profileRows = (tierBreakdown ?? []) as { id?: string; plan_tier: string; created_at?: string; onboarded_at?: string | null }[];
+  for (const row of profileRows) {
     const tier = row.plan_tier ?? "free";
     if (!hostsByTier[tier]) hostsByTier[tier] = [];
     if (row.id) {
       hostsByTier[tier].push({ id: row.id, email: emailById.get(row.id) ?? "(no email)" });
     }
   }
+
+  const [
+    { data: recentMembersRaw },
+    { data: recentDecksRaw },
+    { data: apiKeyRowsRaw },
+    { data: participantRowsRaw },
+  ] = await Promise.all([
+    adminSupabase
+      .from("profiles")
+      .select("id, plan_tier, onboarded_at, created_at")
+      .order("created_at", { ascending: false })
+      .limit(25),
+    adminSupabase
+      .from("presentations")
+      .select("id, owner_id, title, code, state, created_at, last_started_at")
+      .order("created_at", { ascending: false })
+      .limit(25),
+    adminSupabase
+      .from("api_keys")
+      .select("id, user_id, label, prefix, created_at, last_used_at, revoked_at")
+      .order("created_at", { ascending: false })
+      .limit(200),
+    adminSupabase
+      .from("participants")
+      .select("id, presentation_id, created_at")
+      .gte("created_at", since),
+  ]);
+
+  const recentMembers = ((recentMembersRaw ?? []) as AdminMember[]).map((member) => {
+    const authUser = usersList?.users?.find((user) => user.id === member.id);
+    return {
+      ...member,
+      email: emailById.get(member.id) ?? "(no email)",
+      last_sign_in_at: authUser?.last_sign_in_at ?? null,
+    };
+  });
+  const recentDecks = (recentDecksRaw ?? []) as AdminDeck[];
+  const apiKeyRows = (apiKeyRowsRaw ?? []) as AdminApiKey[];
+  const participantRows = (participantRowsRaw ?? []) as { id: string; presentation_id: string; created_at: string }[];
+
+  const ownerDeckCounts: Record<string, number> = {};
+  const ownerStartedCounts: Record<string, number> = {};
+  for (const deck of recentDecks) {
+    ownerDeckCounts[deck.owner_id] = (ownerDeckCounts[deck.owner_id] ?? 0) + 1;
+    if (deck.last_started_at) ownerStartedCounts[deck.owner_id] = (ownerStartedCounts[deck.owner_id] ?? 0) + 1;
+  }
+  const activeApiKeys = apiKeyRows.filter((key) => !key.revoked_at);
+  const usedApiKeys = activeApiKeys.filter((key) => key.last_used_at);
+  const participantByDeck: Record<string, number> = {};
+  for (const row of participantRows) {
+    participantByDeck[row.presentation_id] = (participantByDeck[row.presentation_id] ?? 0) + 1;
+  }
+  const activeDecksInWindow = Object.keys(participantByDeck).length;
+  const onboardedMembers = profileRows.filter((row) => row.onboarded_at).length;
+  const startedHosts = Object.values(ownerStartedCounts).filter((count) => count > 0).length;
 
   // Page views in the window
   const { count: pageViewsTotal } = await adminSupabase
@@ -257,6 +313,7 @@ export default async function AdminPage({ searchParams }: { searchParams?: Searc
       {/* KPI grid (period-aware) */}
       <section className="mt-8 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
         <Kpi title="Total users" value={signups ?? 0} />
+        <Kpi title="Onboarded users" value={onboardedMembers} subtitle={`${pct(onboardedMembers, signups)} of all users`} />
         <Kpi
           title={`Signups · ${days}d`}
           value={signupsPeriod ?? 0}
@@ -284,8 +341,12 @@ export default async function AdminPage({ searchParams }: { searchParams?: Searc
         />
         <Kpi title="Total participants" value={participants ?? 0} />
         <Kpi title="Joined · 24h" value={participants24h ?? 0} />
+        <Kpi title={`Active decks · ${days}d`} value={activeDecksInWindow} subtitle="with participants" />
+        <Kpi title="Activated hosts" value={startedHosts} subtitle={`${pct(startedHosts, signups)} started a deck`} />
+        <Kpi title="API keys active" value={activeApiKeys.length} subtitle={`${usedApiKeys.length} used at least once`} />
         <Kpi title="Avg slides / deck" value={ratio(slidesAll, presentations)} />
         <Kpi title="Avg responses / deck" value={ratio(responses, presentations)} />
+        <Kpi title={`Participants / active deck`} value={ratio(participantRows.length, activeDecksInWindow)} />
         <Kpi
           title="Top slide type"
           value={topSlideType ? `${topSlideType[0]}` : "—"}
@@ -297,6 +358,95 @@ export default async function AdminPage({ searchParams }: { searchParams?: Searc
           subtitle={fbAvg !== null ? `${fbAvg.toFixed(1)}★ in ${days}d` : undefined}
         />
         <Kpi title={`Page views · ${days}d`} value={pageViewsTotal ?? 0} />
+      </section>
+
+      {/* Members + development signals */}
+      <section className="mt-10 grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
+        <div>
+          <h2 className="text-sm uppercase tracking-[0.18em] muted-text">Recent signups</h2>
+          <div className="panel mt-3 overflow-hidden">
+            <table className="w-full text-left text-sm">
+              <thead className="text-[10px] uppercase tracking-[0.16em] muted-text">
+                <tr style={{ borderBottom: "1px solid var(--line)" }}>
+                  <th className="px-4 py-3 font-medium">Email</th>
+                  <th className="px-4 py-3 font-medium">Plan</th>
+                  <th className="px-4 py-3 font-medium">Onboarded</th>
+                  <th className="px-4 py-3 font-medium">Last sign-in</th>
+                </tr>
+              </thead>
+              <tbody>
+                {recentMembers.map((member) => (
+                  <tr key={member.id} style={{ borderBottom: "1px solid var(--line)" }}>
+                    <td className="max-w-[18rem] truncate px-4 py-3" title={member.email}>
+                      {member.email}
+                    </td>
+                    <td className="px-4 py-3 capitalize muted-text">{member.plan_tier ?? "free"}</td>
+                    <td className="px-4 py-3 muted-text">{member.onboarded_at ? "Yes" : "No"}</td>
+                    <td className="px-4 py-3 muted-text">
+                      {member.last_sign_in_at ? formatRelative(member.last_sign_in_at) : "—"}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div>
+          <h2 className="text-sm uppercase tracking-[0.18em] muted-text">Developer signals</h2>
+          <div className="mt-3 grid gap-3">
+            <DevSignal label="Signup → onboarded" value={pct(onboardedMembers, signups)} hint={`${onboardedMembers}/${signups ?? 0} users`} />
+            <DevSignal label="Signup → started deck" value={pct(startedHosts, signups)} hint={`${startedHosts}/${signups ?? 0} users`} />
+            <DevSignal label="API key adoption" value={pct(activeApiKeys.length, signups)} hint={`${activeApiKeys.length} active keys`} />
+            <DevSignal label="Feedback average" value={fbAvg !== null ? `${fbAvg.toFixed(1)} / 5` : "—"} hint={`${feedbackPeriod?.length ?? 0} ratings in window`} />
+          </div>
+        </div>
+      </section>
+
+      <section className="mt-10 grid gap-6 lg:grid-cols-2">
+        <div>
+          <h2 className="text-sm uppercase tracking-[0.18em] muted-text">Recent decks</h2>
+          <div className="panel mt-3 divide-y" style={{ background: "var(--white)" }}>
+            {recentDecks.slice(0, 12).map((deck) => (
+              <div key={deck.id} className="flex items-center justify-between gap-4 p-4 text-sm">
+                <div className="min-w-0">
+                  <p className="truncate font-medium">{deck.title}</p>
+                  <p className="mt-1 text-[11px] muted-text">
+                    {emailById.get(deck.owner_id) ?? deck.owner_id} · {deck.code} · {deck.state}
+                  </p>
+                </div>
+                <div className="shrink-0 text-right text-[11px] muted-text">
+                  <p>{formatRelative(deck.created_at)}</p>
+                  <p>{participantByDeck[deck.id] ?? 0} participants</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div>
+          <h2 className="text-sm uppercase tracking-[0.18em] muted-text">API key usage</h2>
+          <div className="panel mt-3 divide-y" style={{ background: "var(--white)" }}>
+            {apiKeyRows.slice(0, 12).length === 0 ? (
+              <p className="p-4 text-sm muted-text">No API keys yet.</p>
+            ) : (
+              apiKeyRows.slice(0, 12).map((key) => (
+                <div key={key.id} className="flex items-center justify-between gap-4 p-4 text-sm">
+                  <div className="min-w-0">
+                    <p className="truncate font-medium">{key.label}</p>
+                    <p className="mt-1 text-[11px] muted-text">
+                      {emailById.get(key.user_id) ?? key.user_id} · {key.prefix}…
+                    </p>
+                  </div>
+                  <div className="shrink-0 text-right text-[11px] muted-text">
+                    <p>{key.revoked_at ? "Revoked" : "Active"}</p>
+                    <p>{key.last_used_at ? `Used ${formatRelative(key.last_used_at)}` : "Never used"}</p>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
       </section>
 
       {/* Trends */}
@@ -396,7 +546,7 @@ export default async function AdminPage({ searchParams }: { searchParams?: Searc
                     {f.comment || <span className="muted-text">(no comment)</span>}
                   </p>
                   <p className="mt-1 text-[11px] muted-text">
-                    {f.persona} · {f.page_path ?? ""} · {new Date(f.created_at).toLocaleString()}
+                    {emailById.get(f.user_id ?? "") ?? "anonymous"} · {f.persona} · {f.page_path ?? ""} · {new Date(f.created_at).toLocaleString()}
                   </p>
                 </div>
               </li>
@@ -414,11 +564,41 @@ export default async function AdminPage({ searchParams }: { searchParams?: Searc
 
 type RecentFeedback = {
   id: string;
+  user_id: string | null;
   rating: number;
   comment: string;
   persona: string;
   page_path: string | null;
   created_at: string;
+};
+
+type AdminMember = {
+  id: string;
+  email: string;
+  plan_tier: string;
+  onboarded_at: string | null;
+  created_at: string;
+  last_sign_in_at: string | null;
+};
+
+type AdminDeck = {
+  id: string;
+  owner_id: string;
+  title: string;
+  code: string;
+  state: string;
+  created_at: string;
+  last_started_at: string | null;
+};
+
+type AdminApiKey = {
+  id: string;
+  user_id: string;
+  label: string;
+  prefix: string;
+  created_at: string;
+  last_used_at: string | null;
+  revoked_at: string | null;
 };
 
 // ---------- helpers ----------
@@ -473,9 +653,37 @@ function Kpi({
   );
 }
 
+function DevSignal({ label, value, hint }: { label: string; value: string; hint: string }) {
+  return (
+    <div className="panel-soft p-4">
+      <p className="text-[11px] uppercase tracking-[0.14em] muted-text">{label}</p>
+      <p className="mt-2 text-2xl font-semibold tracking-tight">{value}</p>
+      <p className="mt-1 text-[11px] muted-text">{hint}</p>
+    </div>
+  );
+}
+
 function ratio(a: number | null | undefined, b: number | null | undefined): string {
   if (!a || !b) return "—";
   return (a / b).toFixed(1);
+}
+
+function pct(a: number | null | undefined, b: number | null | undefined): string {
+  if (!a || !b) return "0%";
+  return `${Math.round((a / b) * 100)}%`;
+}
+
+function formatRelative(iso: string): string {
+  const then = new Date(iso).getTime();
+  const diffSec = Math.max(0, Math.round((Date.now() - then) / 1000));
+  if (diffSec < 60) return "just now";
+  const diffMin = Math.round(diffSec / 60);
+  if (diffMin < 60) return `${diffMin}m ago`;
+  const diffHr = Math.round(diffMin / 60);
+  if (diffHr < 24) return `${diffHr}h ago`;
+  const diffDay = Math.round(diffHr / 24);
+  if (diffDay < 14) return `${diffDay}d ago`;
+  return new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
 }
 
 function delta(curr: number | null | undefined, prev: number | null | undefined) {
