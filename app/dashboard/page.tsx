@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { BarChart3, FilePlus2, LayoutTemplate, Pin, PinOff, Copy } from "lucide-react";
+import { BarChart3, Download, FilePlus2, FileText, LayoutTemplate, Pin, PinOff, Copy, Trash2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import {
   createPresentation,
@@ -142,9 +142,9 @@ export default async function Dashboard({ searchParams }: { searchParams?: Searc
         {rows.map((p) => (
           <li
             key={p.id}
-            className="panel p-5 flex items-center justify-between gap-4"
+            className="panel flex items-center justify-between gap-5 p-5"
           >
-            <div className="min-w-0">
+            <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2 min-w-0">
                 {p.pinned && (
                   <Pin
@@ -175,11 +175,16 @@ export default async function Dashboard({ searchParams }: { searchParams?: Searc
                 )}
               </div>
             </div>
-            <div className="flex items-center gap-2">
-              <Link href={`/dashboard/analytics/${p.id}`} className="btn-ghost text-xs muted-text" title="Analytics">
+            <div className="flex shrink-0 flex-wrap items-center justify-end gap-1.5">
+              <Link
+                href={`/dashboard/analytics/${p.id}`}
+                className="btn-ghost inline-flex h-9 w-9 items-center justify-center p-0 text-xs muted-text"
+                title="Analytics"
+                aria-label="Analytics"
+              >
                 <BarChart3 className="h-3.5 w-3.5" />
               </Link>
-              <Link href={`/present/${p.id}`} className="btn-primary">Present</Link>
+              <Link href={`/present/${p.id}`} className="btn-primary h-9 px-4 text-sm">Present</Link>
               {p.is_owner ? (
                 <>
                   <form
@@ -189,7 +194,7 @@ export default async function Dashboard({ searchParams }: { searchParams?: Searc
                     }}
                   >
                     <button
-                      className="btn-ghost text-xs muted-text"
+                      className="btn-ghost inline-flex h-9 w-9 items-center justify-center p-0 text-xs muted-text"
                       title={p.pinned ? "Unpin" : "Pin to top"}
                       aria-label={p.pinned ? "Unpin" : "Pin"}
                     >
@@ -203,16 +208,37 @@ export default async function Dashboard({ searchParams }: { searchParams?: Searc
                     }}
                   >
                     <button
-                      className="btn-ghost text-xs muted-text"
+                      className="btn-ghost inline-flex h-9 w-9 items-center justify-center p-0 text-xs muted-text"
                       title="Duplicate"
                       aria-label="Duplicate"
                     >
                       <Copy className="h-3.5 w-3.5" />
                     </button>
                   </form>
-                  <a href={`/api/export/${p.id}`} download className="btn-ghost text-xs muted-text" title="Export CSV">CSV</a>
-                  <a href={`/api/export/${p.id}?format=xlsx`} className="btn-ghost text-xs muted-text" title="Export Excel">XLSX</a>
-                  <a href={`/api/export/${p.id}?format=pdf`} className="btn-ghost text-xs muted-text" title="Export PDF">PDF</a>
+                  <a
+                    href={`/api/export/${p.id}`}
+                    download
+                    className="btn-ghost inline-flex h-9 w-9 items-center justify-center p-0 text-xs muted-text"
+                    title="Export CSV"
+                    aria-label="Export CSV"
+                  >
+                    <Download className="h-3.5 w-3.5" />
+                  </a>
+                  <a
+                    href={`/api/export/${p.id}?format=xlsx`}
+                    className="btn-ghost h-9 px-3 text-xs muted-text"
+                    title="Export Excel"
+                  >
+                    XLS
+                  </a>
+                  <a
+                    href={`/api/export/${p.id}?format=pdf`}
+                    className="btn-ghost inline-flex h-9 w-9 items-center justify-center p-0 text-xs muted-text"
+                    title="Export PDF"
+                    aria-label="Export PDF"
+                  >
+                    <FileText className="h-3.5 w-3.5" />
+                  </a>
                   <SaveAsTemplateButton presentationId={p.id} presentationTitle={p.title} />
                   <form
                     action={async () => {
@@ -220,7 +246,13 @@ export default async function Dashboard({ searchParams }: { searchParams?: Searc
                       await deletePresentation(p.id);
                     }}
                   >
-                    <button className="btn-ghost text-xs muted-text" aria-label="Delete">Delete</button>
+                    <button
+                      className="btn-ghost inline-flex h-9 w-9 items-center justify-center p-0 text-xs muted-text"
+                      title="Delete"
+                      aria-label="Delete"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
                   </form>
                 </>
               ) : (

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { Save } from "lucide-react";
 import { saveAsTemplate } from "@/app/templates/actions";
 
 const CATEGORIES = ["Business", "Classroom", "Workshops", "Icebreakers", "Brainstorming", "Surveys", "Recognition"];
@@ -10,8 +11,13 @@ export default function SaveAsTemplateButton({ presentationId, presentationTitle
 
   if (!open) {
     return (
-      <button onClick={() => setOpen(true)} className="btn-ghost text-xs muted-text" title="Save as template">
-        Save
+      <button
+        onClick={() => setOpen(true)}
+        className="btn-ghost inline-flex h-9 w-9 items-center justify-center p-0 text-xs muted-text"
+        title="Save as template"
+        aria-label="Save as template"
+      >
+        <Save className="h-3.5 w-3.5" />
       </button>
     );
   }
