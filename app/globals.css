@@ -405,6 +405,18 @@
   to { opacity: 1; transform: translateX(0); }
 }
 
+/* Live-demo: mimic a ranking item being lifted and settled into first place. */
+.ranking-lift {
+  animation:
+    rowEnter 0.5s cubic-bezier(0.2, 0.8, 0.2, 1) forwards,
+    rankingLift 3.4s cubic-bezier(0.2, 0.8, 0.2, 1) infinite 0.8s;
+}
+@keyframes rankingLift {
+  0%, 100% { transform: translateX(0) translateY(0) scale(1); box-shadow: none; }
+  18% { transform: translateX(0) translateY(-9px) scale(1.025); box-shadow: 0 20px 34px -22px rgba(0,113,227,0.75); }
+  42% { transform: translateX(0) translateY(0) scale(1); box-shadow: none; }
+}
+
 /* Gentle float for decorative elements. */
 .float-slow { animation: floatSlow 6s ease-in-out infinite alternate; }
 @keyframes floatSlow {
@@ -569,4 +581,3 @@
   .sheen::after, .headline-shine, .float-slow, .pulse-ring::before, .bar-grow, .word-fly, .row-enter, .orb { animation: none !important; }
   .tilt:hover { transform: none; }
 }
-

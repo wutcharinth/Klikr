@@ -59,12 +59,17 @@ export function LiveHeroDemo() {
   }, [sceneIdx]);
 
   return (
-    <div className="hero-breathe panel relative w-full max-w-md overflow-hidden p-5 sm:p-6">
-      <div className="orb orb-1" style={{ width: "70%", height: "70%", top: "-20%", right: "-20%", opacity: 0.3 }} />
-
+    <div
+      className="hero-breathe scene-dark relative w-full max-w-md overflow-hidden rounded-[28px] p-4 shadow-2xl sm:p-5"
+      style={{
+        background: "linear-gradient(180deg, #252527 0%, #1d1d1f 100%)",
+        border: "1px solid rgba(255,255,255,0.10)",
+        boxShadow: "0 30px 80px -45px rgba(0, 113, 227, 0.65)",
+      }}
+    >
       <div className="relative flex items-center justify-between">
         <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.18em] muted-text">
-          <span className="live-dot pulse-ring" /> live
+          <span className="live-dot pulse-ring" /> Klikr live
         </div>
         <div className="flex items-center gap-1">
           {SCENES.map((s, i) => (
@@ -80,7 +85,7 @@ export function LiveHeroDemo() {
         </div>
       </div>
 
-      <div className="relative mt-4 min-h-[260px]">
+      <div className="relative mt-4 min-h-[290px]">
         {prevIdx !== null && (
           <div key={`prev-${prevIdx}`} className="morph-out absolute inset-0">
             <SceneBody scene={SCENES[prevIdx]} tick={tick} />
@@ -124,24 +129,29 @@ function MCQScene({ tick }: { tick: number }) {
 
   return (
     <>
-      <p className="text-xs uppercase tracking-[0.18em] muted-text">Multiple choice</p>
-      <h3 className="mt-1 text-lg font-semibold tracking-tight">How was the workshop?</h3>
-      <div className="mt-4 space-y-2.5">
+      <div className="flex items-center justify-between">
+        <p className="text-[10px] uppercase tracking-[0.18em] muted-text">Slide 01 of 06 · mcq</p>
+        <span className="flex items-center gap-2 text-[10px] uppercase tracking-[0.18em] muted-text">
+          <span className="live-dot" /> live
+        </span>
+      </div>
+      <h3 className="mt-3 text-2xl font-semibold tracking-tight">How was the workshop?</h3>
+      <div className="mt-5 space-y-3">
         {labels.map((label, i) => {
           const pct = Math.round((totals[i] / sum) * 100);
           return (
-            <div key={label}>
-              <div className="flex items-center justify-between text-xs">
-                <span>{label}</span>
-                <span className="muted-text">{pct}%</span>
+            <div key={label} className="rounded-2xl p-3" style={{ border: "1px solid var(--line)", background: "rgba(255,255,255,0.03)" }}>
+              <div className="flex items-center justify-between text-sm">
+                <span className="font-medium">{label}</span>
+                <span className="mono muted-text">{pct}%</span>
               </div>
-              <div className="mt-1 h-2 overflow-hidden rounded-full" style={{ background: "var(--line)" }}>
+              <div className="mt-2 h-2.5 overflow-hidden rounded-full" style={{ background: "rgba(255,255,255,0.08)" }}>
                 <div
                   className="bar-fill h-full rounded-full"
                   style={{
                     width: `${mounted ? pct : 0}%`,
                     transitionDelay: `${i * 80}ms`,
-                    background: i === 1 || i === 3 ? "var(--blue)" : "var(--ink)",
+                    background: i === 1 || i === 3 ? "var(--blue)" : "rgba(255,255,255,0.55)",
                   }}
                 />
               </div>
@@ -150,7 +160,7 @@ function MCQScene({ tick }: { tick: number }) {
         })}
       </div>
       <p className="mt-4 text-[11px] muted-text">
-        <span className="mono" style={{ color: "var(--ink)" }}>{sum}</span> responses
+        <span className="mono text-[var(--fg)]">{sum}</span> responses
       </p>
     </>
   );
@@ -187,7 +197,7 @@ function WordCloudScene({ tick }: { tick: number }) {
               style={{
                 fontSize: `${0.85 + w.w * 0.12}rem`,
                 fontWeight: w.w > 5 ? 700 : 500,
-                color: w.w > 5 ? "var(--blue)" : "var(--ink)",
+                color: w.w > 5 ? "var(--blue)" : "var(--fg)",
                 animationDelay: isNew ? `${i * 70}ms` : "0ms",
               }}
             >
@@ -197,7 +207,7 @@ function WordCloudScene({ tick }: { tick: number }) {
         })}
       </div>
       <p className="mt-3 text-[11px] muted-text">
-        <span className="mono" style={{ color: "var(--ink)" }}>{visible * 4 + 8}</span> responses
+        <span className="mono text-[var(--fg)]">{visible * 4 + 8}</span> responses
       </p>
     </>
   );
@@ -207,17 +217,30 @@ function WordCloudScene({ tick }: { tick: number }) {
 
 function IntroScene() {
   return (
-    <div className="flex h-full flex-col items-center justify-center text-center">
-      <p className="anim-fade-up text-xs uppercase tracking-[0.18em] muted-text">A live audience tool</p>
-      <h3 className="anim-fade-up delay-200 mt-3 text-4xl font-semibold tracking-tight">
-        <span className="headline-shine">Klikr</span>
-      </h3>
-      <p className="anim-fade-up delay-400 mt-3 max-w-[16rem] text-sm muted-text">
-        Polls, word clouds, quizzes, Q&amp;A — running on any phone, no app required.
+    <div className="flex h-full flex-col text-center">
+      <div className="anim-fade-up pill mx-auto"><span className="live-dot pulse-ring" /> Lobby</div>
+      <p className="anim-fade-up delay-200 mt-7 text-sm muted-text">Audience joins at</p>
+      <p className="anim-fade-up delay-200 mt-1 text-sm break-all">
+        <span className="muted-text">klikrapp.com / </span>
+        <span className="mono">7RUC66</span>
       </p>
-      <div className="anim-pop delay-500 mt-5 inline-flex items-center gap-2 rounded-full px-3 py-1 text-[10px] uppercase tracking-[0.18em]"
-        style={{ background: "rgba(0,113,227,0.10)", color: "var(--blue)", border: "1px solid rgba(0,113,227,0.25)" }}>
-        Free to start
+      <div className="anim-scale-in delay-300 mx-auto mt-8 grid h-36 w-36 place-items-center rounded-2xl bg-white p-4 shadow-xl">
+        <div
+          className="h-full w-full rounded-lg"
+          style={{
+            background:
+              "linear-gradient(90deg,#111 10px,transparent 10px 18px,#111 18px 28px,transparent 28px),linear-gradient(#111 10px,transparent 10px 18px,#111 18px 28px,transparent 28px)",
+            backgroundSize: "38px 38px",
+          }}
+        />
+      </div>
+      <p className="anim-fade-up delay-400 mt-4 text-[10px] uppercase tracking-[0.18em] muted-text">Scan to join</p>
+      <p className="anim-fade-up delay-500 mono mt-2 text-4xl font-bold tracking-[0.22em]" style={{ color: "var(--blue)" }}>
+        7RUC66
+      </p>
+      <div className="anim-pop delay-700 mx-auto mt-6 rounded-full px-4 py-2 text-sm font-medium"
+        style={{ background: "rgba(0,113,227,0.22)", color: "#fff", boxShadow: "0 14px 34px -16px rgba(0,113,227,.8)" }}>
+        Maya joined
       </div>
     </div>
   );
@@ -225,30 +248,33 @@ function IntroScene() {
 
 function ValuePropScene() {
   const stats = [
-    { big: "0", small: "Apps to install" },
-    { big: "6", small: "Letter join code" },
-    { big: "<200ms", small: "Live result latency" },
+    { big: "14", small: "people joined" },
+    { big: "06", small: "slides ready" },
+    { big: "LIVE", small: "present mode" },
   ];
   return (
     <div className="flex h-full flex-col">
-      <p className="text-xs uppercase tracking-[0.18em] muted-text">Why Klikr</p>
-      <h3 className="mt-1 text-lg font-semibold tracking-tight">Built for the room</h3>
-      <div className="mt-5 grid flex-1 grid-cols-3 gap-2">
+      <p className="text-[10px] uppercase tracking-[0.18em] muted-text">Presenter view</p>
+      <h3 className="mt-2 text-2xl font-semibold tracking-tight">Start when the room is ready.</h3>
+      <div className="mt-6 grid flex-1 grid-cols-3 gap-2">
         {stats.map((s, i) => (
           <div
             key={s.small}
-            className="anim-pop flex flex-col items-center justify-center rounded-xl p-3 text-center"
+            className="anim-pop flex flex-col items-center justify-center rounded-2xl p-3 text-center"
             style={{
-              background: "rgba(0,113,227,0.06)",
-              border: "1px solid rgba(0,113,227,0.20)",
+              background: i === 0 ? "rgba(0,113,227,0.14)" : "rgba(255,255,255,0.04)",
+              border: i === 0 ? "1px solid rgba(0,113,227,0.32)" : "1px solid var(--line)",
               animationDelay: `${i * 120}ms`,
             }}
           >
             <span className="mono text-2xl font-bold" style={{ color: "var(--blue)" }}>{s.big}</span>
-            <span className="mt-1 text-[10px] uppercase tracking-[0.15em] muted-text">{s.small}</span>
+            <span className="mt-2 text-[10px] uppercase tracking-[0.15em] muted-text">{s.small}</span>
           </div>
         ))}
       </div>
+      <button className="btn-primary anim-fade-up delay-400 mt-5 w-full" style={{ height: 46 }}>
+        Start presentation
+      </button>
     </div>
   );
 }
@@ -274,25 +300,25 @@ function QuizScene({ tick }: { tick: number }) {
   return (
     <>
       <div className="flex items-center justify-between">
-        <p className="text-xs uppercase tracking-[0.18em] muted-text">Quiz · Kahoot mode</p>
-        <span className="mono text-[11px]" style={{ color: reveal ? "var(--blue)" : "var(--ink)" }}>
-          {reveal ? "✓ revealed" : `${timer}s`}
+        <p className="text-[10px] uppercase tracking-[0.18em] muted-text">Slide 03 of 06 · quiz</p>
+        <span className="mono rounded-full px-2.5 py-1 text-xs" style={{ color: reveal ? "#86efac" : "var(--fg)", border: "1px solid var(--line)" }}>
+          {reveal ? "results" : `${timer}s`}
         </span>
       </div>
-      <h3 className="mt-1 text-lg font-semibold tracking-tight">When did the web go public?</h3>
-      <div className="mt-4 space-y-2.5">
+      <h3 className="mt-3 text-2xl font-semibold tracking-tight">When did the web go public?</h3>
+      <div className="mt-5 space-y-3">
         {labels.map((label, i) => {
           const pct = Math.round((totals[i] / sum) * 100);
           const isCorrect = reveal && i === correctIdx;
           return (
-            <div key={label}>
-              <div className="flex items-center justify-between text-xs">
+            <div key={label} className="rounded-2xl p-3" style={{ border: `1px solid ${isCorrect ? "rgba(48,209,88,.55)" : "var(--line)"}`, background: isCorrect ? "rgba(48,209,88,.10)" : "rgba(255,255,255,0.03)" }}>
+              <div className="flex items-center justify-between text-sm">
                 <span className={isCorrect ? "font-semibold" : ""} style={isCorrect ? { color: "#22c55e" } : undefined}>
                   {label} {isCorrect && "✓"}
                 </span>
-                <span className="muted-text">{pct}%</span>
+                <span className="mono muted-text">{pct}%</span>
               </div>
-              <div className="mt-1 h-2 overflow-hidden rounded-full" style={{ background: "var(--line)" }}>
+              <div className="mt-2 h-2.5 overflow-hidden rounded-full" style={{ background: "rgba(255,255,255,0.08)" }}>
                 <div
                   className="bar-fill h-full rounded-full"
                   style={{
@@ -366,7 +392,7 @@ function RatingScene({ tick }: { tick: number }) {
         })}
       </div>
       <p className="mt-2 text-[11px] muted-text">
-        <span className="mono" style={{ color: "var(--ink)" }}>{dist.reduce((a, b) => a + b, 0)}</span> ratings
+        <span className="mono text-[var(--fg)]">{dist.reduce((a, b) => a + b, 0)}</span> ratings
       </p>
     </>
   );
@@ -415,23 +441,23 @@ function QAScene({ tick }: { tick: number }) {
 
 function RankingScene() {
   const items = [
-    { t: "Better onboarding", color: "var(--blue)" },
-    { t: "Mobile app", color: "var(--ink)" },
-    { t: "More integrations", color: "var(--ink)" },
-    { t: "Dark mode polish", color: "var(--ink)" },
+    { t: "Better onboarding" },
+    { t: "Mobile app" },
+    { t: "More integrations" },
+    { t: "Dark mode polish" },
   ];
   return (
     <>
-      <p className="text-xs uppercase tracking-[0.18em] muted-text">Ranking</p>
-      <h3 className="mt-1 text-lg font-semibold tracking-tight">Drag to prioritize</h3>
-      <ol className="mt-4 space-y-2">
+      <p className="text-[10px] uppercase tracking-[0.18em] muted-text">Audience · ranking</p>
+      <h3 className="mt-2 text-2xl font-semibold tracking-tight">Drag to prioritize</h3>
+      <ol className="relative mt-5 space-y-2">
         {items.map((it, i) => (
           <li
             key={it.t}
-            className="row-enter flex items-center justify-between rounded-lg px-3 py-2.5 text-sm"
+            className={`row-enter flex items-center justify-between rounded-2xl px-3 py-3 text-sm ${i === 0 ? "ranking-lift" : ""}`}
             style={{
-              background: i === 0 ? "rgba(0,113,227,0.08)" : "rgba(255,255,255,0.02)",
-              border: "1px solid var(--line)",
+              background: i === 0 ? "rgba(0,113,227,0.18)" : "rgba(255,255,255,0.04)",
+              border: i === 0 ? "1px solid rgba(0,113,227,0.48)" : "1px solid var(--line)",
               animationDelay: `${i * 80}ms`,
             }}
           >
@@ -439,12 +465,13 @@ function RankingScene() {
               <span className="mono text-xs" style={{ color: i === 0 ? "var(--blue)" : "var(--muted)" }}>
                 #{i + 1}
               </span>
-              <span className={i === 0 ? "font-semibold" : ""} style={{ color: it.color }}>{it.t}</span>
+              <span className={i === 0 ? "font-semibold text-[var(--blue)]" : ""}>{it.t}</span>
             </span>
             <span className="muted-text text-[11px]" style={{ letterSpacing: "0.1em" }}>⋮⋮</span>
           </li>
         ))}
       </ol>
+      <p className="mt-4 text-[11px] muted-text"><span className="mono text-[var(--fg)]">18</span> rankings submitted</p>
     </>
   );
 }
@@ -486,7 +513,7 @@ function LeaderboardScene({ tick }: { tick: number }) {
               </span>
               <span className={i === 0 ? "font-semibold" : ""}>{r.n}</span>
             </span>
-            <span className="mono text-xs" style={{ color: i === 0 ? "var(--blue)" : "var(--ink)" }}>
+            <span className="mono text-xs" style={{ color: i === 0 ? "var(--blue)" : "var(--fg)" }}>
               {r.s.toLocaleString()}
             </span>
           </li>

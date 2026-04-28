@@ -24,17 +24,9 @@
   .mono { font-family: "SF Mono", ui-monospace, Menlo, monospace; }
   .slide { position: absolute; inset: 0; opacity: 0; pointer-events: none; transition: opacity .5s ease; }
   .slide.active { opacity: 1; pointer-events: auto; }
-  .panel { background: linear-gradient(180deg, rgba(255,255,255,.02), rgba(255,255,255,.005)); border: 1px solid var(--line); border-radius: 16px; }
-  .panel-soft { background: rgba(255,255,255,.015); border: 1px solid var(--line); border-radius: 14px; }
-  .grid-bg {
-    background-image:
-      radial-gradient(1200px 600px at 50% -10%, rgba(124,138,255,.10), transparent 60%),
-      radial-gradient(800px 500px at 90% 110%, rgba(201,212,255,.06), transparent 60%),
-      linear-gradient(rgba(255,255,255,.02) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(255,255,255,.02) 1px, transparent 1px);
-    background-size: auto, auto, 56px 56px, 56px 56px;
-    background-position: 0 0, 0 0, -1px -1px, -1px -1px;
-  }
+  .panel { background: #272729; border: 1px solid rgba(255,255,255,.06); border-radius: 18px; }
+  .panel-soft { background: #2a2a2d; border: 1px solid var(--line); border-radius: 14px; }
+  .grid-bg { background: var(--bg); }
   .live-dot { width: 7px; height: 7px; border-radius: 999px; background: var(--accent-2); box-shadow: 0 0 0 0 rgba(41,151,255,.55); animation: pulse 1.6s infinite; }
   @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(41,151,255,.55);} 70% { box-shadow: 0 0 0 12px rgba(41,151,255,0);} 100% { box-shadow: 0 0 0 0 rgba(41,151,255,0);} }
   .icon-tile { width: 36px; height: 36px; border-radius: 10px; background: rgba(255,255,255,.04); border: 1px solid var(--line); display: inline-flex; align-items: center; justify-content: center; }
@@ -57,7 +49,7 @@
   .display-lg { font-size: clamp(48px, 6vw, 84px); }
   .display-md { font-size: clamp(36px, 4vw, 56px); }
   .device { border: 1px solid var(--line); border-radius: 28px; background: linear-gradient(180deg, rgba(255,255,255,.02), rgba(255,255,255,0)); overflow: hidden; }
-  .device-screen { background: #06090d; border: 1px solid var(--line); border-radius: 22px; padding: 20px; }
+  .device-screen { background: #1d1d1f; border: 1px solid var(--line); border-radius: 22px; padding: 20px; }
   .opt-base { transition: all .18s ease; border: 1px solid var(--line); background: rgba(255,255,255,.02); border-radius: 12px; }
   .opt-base:hover:not(:disabled) { background: rgba(255,255,255,.05); border-color: rgba(255,255,255,.18); }
   .opt-selected { background: rgba(0,113,227,.10) !important; border-color: rgba(0,113,227,.5) !important; color: var(--accent-2) !important; }
@@ -67,6 +59,16 @@
   .muted { color: var(--muted); }
   .btn-app-primary { background: var(--accent); color: #fff; border-radius: 999px; padding: 10px 18px; font-weight: 500; font-size: 14px; transition: background .15s; }
   .btn-app-primary:hover { background: var(--accent-2); }
+  .slide-pop { animation: slidePop .55s cubic-bezier(.2,.8,.2,1) forwards; opacity: 0; transform: translateY(14px) scale(.985); }
+  @keyframes slidePop { to { opacity: 1; transform: translateY(0) scale(1); } }
+  .quiz-phase { display: none !important; }
+  .quiz-phase.active { display: flex !important; }
+  .quiz-phase.active.grid { display: grid !important; }
+  .answer-card { min-height: 88px; }
+  .host-control { display: inline-flex; align-items: center; gap: 8px; border: 1px solid var(--line); background: rgba(255,255,255,.025); border-radius: 999px; padding: 10px 16px; font-size: 14px; font-weight: 500; transition: all .15s ease; }
+  .host-control svg { width: 15px; height: 15px; }
+  .host-control:hover { background: rgba(255,255,255,.06); border-color: rgba(255,255,255,.16); }
+  .host-control:disabled { opacity: .42; cursor: not-allowed; }
 
   /* ---------- Mobile (≤768px): vertical scroll, stacked panels ---------- */
   @media (max-width: 768px) {
@@ -181,8 +183,8 @@
       <div class="bg-white p-2.5 rounded-lg" id="qr-title"></div>
       <div class="text-left">
         <div class="text-[10px] uppercase tracking-[0.18em] muted">Scan to join</div>
-        <div class="mono text-3xl font-semibold tracking-[.18em] mt-1">ZSZH2T</div>
-        <div class="text-xs muted mt-1">klikr.app/ZSZH2T</div>
+        <div class="mono text-3xl font-semibold tracking-[.18em] mt-1">7RUC66</div>
+        <div class="text-xs muted mt-1">klikrapp.com/7RUC66</div>
       </div>
     </div>
 
@@ -208,8 +210,8 @@
           <div class="bg-white p-3 rounded-xl" id="qr-howto"></div>
           <div>
             <div class="text-[10px] uppercase tracking-[0.18em] muted">Join code</div>
-            <div class="mono text-4xl font-bold tracking-[.18em] mt-1">ZSZH2T</div>
-            <div class="text-xs muted mt-2">klikr.app/ZSZH2T</div>
+            <div class="mono text-4xl font-bold tracking-[.18em] mt-1">7RUC66</div>
+            <div class="text-xs muted mt-2">klikrapp.com/7RUC66</div>
           </div>
         </div>
         <ul class="mt-8 space-y-2 text-sm">
@@ -223,7 +225,7 @@
         <div class="device-screen">
           <div class="flex items-center justify-between text-[10px] uppercase tracking-[0.18em] muted">
             <span>Klikr</span>
-            <span>ZSZH2T</span>
+            <span>7RUC66</span>
           </div>
           <div class="mt-6 text-lg font-semibold">Choose a nickname</div>
           <div class="mt-3 panel-soft px-3 py-3 text-sm">Alice</div>
@@ -337,10 +339,10 @@
       <div class="pill"><span data-lucide-name="trophy"></span> Live quiz</div>
       <span class="text-xs muted">04 / 04</span>
     </div>
-    <h2 class="display-h display-md mt-3 tracking-tight">Faster correct answers earn more points.</h2>
+    <h2 class="display-h display-md mt-3 tracking-tight">Collect answers. Reveal results. Then show the leaderboard.</h2>
 
-    <div class="mt-10 grid grid-cols-[2fr_1fr] gap-8 flex-1 min-h-0">
-      <div class="panel p-8 flex flex-col">
+    <div id="quiz-question-phase" class="quiz-phase active mt-10 grid grid-cols-[2fr_1fr] gap-8 flex-1 min-h-0">
+      <div class="panel p-8 flex flex-col slide-pop">
         <div class="flex items-start justify-between gap-6">
           <div class="text-2xl font-semibold max-w-2xl">Which of these databases supports row-level security natively?</div>
           <div class="relative w-16 h-16 shrink-0">
@@ -349,20 +351,55 @@
           </div>
         </div>
         <div class="mt-8 grid grid-cols-2 gap-3" id="quiz-options">
-          <button data-i="0" class="quiz-opt opt-base rounded-xl px-5 py-6 text-left flex items-center gap-4"><span class="mono muted">A</span><span class="font-medium">MySQL</span></button>
-          <button data-i="1" class="quiz-opt opt-base rounded-xl px-5 py-6 text-left flex items-center gap-4"><span class="mono muted">B</span><span class="font-medium">Postgres</span></button>
-          <button data-i="2" class="quiz-opt opt-base rounded-xl px-5 py-6 text-left flex items-center gap-4"><span class="mono muted">C</span><span class="font-medium">SQLite</span></button>
-          <button data-i="3" class="quiz-opt opt-base rounded-xl px-5 py-6 text-left flex items-center gap-4"><span class="mono muted">D</span><span class="font-medium">Redis</span></button>
+          <button data-i="0" class="quiz-opt answer-card opt-base rounded-xl px-5 py-6 text-left flex items-center gap-4"><span class="mono muted">A</span><span class="font-medium">MySQL</span></button>
+          <button data-i="1" class="quiz-opt answer-card opt-base rounded-xl px-5 py-6 text-left flex items-center gap-4"><span class="mono muted">B</span><span class="font-medium">Postgres</span></button>
+          <button data-i="2" class="quiz-opt answer-card opt-base rounded-xl px-5 py-6 text-left flex items-center gap-4"><span class="mono muted">C</span><span class="font-medium">SQLite</span></button>
+          <button data-i="3" class="quiz-opt answer-card opt-base rounded-xl px-5 py-6 text-left flex items-center gap-4"><span class="mono muted">D</span><span class="font-medium">Redis</span></button>
         </div>
         <div id="quiz-feedback" class="mt-6 text-sm font-medium h-6"></div>
-        <div class="mt-auto pt-4 text-[11px] muted mono">round(1000 × (1 − response_time / time_limit))</div>
+        <div class="mt-auto pt-4 text-[11px] muted mono">Scores are hidden until the question ends.</div>
       </div>
       <div class="panel p-7 flex flex-col">
         <div class="flex items-center justify-between text-[10px] uppercase tracking-[0.18em] muted">
-          <span>Leaderboard</span>
+          <span>Host controls</span>
           <span class="flex items-center gap-1.5"><span class="live-dot"></span> live</span>
         </div>
-        <ol id="leaderboard" class="space-y-2 mt-5"></ol>
+        <div class="mt-6 rounded-2xl p-5" style="border:1px solid var(--line);background:rgba(255,255,255,.025)">
+          <div class="text-[10px] uppercase tracking-[0.18em] muted">Answers in</div>
+          <div class="mt-2 text-4xl font-bold mono" id="quiz-response-count">0</div>
+          <p class="mt-2 text-sm muted">The host can end early once most players have answered.</p>
+        </div>
+        <div class="mt-auto flex flex-col gap-3">
+          <button id="quiz-end-now" class="host-control text-left"><span data-lucide-name="timer-off"></span> End question now</button>
+          <button id="quiz-show-leaderboard" class="host-control text-left" disabled><span data-lucide-name="trophy"></span> Show leaderboard</button>
+          <button id="quiz-next-question" class="btn-app-primary text-center" disabled>Next question →</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="quiz-results-phase" class="quiz-phase mt-10 flex-1 min-h-0 flex-col">
+      <div class="panel p-8 flex min-h-0 flex-1 flex-col slide-pop">
+        <div class="flex items-center justify-between">
+          <div>
+            <div class="text-[10px] uppercase tracking-[0.18em] muted">Question ended · results</div>
+            <div class="mt-2 text-3xl font-semibold">Postgres was the correct answer.</div>
+          </div>
+          <button id="quiz-results-to-board" class="btn-app-primary">Show leaderboard</button>
+        </div>
+        <div class="mt-8 flex-1 min-h-0"><canvas id="quiz-results-chart"></canvas></div>
+      </div>
+    </div>
+
+    <div id="quiz-board-phase" class="quiz-phase mt-10 flex-1 min-h-0 flex-col">
+      <div class="panel p-8 flex min-h-0 flex-1 flex-col slide-pop">
+        <div class="flex items-center justify-between">
+          <div>
+            <div class="text-[10px] uppercase tracking-[0.18em] muted">Leaderboard</div>
+            <div class="mt-2 text-3xl font-semibold">Current standings</div>
+          </div>
+          <button onclick="show(6)" class="btn-app-primary">Next →</button>
+        </div>
+        <ol id="leaderboard" class="space-y-3 mt-8"></ol>
       </div>
     </div>
   </div>
@@ -419,7 +456,7 @@ function toPascal(s) { return s.split('-').map(p => p[0].toUpperCase() + p.slice
 setIcons();
 
 // ========== QR codes ==========
-const JOIN_URL = 'https://klikr.app/ZSZH2T';
+const JOIN_URL = 'https://www.klikrapp.com/play/7RUC66';
 function drawQR(id, size) {
   const el = document.getElementById(id);
   if (!el || !window.QRCode) return;
@@ -598,52 +635,117 @@ function pushOpen(name, text, mine) {
 }
 
 // ========== Quiz ==========
-let quizInit = false, quizTimer, quizStart, quizDone, quizMs = 15000;
+let quizInit = false, quizTimer, quizStart, quizDone, quizMs = 15000, quizChart, quizBoard = [], quizVotes = [2, 3, 1, 1], quizAnswered = false;
 const CORRECT = 1; // Postgres
 const QUIZ_NAMES = ['Alice','Bob','Carol','Dave','Eve','Frank','Gina','Henry'];
 function initQuiz() {
   if (quizInit) return; quizInit = true;
   quizDone = false;
+  quizAnswered = false;
+  quizVotes = [2, 3, 1, 1];
   quizStart = Date.now();
   document.getElementById('quiz-feedback').textContent = '';
+  setQuizPhase('question');
+  updateQuizResponseCount();
+  document.getElementById('quiz-show-leaderboard').disabled = true;
+  document.getElementById('quiz-next-question').disabled = true;
+  document.getElementById('quiz-end-now').disabled = false;
   document.querySelectorAll('.quiz-opt').forEach(b => { b.disabled = false; b.classList.remove('opt-selected','opt-correct','opt-wrong'); });
-  const board = QUIZ_NAMES.map(n => ({ name: n, score: Math.floor(Math.random()*1500)+200 }));
-  renderBoard(board);
+  quizBoard = QUIZ_NAMES.map((n, i) => ({ name: n, score: 650 + Math.floor(Math.random()*900) + i * 23 }));
   document.querySelectorAll('.quiz-opt').forEach(b => {
-    b.onclick = () => answerQuiz(+b.dataset.i, b, board);
+    b.onclick = () => answerQuiz(+b.dataset.i, b);
   });
+  document.getElementById('quiz-end-now').onclick = () => endQuizQuestion('Ended early by host.');
+  document.getElementById('quiz-show-leaderboard').onclick = showQuizLeaderboard;
+  document.getElementById('quiz-next-question').onclick = () => show(6);
+  document.getElementById('quiz-results-to-board').onclick = showQuizLeaderboard;
   if (quizTimer) clearInterval(quizTimer);
   quizTimer = setInterval(() => {
     const left = Math.max(0, quizMs - (Date.now() - quizStart));
     document.getElementById('quiz-time').textContent = Math.ceil(left/1000);
     document.getElementById('quiz-ring').style.setProperty('--p', `${(left/quizMs)*360}deg`);
     if (left <= 0 && !quizDone) {
-      quizDone = true;
-      clearInterval(quizTimer);
-      document.getElementById('quiz-feedback').innerHTML = '<span style="color:#fca5a5">Time\'s up.</span>';
-      revealQuiz();
+      endQuizQuestion('Time\'s up.');
     }
   }, 100);
 }
-function answerQuiz(i, btn, board) {
+function answerQuiz(i, btn) {
   if (quizDone) return;
-  quizDone = true;
-  clearInterval(quizTimer);
   const ms = Date.now() - quizStart;
   const correct = i === CORRECT;
   const points = correct ? Math.max(0, Math.round(1000 * (1 - ms/quizMs))) : 0;
+  quizAnswered = true;
+  quizVotes[i] += 1;
+  quizBoard.unshift({ name: 'You', score: points, you: true });
   document.querySelectorAll('.quiz-opt').forEach(b => b.disabled = true);
-  btn.classList.add(correct ? 'opt-correct' : 'opt-wrong');
-  if (!correct) document.querySelector(`.quiz-opt[data-i="${CORRECT}"]`).classList.add('opt-correct');
-  document.getElementById('quiz-feedback').innerHTML = correct
-    ? `<span style="color:#86efac">Correct in ${(ms/1000).toFixed(1)}s · +${points} pts</span>`
-    : `<span style="color:#fca5a5">Postgres has built-in row-level security.</span>`;
-  board.unshift({ name: 'You', score: points, you: true });
-  renderBoard(board);
+  btn.classList.add('opt-selected');
+  document.getElementById('quiz-feedback').innerHTML = '<span class="accent-text">Answer locked.</span> Score reveals when the question ends.';
+  updateQuizResponseCount();
+  let n = 0;
+  const pump = () => {
+    if (quizDone || n >= 10) return;
+    quizVotes[Math.random() < .58 ? CORRECT : Math.floor(Math.random()*4)] += 1;
+    updateQuizResponseCount();
+    n++;
+    setTimeout(pump, 260 + Math.random()*360);
+  };
+  setTimeout(pump, 300);
+}
+function endQuizQuestion(reason) {
+  if (quizDone) return;
+  quizDone = true;
+  clearInterval(quizTimer);
+  document.getElementById('quiz-time').textContent = '0';
+  document.getElementById('quiz-ring').style.setProperty('--p', '0deg');
+  document.getElementById('quiz-feedback').innerHTML = `<span class="accent-text">${reason}</span> Showing results.`;
+  revealQuiz();
+  document.getElementById('quiz-end-now').disabled = true;
+  document.getElementById('quiz-show-leaderboard').disabled = false;
+  document.getElementById('quiz-next-question').disabled = false;
+  setTimeout(showQuizResults, 650);
 }
 function revealQuiz() {
   document.querySelector(`.quiz-opt[data-i="${CORRECT}"]`).classList.add('opt-correct');
   document.querySelectorAll('.quiz-opt').forEach(b => b.disabled = true);
+}
+function setQuizPhase(name) {
+  ['question','results','board'].forEach(phase => {
+    document.getElementById(`quiz-${phase}-phase`).classList.toggle('active', phase === name);
+  });
+}
+function updateQuizResponseCount() {
+  document.getElementById('quiz-response-count').textContent = quizVotes.reduce((a,b)=>a+b,0);
+}
+function showQuizResults() {
+  setQuizPhase('results');
+  const ctx = document.getElementById('quiz-results-chart');
+  const labels = ['MySQL','Postgres','SQLite','Redis'];
+  if (quizChart) quizChart.destroy();
+  quizChart = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [{
+        data: quizVotes,
+        backgroundColor: labels.map((_, i) => i === CORRECT ? '#30d158' : '#0071e3'),
+        borderRadius: 14,
+        barThickness: 72,
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false, animation: { duration: 900 },
+      plugins: { legend: { display: false }, tooltip: { enabled: false } },
+      scales: {
+        x: { ticks: { color: '#f5f5f7', font: { size: 16, weight: '600' } }, grid: { display: false } },
+        y: { ticks: { color: '#a1a1a6', precision: 0 }, grid: { color: 'rgba(255,255,255,.08)' }, beginAtZero: true }
+      }
+    }
+  });
+}
+function showQuizLeaderboard() {
+  if (!quizDone) return;
+  setQuizPhase('board');
+  renderBoard(quizBoard);
 }
 function renderBoard(board) {
   const list = [...board].sort((a,b)=>b.score-a.score).slice(0,8);
@@ -651,10 +753,11 @@ function renderBoard(board) {
   ol.innerHTML = '';
   list.forEach((r, idx) => {
     const li = document.createElement('li');
-    li.className = 'flex items-center justify-between text-sm rounded-lg px-3 py-2.5 border';
-    li.style.borderColor = r.you ? 'rgba(124,138,255,.4)' : 'var(--line)';
-    li.style.background = r.you ? 'rgba(124,138,255,.08)' : 'rgba(255,255,255,.015)';
-    li.innerHTML = `<span class="flex items-center gap-3"><span class="mono muted w-5 text-right">${String(idx+1).padStart(2,'0')}</span><span class="font-medium">${r.name}</span></span><span class="mono font-semibold">${r.score}</span>`;
+    li.className = 'slide-pop flex items-center justify-between rounded-2xl px-5 py-4 border text-lg';
+    li.style.animationDelay = `${idx * 70}ms`;
+    li.style.borderColor = idx === 0 ? 'rgba(0,113,227,.38)' : 'var(--line)';
+    li.style.background = idx === 0 ? 'rgba(0,113,227,.14)' : (r.you ? 'rgba(0,113,227,.10)' : 'rgba(255,255,255,.025)');
+    li.innerHTML = `<span class="flex items-center gap-4"><span class="mono flex h-10 w-10 items-center justify-center rounded-full ${idx === 0 ? '' : 'muted'}" style="background:${idx === 0 ? 'var(--accent)' : 'rgba(255,255,255,.08)'};color:${idx === 0 ? '#fff' : 'var(--muted)'}">${idx+1}</span><span class="font-semibold">${r.name}</span></span><span class="mono text-2xl font-bold accent-text">${r.score.toLocaleString()}</span>`;
     ol.appendChild(li);
   });
 }
