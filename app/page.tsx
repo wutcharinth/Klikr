@@ -5,7 +5,7 @@ import { JoinForm } from "@/components/JoinForm";
 import { ArrowRight } from "lucide-react";
 import NavBar from "@/components/NavBar";
 import { createClient } from "@/lib/supabase/server";
-import { LiveHeroDemo } from "@/components/LiveHeroDemo";
+import { HeroProductAnimation } from "@/components/remotion/HeroProductAnimation";
 import { Reveal } from "@/components/Reveal";
 
 async function joinAction(formData: FormData) {
@@ -69,7 +69,7 @@ export default async function Landing() {
         </div>
 
         <div className="anim-fade-up delay-300 flex justify-center lg:justify-end">
-          <LiveHeroDemo />
+          <HeroProductAnimation className="w-full max-w-xl" />
         </div>
       </div>
 

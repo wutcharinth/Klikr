@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { Plus, QrCode, Sparkles, Zap, ArrowRight } from "lucide-react";
 import { getTranslations } from "next-intl/server";
+import { HeroProductAnimation } from "@/components/remotion/HeroProductAnimation";
+import { HowItWorksMotion } from "@/components/remotion/HowItWorksMotion";
 
 function FloatingOrbs() {
   return (
@@ -112,9 +114,17 @@ export async function HomeLanding() {
           </div>
         </div>
 
+        {/* Product animation — Remotion-driven hero loop */}
+        <div className="anim-fade-up delay-500 mt-14 sm:mt-16">
+          <HeroProductAnimation className="mx-auto w-full" />
+        </div>
+
         {/* How it works */}
         <div className="mt-20">
           <h2 className="text-2xl font-semibold tracking-tight text-center">{t("howItWorks")}</h2>
+          <div className="mt-8">
+            <HowItWorksMotion className="mx-auto w-full max-w-4xl" />
+          </div>
           <ol className="mt-8 grid gap-4 sm:grid-cols-3">
             {stepKeys.map((n, i) => {
               const Icon = stepIcons[i];

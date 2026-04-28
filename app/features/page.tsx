@@ -17,6 +17,12 @@ import {
   Wand2,
   ArrowRight,
 } from "lucide-react";
+import { PollMotion } from "@/components/remotion/PollMotion";
+import { WordCloudMotion } from "@/components/remotion/WordCloudMotion";
+import { QAMotion } from "@/components/remotion/QAMotion";
+import { QuizMotion } from "@/components/remotion/QuizMotion";
+import { AIDeckGenerationMotion } from "@/components/remotion/AIDeckGenerationMotion";
+import { HowItWorksMotion } from "@/components/remotion/HowItWorksMotion";
 
 export async function generateMetadata() {
   const t = await getTranslations("features");
@@ -45,6 +51,15 @@ export default async function FeaturesPage() {
         </h1>
         <p className="anim-fade-up delay-300 mt-3 text-[17px] muted-text">{t("intro")}</p>
       </header>
+
+      {/* Animated feature cards — premium SaaS feel hero strip */}
+      <section className="mt-12 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+        <PollMotion />
+        <WordCloudMotion />
+        <QAMotion />
+        <QuizMotion />
+        <AIDeckGenerationMotion />
+      </section>
 
       <section className="mt-16">
         <Reveal>

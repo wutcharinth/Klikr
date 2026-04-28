@@ -19,6 +19,8 @@ import { KahootPresenterView } from "./KahootPresenterView";
 import { QuizPodium } from "./QuizPodium";
 import { QrCode } from "./QrCode";
 import { PresenterMusicToggle } from "./PresenterMusicToggle";
+import { SessionStatusPill } from "./SessionStatusPill";
+import { Maximize2, Minimize2 } from "lucide-react";
 import type { EmbedConfig, QAConfig } from "@/lib/types";
 
 export function PresenterView({
@@ -40,6 +42,60 @@ export function PresenterView({
   const [scoredSlideIds, setScoredSlideIds] = useState<Set<string>>(() => new Set());
   const [expiredQuizSlideIds, setExpiredQuizSlideIds] = useState<Set<string>>(() => new Set());
   const [leaderboardSlideId, setLeaderboardSlideId] = useState<string | null>(null);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+
+  // Track fullscreen state — handles user-driven Esc + button taps + keyboard.
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    const handler = () => setIsFullscreen(Boolean(document.fullscreenElement));
+    document.addEventListener("fullscreenchange", handler);
+    return () => document.removeEventListener("fullscreenchange", handler);
+  }, []);
+
+  const toggleFullscreen = useCallback(() => {
+    if (typeof document === "undefined") return;
+    if (document.fullscreenElement) {
+      document.exitFullscreen?.().catch(() => {});
+    } else {
+      document.documentElement.requestFullscreen?.().catch(() => {});
+    }
+  }, []);
+
+  // Keyboard shortcuts — host-only, scoped to presentation states.
+  // Right / Space → next, Left → prev, F → fullscreen.
+  // Ignore when focus is in an input / textarea / contenteditable so editing
+  // isn't disrupted.
+  useEffect(() => {
+    if (presentation.state !== "active" && presentation.state !== "lobby") return;
+    const handler = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (
+        target &&
+        (target.tagName === "INPUT" ||
+          target.tagName === "TEXTAREA" ||
+          target.isContentEditable)
+      ) {
+        return;
+      }
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      if (e.key === "ArrowRight" || e.key === " ") {
+        if (presentation.state === "active") {
+          e.preventDefault();
+          moveSlide(presentation.id, "next").catch(() => {});
+        }
+      } else if (e.key === "ArrowLeft") {
+        if (presentation.state === "active") {
+          e.preventDefault();
+          moveSlide(presentation.id, "prev").catch(() => {});
+        }
+      } else if (e.key === "f" || e.key === "F") {
+        e.preventDefault();
+        toggleFullscreen();
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [presentation.state, presentation.id, toggleFullscreen]);
 
   useEffect(() => {
     try {
@@ -292,7 +348,16 @@ export function PresenterView({
               </a>
               <PresenterMusicToggle />
               <ModeToggleButton mode={effectiveMode} onToggle={toggleMode} />
-              <span className="flex items-center gap-2"><span className="live-dot" /> live</span>
+              <button
+                type="button"
+                onClick={toggleFullscreen}
+                title={isFullscreen ? "Exit fullscreen (F)" : "Fullscreen (F)"}
+                aria-label={isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
+                className="hover:text-[var(--fg)]"
+              >
+                {isFullscreen ? <Minimize2 className="h-3.5 w-3.5" /> : <Maximize2 className="h-3.5 w-3.5" />}
+              </button>
+              <SessionStatusPill state="live" />
             </div>
           </div>
           <div key={`${currentSlide.id}-${showQuizLeaderboard ? "leaderboard" : "slide"}`} className="slide-enter flex min-h-0 flex-1 flex-col">
