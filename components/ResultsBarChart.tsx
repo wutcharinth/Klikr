@@ -170,14 +170,14 @@ export function QuizCountdown({
         {cfg.options.map((opt, i) => (
           <li
             key={i}
-            className="flex items-center gap-3 rounded-xl px-4 py-4 text-lg sm:text-xl"
+            className="flex items-center gap-3 rounded-xl px-4 py-3 text-base sm:text-lg"
             style={{
               border: "1px solid var(--line)",
               background: "rgba(255,255,255,0.02)",
             }}
           >
             <span
-              className="mono inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-semibold"
+              className="mono inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-semibold"
               style={{ background: "rgba(0,113,227,0.10)", color: "var(--blue)" }}
             >
               {String.fromCharCode(65 + i)}

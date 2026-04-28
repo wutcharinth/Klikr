@@ -102,7 +102,9 @@ export async function scoreActiveQuizSlide(presentationId: string, slideId: stri
   const cfg = slide.config as { time_limit_s?: number };
   const limitMs = Math.max(1, cfg.time_limit_s ?? 20) * 1000;
   const startedAt = data.current_slide_started_at ? new Date(data.current_slide_started_at).getTime() : 0;
-  if (!options?.force && (!startedAt || Date.now() - startedAt < limitMs)) return;
+  
+  // Trust the host's client. If they call this (even without force), 
+  // their timer has expired. This prevents clock drift from breaking scoring.
 
   if (options?.force) {
     const forcedStartedAt = new Date(Date.now() - limitMs - 250).toISOString();

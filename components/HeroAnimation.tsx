@@ -19,21 +19,23 @@ const Pill = ({ label, dot = false }: { label: string; dot?: boolean }) => (
 
 function BeatDashboard() {
   return (
-    <div className="hero-beat hero-beat-1 hero-beat-initial flex flex-col justify-center h-full">
-      <div className="text-xs font-semibold tracking-[0.2em] uppercase text-zinc-500 mb-4">
-        Dashboard
-      </div>
-      <div className="text-xl sm:text-2xl font-bold tracking-tight text-zinc-100 mb-4 sm:mb-6">
-        Your sessions
-      </div>
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <div className="p-3 sm:p-4 rounded-2xl bg-blue-500/10 border border-blue-500/30 shadow-[0_8px_30px_-12px_rgba(59,130,246,0.5)]">
-          <div className="text-sm font-semibold text-zinc-100">New session</div>
-          <div className="mt-1 text-xs text-blue-200/60">Empty deck, name it later</div>
+    <div className="hero-beat hero-beat-1 hero-beat-initial absolute inset-x-0 top-8 mx-auto grid w-[90%] max-w-[440px] grid-cols-2 gap-4 sm:top-12 sm:gap-5">
+      <div className="col-span-2">
+        <div className="text-xs font-semibold tracking-[0.2em] uppercase text-zinc-500">
+          Dashboard
         </div>
-        <div className="hidden sm:block p-3 sm:p-4 rounded-2xl bg-white/5 border border-white/10">
-          <div className="text-sm font-semibold text-zinc-100">Templates</div>
-          <div className="mt-1 text-xs text-zinc-500">Polls, quizzes, icebreakers</div>
+        <p className="mt-4 text-xl font-bold tracking-tight text-white sm:mt-5 sm:text-2xl">
+          Your sessions
+        </p>
+      </div>
+      <div className="col-span-2 grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <div className="rounded-2xl border border-blue-500/30 bg-blue-500/10 p-3 shadow-[0_8px_30px_-12px_rgba(59,130,246,0.5)] sm:p-4">
+          <p className="text-sm font-semibold text-white">New session</p>
+          <p className="mt-1 text-xs text-zinc-400">Empty deck, name it later</p>
+        </div>
+        <div className="hidden rounded-2xl border border-white/10 bg-white/5 p-3 sm:block sm:p-4">
+          <p className="text-sm font-semibold text-white">Templates</p>
+          <p className="mt-1 text-xs text-zinc-400">Polls, quizzes, icebreakers</p>
         </div>
       </div>
     </div>
@@ -60,7 +62,7 @@ function BeatJoinCode() {
 function BeatPoll() {
   const options = ["Ship faster", "Polish UX", "New market"];
   return (
-    <div className="hero-beat hero-beat-3 flex flex-col h-full justify-center">
+    <div className="hero-beat hero-beat-3 absolute inset-x-0 bottom-8 mx-auto flex w-[90%] max-w-[380px] flex-col justify-center sm:bottom-12">
       <div className="text-center mb-5 sm:mb-6">
         <div className="text-[10px] sm:text-xs font-semibold tracking-[0.2em] uppercase text-zinc-500 mb-2">
           Live poll
@@ -131,7 +133,12 @@ function BeatResults() {
 export function HeroAnimationCSS({ className = "" }: { className?: string }) {
   return (
     <div
-      className={`relative w-full aspect-video min-h-[300px] overflow-hidden rounded-2xl sm:rounded-3xl bg-zinc-950 border border-white/10 shadow-[0_30px_80px_-40px_rgba(0,0,0,0.5)] ${className}`}
+      className={`relative w-full overflow-hidden rounded-2xl bg-zinc-950/40 ${className}`}
+      style={{
+        aspectRatio: "16 / 11",
+        minHeight: "420px",
+        boxShadow: "0 0 0 1px rgba(255,255,255,0.05), 0 30px 60px -20px rgba(0,0,0,0.5)",
+      }}
       role="img"
       aria-label="A live Klikr session — host creates a deck, audience joins, votes flow in, and live results appear."
     >

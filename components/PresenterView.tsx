@@ -152,9 +152,20 @@ export function PresenterView({
       )
       .on(
         "postgres_changes",
-        { event: "*", schema: "public", table: "participants", filter: `presentation_id=eq.${presentation.id}` },
-        () => {
-          loadParticipants();
+        { event: "INSERT", schema: "public", table: "participants", filter: `presentation_id=eq.${presentation.id}` },
+        (payload) => {
+          setParticipants((prev) => {
+            const fresh = payload.new as Participant;
+            if (prev.some(p => p.id === fresh.id)) return prev;
+            return [...prev, fresh];
+          });
+        },
+      )
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "participants", filter: `presentation_id=eq.${presentation.id}` },
+        (payload) => {
+          setParticipants((prev) => prev.map(p => p.id === payload.new.id ? payload.new as Participant : p));
         },
       )
       .subscribe();
@@ -336,7 +347,7 @@ export function PresenterView({
           </div>
           <QrCode value={joinUrl} size={88} />
         </div>
-        <div className="flex min-h-0 flex-1 flex-col gap-4 rounded-2xl px-2 py-3 sm:px-6 sm:py-5">
+        <div className="flex min-h-0 flex-1 flex-col gap-4 rounded-2xl px-2 py-3 sm:px-6 sm:py-5 overflow-y-auto">
           <div className="flex items-center justify-between">
             <div className="mono text-[11px] uppercase tracking-[0.2em] muted-text">
               Slide {String(idx + 1).padStart(2, "0")} of {String(slides.length).padStart(2, "0")} · {currentSlide.type}
