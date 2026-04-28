@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Moon, Sun } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import type { Presentation, Slide, ResponseRow, Participant } from "@/lib/types";
@@ -38,6 +38,8 @@ export function PresenterView({
   const [participants, setParticipants] = useState<Participant[]>([]);
   const [modeOverride, setModeOverride] = useState<"light" | "dark" | null>(null);
   const [scoredSlideIds, setScoredSlideIds] = useState<Set<string>>(() => new Set());
+  const [expiredQuizSlideIds, setExpiredQuizSlideIds] = useState<Set<string>>(() => new Set());
+  const [leaderboardSlideId, setLeaderboardSlideId] = useState<string | null>(null);
 
   useEffect(() => {
     try {
@@ -67,6 +69,18 @@ export function PresenterView({
 
   const currentSlide = slides.find((s) => s.id === presentation.current_slide_id) ?? null;
 
+  const loadParticipants = useCallback(() => {
+    return supabase
+      .from("participants")
+      .select("*")
+      .eq("presentation_id", presentation.id)
+      .order("score", { ascending: false })
+      .order("created_at", { ascending: true })
+      .then(({ data }) => {
+        if (data) setParticipants(data);
+      });
+  }, [supabase, presentation.id]);
+
   useEffect(() => {
     const channel = supabase
       .channel(`pres-${presentation.id}`)
@@ -79,27 +93,19 @@ export function PresenterView({
         "postgres_changes",
         { event: "*", schema: "public", table: "participants", filter: `presentation_id=eq.${presentation.id}` },
         () => {
-          supabase
-            .from("participants")
-            .select("*")
-            .eq("presentation_id", presentation.id)
-            .order("score", { ascending: false })
-            .order("created_at", { ascending: true })
-            .then(({ data }) => data && setParticipants(data));
+          loadParticipants();
         },
       )
       .subscribe();
-    supabase
-      .from("participants")
-      .select("*")
-      .eq("presentation_id", presentation.id)
-      .order("score", { ascending: false })
-      .order("created_at", { ascending: true })
-      .then(({ data }) => data && setParticipants(data));
+    loadParticipants();
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [supabase, presentation.id]);
+  }, [supabase, presentation.id, loadParticipants]);
+
+  useEffect(() => {
+    setLeaderboardSlideId(null);
+  }, [currentSlide?.id]);
 
   useEffect(() => {
     if (!currentSlide) {
@@ -210,13 +216,21 @@ export function PresenterView({
   const isLast = idx === slides.length - 1;
 
   const isKahoot = currentSlide.type === "quiz" && currentSlide.kahoot_mode;
+  const isQuiz = currentSlide.type === "quiz";
   const qaCfg = currentSlide.type === "qa" ? (currentSlide.config as QAConfig) : null;
+  const quizExpired = isQuiz && expiredQuizSlideIds.has(currentSlide.id);
+  const showQuizLeaderboard = isQuiz && leaderboardSlideId === currentSlide.id;
 
   async function scoreQuizOnExpiry(slideId: string) {
+    setExpiredQuizSlideIds((prev) => {
+      if (prev.has(slideId)) return prev;
+      return new Set(prev).add(slideId);
+    });
     if (scoredSlideIds.has(slideId)) return;
     setScoredSlideIds((prev) => new Set(prev).add(slideId));
     try {
       await scoreActiveQuizSlide(presentation.id, slideId);
+      await loadParticipants();
     } catch (err) {
       console.error("scoreActiveQuizSlide failed", err);
       setScoredSlideIds((prev) => {
@@ -258,8 +272,10 @@ export function PresenterView({
               <span className="flex items-center gap-2"><span className="live-dot" /> live</span>
             </div>
           </div>
-          <div key={currentSlide.id} className="slide-enter flex min-h-0 flex-1 flex-col">
-            {isKahoot ? (
+          <div key={`${currentSlide.id}-${showQuizLeaderboard ? "leaderboard" : "slide"}`} className="slide-enter flex min-h-0 flex-1 flex-col">
+            {showQuizLeaderboard ? (
+              <QuizLeaderboardScreen participants={participants} />
+            ) : isKahoot ? (
               <KahootPresenterView
                 slide={currentSlide}
                 responses={responses}
@@ -352,13 +368,27 @@ export function PresenterView({
 
         <div className="flex items-center justify-between px-2 sm:px-6">
           <button
-            onClick={() => moveSlide(presentation.id, "prev")}
-            disabled={idx === 0}
+            onClick={() => {
+              if (showQuizLeaderboard) {
+                setLeaderboardSlideId(null);
+                return;
+              }
+              moveSlide(presentation.id, "prev");
+            }}
+            disabled={idx === 0 && !showQuizLeaderboard}
             className="btn-ghost disabled:opacity-40"
           >
             ← Prev
           </button>
-          {isLast ? (
+          {isQuiz && !showQuizLeaderboard ? (
+            <button
+              onClick={() => setLeaderboardSlideId(currentSlide.id)}
+              disabled={!quizExpired}
+              className="btn-primary disabled:opacity-40"
+            >
+              {quizExpired ? "Show leaderboard →" : "Waiting for timer"}
+            </button>
+          ) : isLast ? (
             <button
               onClick={async () => {
                 if (!confirm("End the session for everyone?")) return;
@@ -379,17 +409,80 @@ export function PresenterView({
               End session
             </button>
           ) : (
-            <button onClick={() => moveSlide(presentation.id, "next")} className="btn-primary">
+            <button
+              onClick={() => {
+                setLeaderboardSlideId(null);
+                moveSlide(presentation.id, "next");
+              }}
+              className="btn-primary"
+            >
               Next →
             </button>
           )}
         </div>
 
-        {hasAnyQuiz && <Leaderboard participants={participants} />}
+        {hasAnyQuiz && !isQuiz && <Leaderboard participants={participants} />}
 
         <ReactionOverlay presentationId={presentation.id} />
       </div>
     </ThemedShell>
+  );
+}
+
+function QuizLeaderboardScreen({ participants }: { participants: Participant[] }) {
+  const sorted = [...participants]
+    .sort((a, b) => b.score - a.score || new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
+    .slice(0, 8);
+
+  return (
+    <div className="flex min-h-0 flex-1 flex-col justify-center">
+      <div className="mx-auto w-full max-w-4xl">
+        <p className="text-center text-[11px] uppercase tracking-[0.24em] muted-text">
+          Leaderboard
+        </p>
+        <h2 className="mt-2 text-center text-4xl font-semibold tracking-tight sm:text-6xl">
+          Current standings
+        </h2>
+        {sorted.length === 0 ? (
+          <div className="panel-soft mt-10 p-10 text-center">
+            <p className="text-lg font-medium">No scores yet.</p>
+            <p className="mt-2 text-sm muted-text">Scores appear after a quiz question is answered and timed out.</p>
+          </div>
+        ) : (
+          <ol className="mt-10 space-y-3">
+            {sorted.map((p, i) => {
+              const rank = i + 1;
+              return (
+                <li
+                  key={p.id}
+                  className="row-enter flex items-center gap-4 rounded-2xl px-5 py-4 text-lg sm:px-6 sm:py-5"
+                  style={{
+                    animationDelay: `${i * 70}ms`,
+                    background: rank === 1 ? "rgba(0, 113, 227, 0.12)" : "rgba(255, 255, 255, 0.03)",
+                    border: "1px solid " + (rank === 1 ? "rgba(0, 113, 227, 0.35)" : "var(--line)"),
+                  }}
+                >
+                  <span
+                    className="mono flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-base font-bold"
+                    style={{
+                      background: rank === 1 ? "var(--blue)" : "var(--line)",
+                      color: rank === 1 ? "#fff" : "var(--ink)",
+                      fontVariantNumeric: "tabular-nums",
+                    }}
+                  >
+                    {rank}
+                  </span>
+                  <span className="min-w-0 flex-1 truncate font-semibold">{p.nickname}</span>
+                  <span className="mono text-2xl font-bold" style={{ fontVariantNumeric: "tabular-nums", color: "var(--blue)" }}>
+                    {p.score.toLocaleString()}
+                  </span>
+                </li>
+              );
+            })}
+          </ol>
+        )}
+      </div>
+    </div>
   );
 }
 
