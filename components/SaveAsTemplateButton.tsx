@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Save } from "lucide-react";
 import { saveAsTemplate } from "@/app/templates/actions";
 
-const CATEGORIES = ["Business", "Classroom", "Workshops", "Icebreakers", "Brainstorming", "Surveys", "Recognition"];
+const CATEGORIES = ["Business", "Classroom", "Quiz", "Workshops", "Icebreakers", "Brainstorming", "Surveys", "Recognition"];
 
 export default function SaveAsTemplateButton({ presentationId, presentationTitle }: { presentationId: string; presentationTitle: string }) {
   const [open, setOpen] = useState(false);
