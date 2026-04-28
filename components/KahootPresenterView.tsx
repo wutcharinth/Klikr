@@ -124,9 +124,11 @@ export function KahootPresenterView({
                     </span>
                   )}
                 </div>
-                <p className="mt-2 text-base font-medium opacity-90 sm:text-lg">
-                  {counts[i]} vote{counts[i] === 1 ? "" : "s"}
-                </p>
+                {expired && (
+                  <p className="mt-2 text-base font-medium opacity-90 sm:text-lg">
+                    {counts[i]} vote{counts[i] === 1 ? "" : "s"}
+                  </p>
+                )}
               </div>
               {expired && isCorrect && (
                 <>

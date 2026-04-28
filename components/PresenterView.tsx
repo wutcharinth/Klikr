@@ -152,10 +152,11 @@ export function PresenterView({
       )
       .on(
         "postgres_changes",
-        { event: "INSERT", schema: "public", table: "participants", filter: `presentation_id=eq.${presentation.id}` },
+        { event: "INSERT", schema: "public", table: "participants" },
         (payload) => {
           setParticipants((prev) => {
             const fresh = payload.new as Participant;
+            if (fresh.presentation_id !== presentation.id) return prev;
             if (prev.some(p => p.id === fresh.id)) return prev;
             return [...prev, fresh];
           });
@@ -163,9 +164,11 @@ export function PresenterView({
       )
       .on(
         "postgres_changes",
-        { event: "UPDATE", schema: "public", table: "participants", filter: `presentation_id=eq.${presentation.id}` },
+        { event: "UPDATE", schema: "public", table: "participants" },
         (payload) => {
-          setParticipants((prev) => prev.map(p => p.id === payload.new.id ? payload.new as Participant : p));
+          const fresh = payload.new as Participant;
+          if (fresh.presentation_id !== presentation.id) return;
+          setParticipants((prev) => prev.map(p => p.id === fresh.id ? fresh : p));
         },
       )
       .subscribe();
