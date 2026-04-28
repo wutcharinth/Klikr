@@ -26,7 +26,7 @@ export function JoinForm({ action }: { action: (formData: FormData) => Promise<v
           maxLength={6}
           size={6}
           className="input mono border-0 bg-transparent text-center text-2xl uppercase tracking-[0.3em] focus:bg-transparent focus:shadow-none"
-          style={{ height: 56, fontWeight: 600, width: "10ch", padding: "0 12px" }}
+          style={{ height: 56, fontWeight: 600, width: "11ch", padding: "0 12px" }}
           required
         />
         <button
