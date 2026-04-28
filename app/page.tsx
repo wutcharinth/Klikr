@@ -62,10 +62,10 @@ export default async function Landing() {
               const first = headline.slice(0, splitIdx + 1);
               const second = headline.slice(splitIdx + 2);
               return (
-                <span className="headline-shine">
-                  <span className="block">{first}</span>
-                  <span className="block">{second}</span>
-                </span>
+                <>
+                  <span className="headline-shine block">{first}</span>
+                  <span className="headline-shine block">{second}</span>
+                </>
               );
             })()}
           </h1>

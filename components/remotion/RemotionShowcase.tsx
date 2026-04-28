@@ -32,6 +32,8 @@ export type RemotionShowcaseProps = {
   loop?: boolean;
   /** ARIA label for the wrapper — describe what the animation depicts. */
   ariaLabel?: string;
+  /** Skip the IntersectionObserver gate. Use for above-the-fold instances. */
+  eager?: boolean;
 };
 
 // Universal wrapper. Enforces:
@@ -52,10 +54,11 @@ export function RemotionShowcase({
   style,
   loop = true,
   ariaLabel,
+  eager = false,
 }: RemotionShowcaseProps) {
   const wrapRef = useRef<HTMLDivElement | null>(null);
   const [reduced, setReduced] = useState(false);
-  const [visible, setVisible] = useState(false);
+  const [visible, setVisible] = useState(eager);
   const [theme, setTheme] = useState<RemotionTheme | null>(null);
   const playerRef = useRef<{ play: () => void; pause: () => void } | null>(null);
 
@@ -76,7 +79,7 @@ export function RemotionShowcase({
 
   // Mount Player only when scrolled into view
   useEffect(() => {
-    if (reduced) return;
+    if (reduced || eager) return;
     const el = wrapRef.current;
     if (!el || typeof IntersectionObserver === "undefined") {
       setVisible(true);
@@ -109,7 +112,7 @@ export function RemotionShowcase({
     };
     document.addEventListener("visibilitychange", onVisibility);
     return () => document.removeEventListener("visibilitychange", onVisibility);
-  }, [reduced]);
+  }, [reduced, eager]);
 
   const mergedInputProps = useMemo(() => {
     return { ...(inputProps ?? {}), theme: theme ?? undefined };

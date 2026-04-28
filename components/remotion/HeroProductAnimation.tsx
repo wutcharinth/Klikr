@@ -13,6 +13,7 @@ export function HeroProductAnimation({ className }: { className?: string }) {
       compositionWidth={1280}
       compositionHeight={720}
       className={className}
+      eager
       ariaLabel="A live Klikr session — host invites the room, audience joins, votes flow in, and live results appear."
       style={{
         aspectRatio: "16 / 9",
