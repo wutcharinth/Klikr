@@ -23,17 +23,17 @@ function BeatDashboard() {
       <div className="text-xs font-semibold tracking-[0.2em] uppercase text-zinc-500 mb-4">
         Dashboard
       </div>
-      <div className="text-2xl sm:text-3xl font-bold tracking-tight text-zinc-100 mb-6 sm:mb-8">
+      <div className="text-xl sm:text-2xl font-bold tracking-tight text-zinc-100 mb-4 sm:mb-6">
         Your sessions
       </div>
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-        <div className="p-4 sm:p-5 rounded-2xl bg-blue-500/10 border border-blue-500/30 shadow-[0_8px_30px_-12px_rgba(59,130,246,0.5)]">
-          <div className="text-sm sm:text-base font-semibold text-zinc-100">New session</div>
-          <div className="mt-1 text-xs sm:text-sm text-blue-200/60">Empty deck, name it later</div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div className="p-3 sm:p-4 rounded-2xl bg-blue-500/10 border border-blue-500/30 shadow-[0_8px_30px_-12px_rgba(59,130,246,0.5)]">
+          <div className="text-sm font-semibold text-zinc-100">New session</div>
+          <div className="mt-1 text-xs text-blue-200/60">Empty deck, name it later</div>
         </div>
-        <div className="hidden sm:block p-4 sm:p-5 rounded-2xl bg-white/5 border border-white/10">
-          <div className="text-sm sm:text-base font-semibold text-zinc-100">Templates</div>
-          <div className="mt-1 text-xs sm:text-sm text-zinc-500">Polls, quizzes, icebreakers</div>
+        <div className="hidden sm:block p-3 sm:p-4 rounded-2xl bg-white/5 border border-white/10">
+          <div className="text-sm font-semibold text-zinc-100">Templates</div>
+          <div className="mt-1 text-xs text-zinc-500">Polls, quizzes, icebreakers</div>
         </div>
       </div>
     </div>
@@ -47,7 +47,7 @@ function BeatJoinCode() {
         Audience joins at
       </span>
       <span className="text-sm sm:text-base text-zinc-400 mb-1">klikrapp.com /</span>
-      <div className="text-5xl sm:text-7xl font-extrabold tracking-widest text-blue-500 tabular-nums leading-none mb-6">
+      <div className="text-4xl sm:text-6xl font-extrabold tracking-widest text-blue-500 tabular-nums leading-none mb-5">
         JX9PQ
       </div>
       <div className="flex gap-2">
@@ -61,19 +61,19 @@ function BeatPoll() {
   const options = ["Ship faster", "Polish UX", "New market"];
   return (
     <div className="hero-beat hero-beat-3 flex flex-col h-full justify-center">
-      <div className="text-center mb-6 sm:mb-8">
-        <div className="text-xs font-semibold tracking-[0.2em] uppercase text-zinc-500 mb-3">
+      <div className="text-center mb-5 sm:mb-6">
+        <div className="text-[10px] sm:text-xs font-semibold tracking-[0.2em] uppercase text-zinc-500 mb-2">
           Live poll
         </div>
-        <div className="text-xl sm:text-2xl font-bold tracking-tight text-zinc-100 leading-snug">
+        <div className="text-lg sm:text-xl font-bold tracking-tight text-zinc-100 leading-snug">
           Which idea should we prioritize?
         </div>
       </div>
-      <div className="grid gap-2 sm:gap-3 max-w-sm w-full mx-auto">
+      <div className="grid gap-2 max-w-sm w-full mx-auto">
         {options.map((label, i) => (
           <div
             key={label}
-            className={`hero-option hero-option-${i + 1} p-3 sm:p-4 rounded-xl text-sm sm:text-base font-semibold transition-colors ${
+            className={`hero-option hero-option-${i + 1} p-2.5 sm:p-3 rounded-xl text-xs sm:text-sm font-semibold transition-colors ${
               i === 0
                 ? "bg-blue-500/15 border border-blue-500/40 text-blue-400"
                 : "bg-white/5 border border-white/10 text-zinc-300"
@@ -95,28 +95,28 @@ function BeatResults() {
   ];
   return (
     <div className="hero-beat hero-beat-4 flex flex-col h-full justify-center">
-      <div className="text-center mb-6 sm:mb-8">
-        <div className="text-xs font-semibold tracking-[0.2em] uppercase text-zinc-500">
+      <div className="text-center mb-5 sm:mb-6">
+        <div className="text-[10px] sm:text-xs font-semibold tracking-[0.2em] uppercase text-zinc-500">
           Live results
         </div>
       </div>
-      <div className="flex flex-col gap-3 sm:gap-4 max-w-sm w-full mx-auto">
+      <div className="flex flex-col gap-2.5 sm:gap-3 max-w-sm w-full mx-auto">
         {bars.map((b, i) => (
-          <div key={b.label} className="grid grid-cols-[1fr_48px] sm:grid-cols-[1fr_60px] gap-3 items-center">
-            <div className="relative h-10 sm:h-12 rounded-xl bg-white/5 overflow-hidden">
+          <div key={b.label} className="grid grid-cols-[1fr_48px] sm:grid-cols-[1fr_52px] gap-3 items-center">
+            <div className="relative h-8 sm:h-10 rounded-lg bg-white/5 overflow-hidden">
               <div
-                className={`hero-bar hero-bar-${i + 1} absolute inset-0 rounded-xl origin-left`}
+                className={`hero-bar hero-bar-${i + 1} absolute inset-0 rounded-lg origin-left`}
                 style={{
                   background: b.highlight
                     ? "linear-gradient(90deg, rgba(59,130,246,0.3), rgba(59,130,246,0.6))"
                     : "rgba(255,255,255,0.08)",
                 }}
               />
-              <span className={`relative flex items-center h-full px-4 text-xs sm:text-sm font-semibold ${b.highlight ? "text-blue-400" : "text-zinc-200"}`}>
+              <span className={`relative flex items-center h-full px-3 text-xs sm:text-sm font-semibold ${b.highlight ? "text-blue-400" : "text-zinc-200"}`}>
                 {b.label}
               </span>
             </div>
-            <span className={`text-lg sm:text-xl font-bold tracking-tight text-right tabular-nums ${b.highlight ? "text-blue-400" : "text-zinc-200"}`}>
+            <span className={`text-base sm:text-lg font-bold tracking-tight text-right tabular-nums ${b.highlight ? "text-blue-400" : "text-zinc-200"}`}>
               {b.pct}%
             </span>
           </div>
@@ -148,7 +148,7 @@ export function HeroAnimationCSS({ className = "" }: { className?: string }) {
       </div>
 
       {/* Beats container — stacked, CSS-animated opacity */}
-      <div className="absolute inset-0 pt-16 px-6 pb-6 sm:px-10 sm:pb-10">
+      <div className="absolute inset-0 pt-20 px-6 pb-6 sm:pt-24 sm:px-10 sm:pb-8">
         <BeatDashboard />
         <BeatJoinCode />
         <BeatPoll />
