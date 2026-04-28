@@ -172,8 +172,14 @@ export function PresenterView({
         },
       )
       .subscribe();
+    
+    // Fallback polling: if Railway's websockets drop, this guarantees
+    // the host UI still updates instantly.
     loadParticipants();
+    const pollInterval = setInterval(loadParticipants, 2000);
+    
     return () => {
+      clearInterval(pollInterval);
       supabase.removeChannel(channel);
     };
   }, [supabase, presentation.id, loadParticipants]);
@@ -213,8 +219,22 @@ export function PresenterView({
         },
       )
       .subscribe();
+      
+    // Fallback polling for responses too (Word Cloud, Polls, etc)
+    const pollResponses = () => {
+      supabase
+        .from("responses")
+        .select("*")
+        .eq("slide_id", currentSlide.id)
+        .then(({ data }) => {
+          if (!cancelled && data) setResponses(data);
+        });
+    };
+    const pollInterval = setInterval(pollResponses, 2000);
+    
     return () => {
       cancelled = true;
+      clearInterval(pollInterval);
       supabase.removeChannel(channel);
     };
   }, [supabase, currentSlide]);
