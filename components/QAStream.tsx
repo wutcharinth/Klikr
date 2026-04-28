@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import type { Slide, ResponseRow, QAConfig } from "@/lib/types";
+import { EmptyResponseState } from "./EmptyResponseState";
 
 type Vote = { response_id: string; participant_id: string };
 
@@ -49,7 +50,12 @@ export function QAStream({ slide, responses }: { slide: Slide; responses: Respon
   });
 
   if (sorted.length === 0) {
-    return <p className="text-center muted-text">Waiting for questions…</p>;
+    return (
+      <EmptyResponseState
+        title="Audience questions will appear here"
+        body="The most upvoted question floats to the top so you always know what to answer next."
+      />
+    );
   }
 
   return (

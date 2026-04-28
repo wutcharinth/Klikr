@@ -1,12 +1,22 @@
 "use client";
 
 import type { Slide, ResponseRow, RatingConfig } from "@/lib/types";
+import { EmptyResponseState } from "./EmptyResponseState";
 
 export function RatingDistribution({ slide, responses }: { slide: Slide; responses: ResponseRow[] }) {
   const cfg = slide.config as RatingConfig;
   const range = cfg.scale === 5 ? [1, 2, 3, 4, 5] : [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
   const counts = range.map((n) => responses.filter((r) => r.value_index === n).length);
   const total = counts.reduce((a, b) => a + b, 0);
+
+  if (total === 0) {
+    return (
+      <EmptyResponseState
+        title="Ratings will appear here"
+        body="As people tap a number, the distribution and average update in real time."
+      />
+    );
+  }
   const max = Math.max(1, ...counts);
   const sum = responses.reduce((s, r) => s + (r.value_index ?? 0), 0);
   const avg = total ? sum / total : 0;

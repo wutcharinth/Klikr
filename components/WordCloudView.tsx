@@ -1,6 +1,7 @@
 "use client";
 
 import type { ResponseRow } from "@/lib/types";
+import { EmptyResponseState } from "./EmptyResponseState";
 
 // Curated palette — bright but harmonious, distinguishable from each other
 // at small AND large sizes. Mix of blue family + warm accents.
@@ -148,7 +149,12 @@ export function WordCloudView({ responses }: { responses: ResponseRow[] }) {
   const max = Math.max(1, ...entries.map((entry) => entry.count));
 
   if (entries.length === 0) {
-    return <p className="text-center text-sm muted-text">Waiting for responses…</p>;
+    return (
+      <EmptyResponseState
+        title="Words will appear here"
+        body="As people send words from their phones, they fill the cloud — popular ones grow larger."
+      />
+    );
   }
 
   return (

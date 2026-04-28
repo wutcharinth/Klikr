@@ -1,6 +1,7 @@
 "use client";
 
 import type { Slide, ResponseRow, RankingConfig } from "@/lib/types";
+import { EmptyResponseState } from "./EmptyResponseState";
 
 export function ResultsRanking({ slide, responses }: { slide: Slide; responses: ResponseRow[] }) {
   const cfg = slide.config as RankingConfig;
@@ -38,7 +39,12 @@ export function ResultsRanking({ slide, responses }: { slide: Slide; responses: 
 
   const total = responses.length;
   if (total === 0) {
-    return <p className="text-center text-sm muted-text">Waiting for rankings…</p>;
+    return (
+      <EmptyResponseState
+        title="Rankings coming in"
+        body="Each response slots an item into a position. The leaderboard sorts itself as the room agrees."
+      />
+    );
   }
 
   // Bar length: shorter = better rank. Invert so the leader has the longest bar.
