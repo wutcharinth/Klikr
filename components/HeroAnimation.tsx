@@ -19,23 +19,25 @@ const Pill = ({ label, dot = false }: { label: string; dot?: boolean }) => (
 
 function BeatDashboard() {
   return (
-    <div className="hero-beat hero-beat-1 hero-beat-initial absolute inset-x-0 top-8 mx-auto grid w-[90%] max-w-[440px] grid-cols-2 gap-4 sm:top-12 sm:gap-5">
-      <div className="col-span-2">
-        <div className="text-xs font-semibold tracking-[0.2em] uppercase text-zinc-500">
-          Dashboard
+    <div className="hero-beat hero-beat-1 hero-beat-initial flex h-full flex-col items-center justify-center">
+      <div className="grid w-[90%] max-w-[440px] grid-cols-2 gap-4 -mt-4 sm:gap-5">
+        <div className="col-span-2">
+          <div className="text-xs font-semibold uppercase tracking-[0.2em] text-zinc-500">
+            Dashboard
+          </div>
+          <p className="mt-4 text-xl font-bold tracking-tight text-white sm:mt-5 sm:text-2xl">
+            Your sessions
+          </p>
         </div>
-        <p className="mt-4 text-xl font-bold tracking-tight text-white sm:mt-5 sm:text-2xl">
-          Your sessions
-        </p>
-      </div>
-      <div className="col-span-2 grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <div className="rounded-2xl border border-blue-500/30 bg-blue-500/10 p-3 shadow-[0_8px_30px_-12px_rgba(59,130,246,0.5)] sm:p-4">
-          <p className="text-sm font-semibold text-white">New session</p>
-          <p className="mt-1 text-xs text-zinc-400">Empty deck, name it later</p>
-        </div>
-        <div className="hidden rounded-2xl border border-white/10 bg-white/5 p-3 sm:block sm:p-4">
-          <p className="text-sm font-semibold text-white">Templates</p>
-          <p className="mt-1 text-xs text-zinc-400">Polls, quizzes, icebreakers</p>
+        <div className="col-span-2 grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <div className="rounded-2xl border border-blue-500/30 bg-blue-500/10 p-4 shadow-[0_8px_30px_-12px_rgba(59,130,246,0.5)] sm:p-5">
+            <p className="text-sm font-semibold text-white">New session</p>
+            <p className="mt-1 text-xs text-zinc-400">Empty deck, name it later</p>
+          </div>
+          <div className="hidden rounded-2xl border border-white/10 bg-white/5 p-4 sm:block sm:p-5">
+            <p className="text-sm font-semibold text-white">Templates</p>
+            <p className="mt-1 text-xs text-zinc-400">Polls, quizzes, icebreakers</p>
+          </div>
         </div>
       </div>
     </div>
@@ -62,28 +64,30 @@ function BeatJoinCode() {
 function BeatPoll() {
   const options = ["Ship faster", "Polish UX", "New market"];
   return (
-    <div className="hero-beat hero-beat-3 absolute inset-x-0 bottom-8 mx-auto flex w-[90%] max-w-[380px] flex-col justify-center sm:bottom-12">
-      <div className="text-center mb-5 sm:mb-6">
-        <div className="text-[10px] sm:text-xs font-semibold tracking-[0.2em] uppercase text-zinc-500 mb-2">
-          Live poll
-        </div>
-        <div className="text-lg sm:text-xl font-bold tracking-tight text-zinc-100 leading-snug">
-          Which idea should we prioritize?
-        </div>
-      </div>
-      <div className="grid gap-2 max-w-sm w-full mx-auto">
-        {options.map((label, i) => (
-          <div
-            key={label}
-            className={`hero-option hero-option-${i + 1} p-2.5 sm:p-3 rounded-xl text-xs sm:text-sm font-semibold transition-colors ${
-              i === 0
-                ? "bg-blue-500/15 border border-blue-500/40 text-blue-400"
-                : "bg-white/5 border border-white/10 text-zinc-300"
-            }`}
-          >
-            {label}
+    <div className="hero-beat hero-beat-3 flex h-full flex-col items-center justify-center">
+      <div className="w-[90%] max-w-[380px] -mt-4">
+        <div className="mb-5 text-center sm:mb-6">
+          <div className="mb-2 text-[10px] font-semibold uppercase tracking-[0.2em] text-zinc-500 sm:text-xs">
+            Live poll
           </div>
-        ))}
+          <div className="leading-snug text-lg font-bold tracking-tight text-zinc-100 sm:text-xl">
+            Which idea should we prioritize?
+          </div>
+        </div>
+        <div className="grid w-full gap-2">
+          {options.map((label, i) => (
+            <div
+              key={label}
+              className={`hero-option hero-option-${i + 1} rounded-xl p-2.5 text-xs font-semibold transition-colors sm:p-3 sm:text-sm ${
+                i === 0
+                  ? "border border-blue-500/40 bg-blue-500/15 text-blue-400"
+                  : "border border-white/10 bg-white/5 text-zinc-300"
+              }`}
+            >
+              {label}
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   );
