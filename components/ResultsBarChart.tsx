@@ -97,10 +97,12 @@ export function QuizCountdown({
   slide,
   responses,
   startedAt,
+  onExpired,
 }: {
   slide: Slide;
   responses: ResponseRow[];
   startedAt: string | null;
+  onExpired?: () => void;
 }) {
   const cfg = slide.config as QuizConfig;
   const limit = cfg.time_limit_s ?? 20;
@@ -116,6 +118,10 @@ export function QuizCountdown({
   const remaining = Math.max(0, limit - elapsed);
   const expired = remaining <= 0;
   const total = responses.length;
+
+  useEffect(() => {
+    if (expired) onExpired?.();
+  }, [expired, onExpired]);
 
   if (expired) {
     return (

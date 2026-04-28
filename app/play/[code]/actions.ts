@@ -3,7 +3,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { containsProfanity } from "@/lib/profanity";
-import type { MCQConfig, QAConfig, RankingConfig } from "@/lib/types";
+import type { MCQConfig, Participant, QAConfig, RankingConfig } from "@/lib/types";
 
 export async function joinSession(presentationId: string, nickname: string) {
   const supabase = createServiceClient();
@@ -123,6 +123,24 @@ export async function submitResponse(input: {
     { onConflict: "slide_id,participant_id" },
   );
   if (error) throw error;
+}
+
+export async function getParticipantScores(input: {
+  presentationId: string;
+  participantId: string;
+  participantToken: string;
+}): Promise<Participant[]> {
+  const { supabase, participant } = await assertParticipant(input);
+  if (participant.presentation_id !== input.presentationId) throw new Error("Invalid presentation");
+  const { data, error } = await supabase
+    .from("participants")
+    .select("id, presentation_id, nickname, score, created_at")
+    .eq("presentation_id", input.presentationId)
+    .order("score", { ascending: false })
+    .order("created_at", { ascending: true })
+    .returns<Participant[]>();
+  if (error) throw error;
+  return data ?? [];
 }
 
 /** Q&A slides allow each participant to submit MULTIPLE questions, so we INSERT

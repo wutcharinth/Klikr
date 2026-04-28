@@ -9,7 +9,9 @@ const HEIGHTS = [180, 240, 140]; // 1st, 2nd, 3rd block heights
 const COLORS = ["#FFD54F", "#B0BEC5", "#D7864D"];
 
 export function QuizPodium({ participants, presentationId }: { participants: Participant[]; presentationId: string }) {
-  const sorted = [...participants].sort((a, b) => b.score - a.score);
+  const sorted = [...participants].sort(
+    (a, b) => b.score - a.score || new Date(a.created_at).getTime() - new Date(b.created_at).getTime(),
+  );
   const top = sorted.slice(0, 3);
   const rest = sorted.slice(3);
 

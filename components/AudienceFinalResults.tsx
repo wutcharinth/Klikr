@@ -1,12 +1,12 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import confetti from "canvas-confetti";
 import { Trophy } from "lucide-react";
 import type { Participant } from "@/lib/types";
-import { createClient } from "@/lib/supabase/client";
 import { AudienceAppFeedback } from "./AudienceAppFeedback";
 import { encouragementFor } from "./QuizFeedback";
+import { getParticipantScores } from "@/app/play/[code]/actions";
 
 const MEDAL = ["🥇", "🥈", "🥉"];
 const MEDAL_BG = ["#FFD54F", "#B0BEC5", "#D7864D"];
@@ -14,32 +14,32 @@ const MEDAL_BG = ["#FFD54F", "#B0BEC5", "#D7864D"];
 export function AudienceFinalResults({
   presentationId,
   participantId,
+  participantToken,
   nickname,
   hasAnyQuiz,
 }: {
   presentationId: string;
   participantId: string;
+  participantToken: string;
   nickname: string;
   hasAnyQuiz: boolean;
 }) {
-  const supabase = useMemo(() => createClient(), []);
   const [participants, setParticipants] = useState<Participant[] | null>(null);
 
   useEffect(() => {
     if (!hasAnyQuiz) return;
     let cancelled = false;
-    supabase
-      .from("participants")
-      .select("*")
-      .eq("presentation_id", presentationId)
-      .order("score", { ascending: false })
-      .then(({ data }) => {
-        if (!cancelled) setParticipants((data as Participant[]) ?? []);
+    getParticipantScores({ presentationId, participantId, participantToken })
+      .then((data) => {
+        if (!cancelled) setParticipants(data);
+      })
+      .catch(() => {
+        if (!cancelled) setParticipants([]);
       });
     return () => {
       cancelled = true;
     };
-  }, [supabase, presentationId, hasAnyQuiz]);
+  }, [presentationId, participantId, participantToken, hasAnyQuiz]);
 
   if (!hasAnyQuiz) {
     return <PlainEnd nickname={nickname} />;
@@ -77,7 +77,9 @@ function FinalResultsBody({
   nickname: string;
   participants: Participant[];
 }) {
-  const sorted = [...participants].sort((a, b) => b.score - a.score);
+  const sorted = [...participants].sort(
+    (a, b) => b.score - a.score || new Date(a.created_at).getTime() - new Date(b.created_at).getTime(),
+  );
   const myIdx = sorted.findIndex((p) => p.id === participantId);
   const me = myIdx >= 0 ? sorted[myIdx] : null;
   const top3 = sorted.slice(0, 3);

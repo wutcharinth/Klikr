@@ -55,6 +55,7 @@ export function KahootAudienceView({
         picked={picked}
         expired={expired}
         participantId={participantId}
+        participantToken={participantToken}
         presentationId={presentationId}
       />
     );
@@ -116,6 +117,7 @@ function PostQuizFeedback({
   picked,
   expired,
   participantId,
+  participantToken,
   presentationId,
 }: {
   slide: Slide;
@@ -123,6 +125,7 @@ function PostQuizFeedback({
   picked: number | null;
   expired: boolean;
   participantId: string;
+  participantToken: string;
   presentationId: string;
 }) {
   // Pre-reveal "got it, hold tight" — they picked but timer hasn't fired yet.
@@ -208,6 +211,7 @@ function PostQuizFeedback({
       <ScoreCard
         presentationId={presentationId}
         participantId={participantId}
+        participantToken={participantToken}
         slideId={slide.id}
         correct={isCorrect}
       />

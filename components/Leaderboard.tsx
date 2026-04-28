@@ -3,7 +3,9 @@
 import type { Participant } from "@/lib/types";
 
 export function Leaderboard({ participants }: { participants: Participant[] }) {
-  const sorted = [...participants].sort((a, b) => b.score - a.score).slice(0, 10);
+  const sorted = [...participants]
+    .sort((a, b) => b.score - a.score || new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
+    .slice(0, 10);
   return (
     <div className="panel p-6">
       <div className="flex items-center justify-between">

@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { CheckCircle, XCircle } from "lucide-react";
 import type { Participant } from "@/lib/types";
-import { createClient } from "@/lib/supabase/client";
+import { getParticipantScores } from "@/app/play/[code]/actions";
 
 // Big animated badge — green tick + ring on correct, red X + shake on wrong,
 // neutral hourglass when they didn't answer in time.
@@ -99,14 +99,15 @@ export function MiniConfettiBurst({ count = 18 }: { count?: number }) {
 export function ScoreCard({
   presentationId,
   participantId,
+  participantToken,
   correct,
 }: {
   presentationId: string;
   participantId: string;
+  participantToken: string;
   slideId?: string;
   correct?: boolean;
 }) {
-  const supabase = useMemo(() => createClient(), []);
   const [participants, setParticipants] = useState<Participant[]>([]);
   const prevScore = useRef<number | null>(null);
   const prevRank = useRef<number | null>(null);
@@ -117,31 +118,26 @@ export function ScoreCard({
 
   useEffect(() => {
     let cancelled = false;
-    const fetchAll = () =>
-      supabase
-        .from("participants")
-        .select("*")
-        .eq("presentation_id", presentationId)
-        .order("score", { ascending: false })
-        .then(({ data }) => {
-          if (!cancelled && data) setParticipants(data as Participant[]);
+    const fetchAll = () => {
+      getParticipantScores({ presentationId, participantId, participantToken })
+        .then((data) => {
+          if (!cancelled) setParticipants(data);
+        })
+        .catch(() => {
+          if (!cancelled) setParticipants([]);
         });
+    };
     fetchAll();
-    const channel = supabase
-      .channel(`audience-pts-${presentationId}-${participantId}`)
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "participants", filter: `presentation_id=eq.${presentationId}` },
-        () => fetchAll(),
-      )
-      .subscribe();
+    const interval = setInterval(fetchAll, 1000);
     return () => {
       cancelled = true;
-      supabase.removeChannel(channel);
+      clearInterval(interval);
     };
-  }, [supabase, presentationId, participantId]);
+  }, [presentationId, participantId, participantToken]);
 
-  const sorted = [...participants].sort((a, b) => b.score - a.score);
+  const sorted = [...participants].sort(
+    (a, b) => b.score - a.score || new Date(a.created_at).getTime() - new Date(b.created_at).getTime(),
+  );
   const myIdx = sorted.findIndex((p) => p.id === participantId);
   const me = myIdx >= 0 ? sorted[myIdx] : null;
   const ahead = myIdx > 0 ? sorted[myIdx - 1] : null;

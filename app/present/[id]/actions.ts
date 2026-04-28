@@ -84,6 +84,29 @@ export async function endPresentation(presentationId: string) {
   if (error) throw error;
 }
 
+export async function scoreActiveQuizSlide(presentationId: string, slideId: string) {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("presentations")
+    .select("id, state, current_slide_id, current_slide_started_at, slides!inner(id, type, config)")
+    .eq("id", presentationId)
+    .eq("slides.id", slideId)
+    .maybeSingle();
+  if (error) throw error;
+  if (!data || data.state !== "active" || data.current_slide_id !== slideId) return;
+
+  const joined = data.slides as unknown as Pick<Slide, "id" | "type" | "config"> | Pick<Slide, "id" | "type" | "config">[] | null;
+  const slide = Array.isArray(joined) ? joined[0] : joined;
+  if (!slide || slide.type !== "quiz") return;
+
+  const cfg = slide.config as { time_limit_s?: number };
+  const limitMs = Math.max(1, cfg.time_limit_s ?? 20) * 1000;
+  const startedAt = data.current_slide_started_at ? new Date(data.current_slide_started_at).getTime() : 0;
+  if (!startedAt || Date.now() - startedAt < limitMs) return;
+
+  await scoreQuizSlide(presentationId, slide);
+}
+
 async function scoreQuizSlide(
   presentationId: string,
   slide: Pick<Slide, "id" | "type" | "config">,

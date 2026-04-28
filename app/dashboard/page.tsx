@@ -17,6 +17,16 @@ import { FeedbackWidget } from "@/components/FeedbackWidget";
 import { AI_ENABLED } from "@/lib/featureFlags";
 
 type SearchParams = Promise<{ ai?: string }>;
+type DashboardPresentation = {
+  id: string;
+  title: string;
+  code: string;
+  state: string;
+  created_at: string;
+  last_started_at: string | null;
+  pinned: boolean | null;
+  is_owner: boolean;
+};
 
 export default async function Dashboard({ searchParams }: { searchParams?: SearchParams }) {
   const supabase = await createClient();
@@ -36,18 +46,40 @@ export default async function Dashboard({ searchParams }: { searchParams?: Searc
 
   const sp = (await searchParams) ?? {};
 
-  const { data: presentations, error: presentationsErr } = await supabase
-    .from("editable_presentations")
-    .select("id, title, code, state, created_at, last_started_at, pinned, is_owner")
-    .order("pinned", { ascending: false })
-    .order("last_started_at", { ascending: false, nullsFirst: false })
-    .order("created_at", { ascending: false });
+  const [ownedResult, editorResult] = await Promise.all([
+    supabase
+      .from("presentations")
+      .select("id, title, code, state, created_at, last_started_at, pinned")
+      .eq("owner_id", userData.user.id),
+    supabase
+      .from("presentation_editors")
+      .select("presentations(id, title, code, state, created_at, last_started_at, pinned)")
+      .eq("user_id", userData.user.id),
+  ]);
 
+  const presentationsErr = ownedResult.error ?? editorResult.error;
   if (presentationsErr) {
     // Don't trap the user in a blank screen — surface the failure and log it.
-    console.error("dashboard: editable_presentations query failed", presentationsErr);
+    console.error("dashboard: presentations query failed", presentationsErr);
   }
-  const rows = presentations ?? [];
+  const ownedRows = ((ownedResult.data ?? []) as Omit<DashboardPresentation, "is_owner">[])
+    .map((p) => ({ ...p, is_owner: true }));
+  const editorRows = ((editorResult.data ?? []) as { presentations: Omit<DashboardPresentation, "is_owner"> | Omit<DashboardPresentation, "is_owner">[] | null }[])
+    .flatMap((row) => {
+      const pres = row.presentations;
+      if (!pres) return [];
+      return Array.isArray(pres) ? pres : [pres];
+    })
+    .map((p) => ({ ...p, is_owner: false }));
+  const rows = [...ownedRows, ...editorRows]
+    .filter((p, idx, all) => all.findIndex((x) => x.id === p.id) === idx)
+    .sort((a, b) => {
+      if (Boolean(a.pinned) !== Boolean(b.pinned)) return a.pinned ? -1 : 1;
+      const aStarted = a.last_started_at ? new Date(a.last_started_at).getTime() : 0;
+      const bStarted = b.last_started_at ? new Date(b.last_started_at).getTime() : 0;
+      if (aStarted !== bStarted) return bStarted - aStarted;
+      return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+    });
 
   return (
     <main className="mx-auto max-w-4xl px-6 py-12">

@@ -92,6 +92,7 @@ export function AudienceView({
       <AudienceFinalResults
         presentationId={presentation.id}
         participantId={participant.id}
+        participantToken={participant.participantToken}
         nickname={participant.nickname}
         hasAnyQuiz={slides.some((s) => s.type === "quiz")}
       />
@@ -514,6 +515,7 @@ function Quiz({
         <ScoreCard
           presentationId={presentationId}
           participantId={participantId}
+          participantToken={participantToken}
           slideId={slide.id}
           correct={isCorrect}
         />

@@ -15,10 +15,12 @@ export function KahootPresenterView({
   slide,
   responses,
   startedAt,
+  onExpired,
 }: {
   slide: Slide;
   responses: ResponseRow[];
   startedAt: string | null;
+  onExpired?: () => void;
 }) {
   const cfg = slide.config as QuizConfig;
   const opts = cfg.options.slice(0, 4);
@@ -35,6 +37,10 @@ export function KahootPresenterView({
   const progress = Math.min(1, elapsed / limit);
   const expired = remaining <= 0;
   const ringColor = remaining > limit / 2 ? "#26890C" : remaining > limit / 4 ? "#FFA602" : "#E21B3C";
+
+  useEffect(() => {
+    if (expired) onExpired?.();
+  }, [expired, onExpired]);
 
   const counts = opts.map((_, i) => responses.filter((r) => r.value_index === i).length);
   const total = counts.reduce((a, b) => a + b, 0);

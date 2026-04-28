@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Moon, Sun } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import type { Presentation, Slide, ResponseRow, Participant } from "@/lib/types";
-import { startPresentation, moveSlide, endPresentation } from "@/app/present/[id]/actions";
+import { startPresentation, moveSlide, endPresentation, scoreActiveQuizSlide } from "@/app/present/[id]/actions";
 import { setQuestionStatus } from "@/app/play/[code]/actions";
 import { ResultsBarChart, QuizCountdown } from "./ResultsBarChart";
 import { WordCloudView } from "./WordCloudView";
@@ -19,7 +19,6 @@ import { KahootPresenterView } from "./KahootPresenterView";
 import { QuizPodium } from "./QuizPodium";
 import { QrCode } from "./QrCode";
 import { PresenterMusicToggle } from "./PresenterMusicToggle";
-import { FeedbackWidget } from "./FeedbackWidget";
 import type { EmbedConfig, QAConfig } from "@/lib/types";
 
 export function PresenterView({
@@ -38,6 +37,7 @@ export function PresenterView({
   const [responses, setResponses] = useState<ResponseRow[]>([]);
   const [participants, setParticipants] = useState<Participant[]>([]);
   const [modeOverride, setModeOverride] = useState<"light" | "dark" | null>(null);
+  const [scoredSlideIds, setScoredSlideIds] = useState<Set<string>>(() => new Set());
 
   useEffect(() => {
     try {
@@ -84,6 +84,7 @@ export function PresenterView({
             .select("*")
             .eq("presentation_id", presentation.id)
             .order("score", { ascending: false })
+            .order("created_at", { ascending: true })
             .then(({ data }) => data && setParticipants(data));
         },
       )
@@ -93,6 +94,7 @@ export function PresenterView({
       .select("*")
       .eq("presentation_id", presentation.id)
       .order("score", { ascending: false })
+      .order("created_at", { ascending: true })
       .then(({ data }) => data && setParticipants(data));
     return () => {
       supabase.removeChannel(channel);
@@ -153,7 +155,6 @@ export function PresenterView({
           onToggleMode={toggleMode}
           onStart={() => startPresentation(presentation.id)}
         />
-        <FeedbackWidget persona="host" />
       </ThemedShell>
     );
   }
@@ -197,7 +198,6 @@ export function PresenterView({
             <QuizPodium participants={participants} presentationId={presentation.id} />
           ) : null}
         </div>
-        <FeedbackWidget persona="host" />
       </ThemedShell>
     );
   }
@@ -211,6 +211,21 @@ export function PresenterView({
 
   const isKahoot = currentSlide.type === "quiz" && currentSlide.kahoot_mode;
   const qaCfg = currentSlide.type === "qa" ? (currentSlide.config as QAConfig) : null;
+
+  async function scoreQuizOnExpiry(slideId: string) {
+    if (scoredSlideIds.has(slideId)) return;
+    setScoredSlideIds((prev) => new Set(prev).add(slideId));
+    try {
+      await scoreActiveQuizSlide(presentation.id, slideId);
+    } catch (err) {
+      console.error("scoreActiveQuizSlide failed", err);
+      setScoredSlideIds((prev) => {
+        const next = new Set(prev);
+        next.delete(slideId);
+        return next;
+      });
+    }
+  }
 
   return (
     <ThemedShell theme={themeForShell}>
@@ -249,6 +264,7 @@ export function PresenterView({
                 slide={currentSlide}
                 responses={responses}
                 startedAt={presentation.current_slide_started_at}
+                onExpired={() => scoreQuizOnExpiry(currentSlide.id)}
               />
             ) : (
               <>
@@ -294,6 +310,7 @@ export function PresenterView({
                       slide={currentSlide}
                       responses={responses}
                       startedAt={presentation.current_slide_started_at}
+                      onExpired={() => scoreQuizOnExpiry(currentSlide.id)}
                     />
                   )}
                   {currentSlide.type === "qa" && (
