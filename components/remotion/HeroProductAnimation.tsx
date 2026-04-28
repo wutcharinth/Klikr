@@ -10,7 +10,7 @@ function HeroPlaceholder() {
       style={{
         position: "absolute",
         inset: 0,
-        background: "var(--bg)",
+        background: "#0b0b10",
         padding: "48px",
         display: "flex",
         flexDirection: "column",
@@ -40,7 +40,7 @@ function HeroPlaceholder() {
               fontSize: 22,
               fontWeight: 700,
               letterSpacing: "-0.02em",
-              color: "var(--ink)",
+              color: "#f5f5f7",
             }}
           >
             Klikr
@@ -91,7 +91,7 @@ function HeroPlaceholder() {
           fontSize: 36,
           fontWeight: 700,
           letterSpacing: "-0.02em",
-          color: "var(--ink)",
+          color: "#f5f5f7",
         }}
       >
         Your sessions
@@ -113,7 +113,7 @@ function HeroPlaceholder() {
             boxShadow: "0 14px 36px -20px rgba(41,151,255,0.6)",
           }}
         >
-          <div style={{ fontSize: 18, fontWeight: 600, color: "var(--ink)" }}>
+          <div style={{ fontSize: 18, fontWeight: 600, color: "#f5f5f7" }}>
             New session
           </div>
           <div
@@ -130,11 +130,11 @@ function HeroPlaceholder() {
           style={{
             padding: "20px 22px",
             borderRadius: 16,
-            background: "var(--bg-soft, #1c1c1e)",
-            border: "1px solid var(--line, rgba(255,255,255,0.08))",
+            background: "#1c1c1e",
+            border: "1px solid rgba(255,255,255,0.08)",
           }}
         >
-          <div style={{ fontSize: 18, fontWeight: 600, color: "var(--ink)" }}>
+          <div style={{ fontSize: 18, fontWeight: 600, color: "#f5f5f7" }}>
             Templates
           </div>
           <div

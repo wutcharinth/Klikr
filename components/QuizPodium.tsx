@@ -1,14 +1,60 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import confetti from "canvas-confetti";
 import { Trophy, Medal, Volume2, VolumeX } from "lucide-react";
 import type { Participant } from "@/lib/types";
+import { createClient } from "@/lib/supabase/client";
 
 const HEIGHTS = [180, 240, 140]; // 1st, 2nd, 3rd block heights
 const COLORS = ["#FFD54F", "#B0BEC5", "#D7864D"];
 
+type QuizStats = { correct: number; total: number };
+
 export function QuizPodium({ participants, presentationId }: { participants: Participant[]; presentationId: string }) {
+  const supabase = useMemo(() => createClient(), []);
+  const [quizStats, setQuizStats] = useState<Record<string, QuizStats>>({});
+  const [totalQuizSlides, setTotalQuizSlides] = useState(0);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const { data: slides } = await supabase
+        .from("slides")
+        .select("id, config")
+        .eq("presentation_id", presentationId)
+        .eq("type", "quiz");
+      if (cancelled || !slides) return;
+      setTotalQuizSlides(slides.length);
+      if (slides.length === 0) {
+        setQuizStats({});
+        return;
+      }
+      const correctByIdx = new Map<string, number | null>();
+      for (const s of slides) {
+        const ci = (s.config as { correct_index?: number } | null)?.correct_index;
+        correctByIdx.set(s.id, typeof ci === "number" ? ci : null);
+      }
+      const slideIds = Array.from(correctByIdx.keys());
+      const { data: responses } = await supabase
+        .from("responses")
+        .select("slide_id, participant_id, value_index")
+        .in("slide_id", slideIds);
+      if (cancelled || !responses) return;
+      const stats: Record<string, QuizStats> = {};
+      for (const r of responses) {
+        const correct = correctByIdx.get(r.slide_id);
+        if (correct === null || correct === undefined) continue;
+        const s = (stats[r.participant_id] ??= { correct: 0, total: slides.length });
+        if (r.value_index === correct) s.correct += 1;
+      }
+      setQuizStats(stats);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [supabase, presentationId]);
+
   const sorted = [...participants].sort(
     (a, b) => b.score - a.score || new Date(a.created_at).getTime() - new Date(b.created_at).getTime(),
   );
@@ -73,13 +119,23 @@ export function QuizPodium({ participants, presentationId }: { participants: Par
         {order.map(({ idx, rank }) => {
           const p = top[idx];
           const visible = revealed >= rank;
+          const stats = quizStats[p.id];
+          const correct = stats?.correct ?? 0;
+          const total = stats?.total ?? totalQuizSlides;
           return (
             <div key={p.id} className="flex flex-col items-center transition-all" style={{ opacity: visible ? 1 : 0, transform: visible ? "translateY(0)" : "translateY(40px)" }}>
               <div className="flex h-16 w-16 items-center justify-center rounded-full text-2xl font-bold" style={{ background: COLORS[rank - 1], color: "#1d1d1f" }}>
                 {rank === 1 ? <Trophy className="h-7 w-7" /> : <Medal className="h-7 w-7" />}
               </div>
               <p className="mt-3 text-base font-semibold">{p.nickname}</p>
-              <p className="mt-1 text-xs muted-text">{p.score.toLocaleString()} pts</p>
+              <p className="mt-1 text-lg font-bold" style={{ color: "var(--blue)" }}>
+                {p.score.toLocaleString()} pts
+              </p>
+              {total > 0 && (
+                <p className="mt-0.5 text-xs muted-text mono" style={{ fontVariantNumeric: "tabular-nums" }}>
+                  {correct} / {total} correct
+                </p>
+              )}
               <div
                 className="mt-3 flex w-32 items-center justify-center rounded-t-xl text-3xl font-bold"
                 style={{

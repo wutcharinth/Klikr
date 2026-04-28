@@ -46,13 +46,15 @@ export function KahootPresenterView({
   const total = counts.reduce((a, b) => a + b, 0);
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <p className="text-[11px] uppercase tracking-wider muted-text">Quiz</p>
-          <h2 className="mt-1 text-3xl font-semibold tracking-tight">{slide.question}</h2>
+    <div className="space-y-10">
+      <div className="flex items-start justify-between gap-8">
+        <div className="min-w-0 flex-1">
+          <p className="text-sm uppercase tracking-[0.18em] muted-text">Quiz</p>
+          <h2 className="mt-3 text-6xl font-bold tracking-tight leading-[1.05] sm:text-7xl lg:text-8xl break-words">
+            {slide.question}
+          </h2>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-none items-center gap-3">
           <TimerRing remaining={remaining} progress={progress} color={ringColor} expired={expired} />
         </div>
       </div>
@@ -75,7 +77,7 @@ export function KahootPresenterView({
         </div>
       )}
 
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-2 gap-5 sm:gap-6">
         {opts.map((opt, i) => {
           const isCorrect = expired && cfg.correct_index === i;
           const isWrong = expired && cfg.correct_index !== i;
@@ -87,12 +89,12 @@ export function KahootPresenterView({
           return (
             <div
               key={i}
-              className="relative flex items-center gap-4 overflow-hidden rounded-2xl p-5 text-white transition-all"
+              className="relative flex min-h-[180px] items-center gap-6 overflow-hidden rounded-3xl p-8 text-white transition-all sm:min-h-[220px] sm:gap-8 sm:p-10"
               style={{
                 background: revealBg,
                 opacity: isWrong ? 0.55 : 1,
                 transform: isCorrect ? "scale(1.02)" : "scale(1)",
-                boxShadow: isCorrect ? "0 0 0 4px rgba(255,255,255,0.65)" : "none",
+                boxShadow: isCorrect ? "0 0 0 6px rgba(255,255,255,0.65)" : "none",
               }}
             >
               {/* Vote-share fill that grows in once the answer is revealed. */}
@@ -107,26 +109,28 @@ export function KahootPresenterView({
                   aria-hidden
                 />
               )}
-              <tile.Icon className="relative z-10 h-8 w-8 flex-none" />
+              <tile.Icon className="relative z-10 h-16 w-16 flex-none sm:h-20 sm:w-20" strokeWidth={2.4} />
               <div className="relative z-10 min-w-0 flex-1">
-                <div className="flex items-baseline gap-3">
-                  <p className="text-xl font-semibold">{opt}</p>
+                <div className="flex flex-wrap items-baseline gap-x-5 gap-y-1">
+                  <p className="text-3xl font-bold leading-tight sm:text-4xl lg:text-5xl break-words">
+                    {opt}
+                  </p>
                   {expired && total > 0 && (
                     <span
-                      className="mono text-2xl font-bold leading-none"
+                      className="mono text-4xl font-bold leading-none sm:text-5xl"
                       style={{ fontVariantNumeric: "tabular-nums" }}
                     >
                       {Math.round(pct)}%
                     </span>
                   )}
                 </div>
-                <p className="mt-1 text-xs opacity-90">
+                <p className="mt-2 text-base font-medium opacity-90 sm:text-lg">
                   {counts[i]} vote{counts[i] === 1 ? "" : "s"}
                 </p>
               </div>
               {expired && isCorrect && (
                 <>
-                  <span className="relative z-10 rounded-full bg-white px-3 py-1 text-xs font-bold uppercase tracking-wider" style={{ color: "#16a34a" }}>
+                  <span className="relative z-10 rounded-full bg-white px-5 py-2 text-base font-bold uppercase tracking-wider sm:text-lg" style={{ color: "#16a34a" }}>
                     ✓ Correct
                   </span>
                   <ConfettiBurst />
@@ -153,36 +157,36 @@ export function KahootPresenterView({
       )}
 
       {expired ? (
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl panel-soft px-5 py-4">
-          <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center justify-between gap-4 rounded-2xl panel-soft px-8 py-6">
+          <div className="flex items-center gap-5">
             <div
-              className="flex h-10 w-10 items-center justify-center rounded-full"
+              className="flex h-16 w-16 items-center justify-center rounded-full"
               style={{ background: "rgba(34,197,94,0.15)", color: "#22c55e" }}
               aria-hidden
             >
-              <span className="text-lg font-bold">✓</span>
+              <span className="text-3xl font-bold">✓</span>
             </div>
             <div className="leading-tight">
-              <p className="text-2xl font-bold tracking-tight">
+              <p className="text-4xl font-bold tracking-tight sm:text-5xl">
                 <span className="mono count-bump inline-block" style={{ fontVariantNumeric: "tabular-nums", color: "#22c55e" }}>
                   {counts[cfg.correct_index]}
                 </span>
                 <span className="muted-text"> / {total}</span>
               </p>
-              <p className="text-[11px] uppercase tracking-[0.18em] muted-text">got it right</p>
+              <p className="mt-1 text-sm uppercase tracking-[0.18em] muted-text">got it right</p>
             </div>
           </div>
           <div className="leading-tight text-right">
-            <p className="mono text-xl font-semibold" style={{ fontVariantNumeric: "tabular-nums" }}>
+            <p className="mono text-3xl font-semibold sm:text-4xl" style={{ fontVariantNumeric: "tabular-nums" }}>
               {total > 0 ? `${Math.round((counts[cfg.correct_index] / total) * 100)}%` : "0%"}
             </p>
-            <p className="text-[11px] uppercase tracking-[0.18em] muted-text">accuracy</p>
+            <p className="mt-1 text-sm uppercase tracking-[0.18em] muted-text">accuracy</p>
           </div>
         </div>
       ) : (
-        <div className="flex items-center justify-between text-sm muted-text">
+        <div className="flex items-center justify-between text-2xl muted-text">
           <span>
-            <span className="mono count-bump inline-block" style={{ fontVariantNumeric: "tabular-nums" }}>{total}</span>{" "}
+            <span className="mono count-bump inline-block text-3xl font-semibold" style={{ fontVariantNumeric: "tabular-nums" }}>{total}</span>{" "}
             {total === 1 ? "answer" : "answers"} in
           </span>
         </div>
@@ -229,25 +233,26 @@ function ConfettiBurst() {
 }
 
 function TimerRing({ remaining, progress, color, expired }: { remaining: number; progress: number; color: string; expired: boolean }) {
-  const r = 36;
+  const r = 70;
+  const size = 176;
   const c = 2 * Math.PI * r;
   return (
-    <svg width={96} height={96} viewBox="0 0 96 96">
-      <circle cx={48} cy={48} r={r} fill="none" stroke="var(--line)" strokeWidth={8} />
+    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+      <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="var(--line)" strokeWidth={12} />
       <circle
-        cx={48}
-        cy={48}
+        cx={size / 2}
+        cy={size / 2}
         r={r}
         fill="none"
         stroke={color}
-        strokeWidth={8}
+        strokeWidth={12}
         strokeLinecap="round"
         strokeDasharray={c}
         strokeDashoffset={c * progress}
-        transform="rotate(-90 48 48)"
+        transform={`rotate(-90 ${size / 2} ${size / 2})`}
         style={{ transition: "stroke-dashoffset 0.2s linear, stroke 0.5s ease" }}
       />
-      <text x={48} y={56} textAnchor="middle" fontSize="22" fontWeight="600" fill="var(--ink)">
+      <text x={size / 2} y={size / 2 + 18} textAnchor="middle" fontSize="56" fontWeight="700" fill="var(--ink)">
         {expired ? "✓" : Math.ceil(remaining)}
       </text>
     </svg>

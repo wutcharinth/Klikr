@@ -62,10 +62,11 @@ export default async function Landing() {
               const first = headline.slice(0, splitIdx + 1);
               const second = headline.slice(splitIdx + 2);
               return (
-                <>
-                  <span className="headline-shine block">{first}</span>
-                  <span className="headline-shine block">{second}</span>
-                </>
+                <span className="headline-shine">
+                  {first}
+                  <br />
+                  {second}
+                </span>
               );
             })()}
           </h1>
@@ -93,8 +94,8 @@ export default async function Landing() {
             href={signedIn ? "/dashboard" : "/host"}
             className="tilt panel block p-6"
           >
-            <div className="flex items-center justify-between gap-4">
-              <div>
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+              <div className="min-w-0">
                 <p className="text-[11px] uppercase tracking-[0.18em] muted-text">{t("forHosts")}</p>
                 <h2 className="mt-1 text-xl font-semibold tracking-tight">
                   {t("hostCardTitle")}
@@ -103,9 +104,9 @@ export default async function Landing() {
                   {t("hostCardBody")}
                 </p>
               </div>
-              <span className="btn-primary sheen">
+              <span className="btn-primary sheen flex-none self-start sm:self-auto">
                 {signedIn ? t("openDashboard") : t("getStarted")}
-                <ArrowRight className="h-4 w-4" />
+                <ArrowRight className="h-4 w-4 flex-none" />
               </span>
             </div>
           </Link>
