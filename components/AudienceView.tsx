@@ -7,6 +7,7 @@ import { joinSession, submitResponse, sendReaction, toggleQuestionVote, submitQu
 import { KahootAudienceView } from "./KahootAudienceView";
 import { RevealMedal, ScoreCard } from "./QuizFeedback";
 import { AudienceFinalResults } from "./AudienceFinalResults";
+import { LogoMarkPlayer } from "./remotion/LogoMarkPlayer";
 
 type LocalParticipant = {
   id: string;
@@ -87,8 +88,12 @@ export function AudienceView({
   if (presentation.state === "lobby") {
     return (
       <Stage>
-        <h2 className="text-2xl font-semibold">Hi {participant.nickname}!</h2>
+        <div className="flex justify-center" aria-hidden>
+          <LogoMarkPlayer variant="idle" width={260} height={80} />
+        </div>
+        <h2 className="mt-4 text-2xl font-semibold">Hi {participant.nickname}!</h2>
         <p className="mt-2 text-slate-500">Waiting for the presenter to start…</p>
+        <p className="mt-4 text-xs muted-text">Keep this tab open — answers will appear as the host moves on.</p>
       </Stage>
     );
   }
