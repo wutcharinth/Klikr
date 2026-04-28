@@ -299,6 +299,57 @@
   100% { transform: translate(-6%, 6%) scale(1.08); }
 }
 
+/* ── Hero animation beats (CSS-only, 12s cycle) ─────── */
+.hero-beat {
+  position: absolute; inset: 0;
+  opacity: 0;
+  transform: translateY(10px);
+  transition: none;
+  animation: heroBeatCycle 12s ease-in-out infinite;
+}
+/* Stagger each beat: 0s, 3s, 6s, 9s */
+.hero-beat-1 { animation-delay: 0s; }
+.hero-beat-2 { animation-delay: 3s; }
+.hero-beat-3 { animation-delay: 6s; }
+.hero-beat-4 { animation-delay: 9s; }
+
+@keyframes heroBeatCycle {
+  0%     { opacity: 0; transform: translateY(10px); }
+  3%     { opacity: 1; transform: translateY(0); }
+  22%    { opacity: 1; transform: translateY(0); }
+  25%    { opacity: 0; transform: translateY(-6px); }
+  100%   { opacity: 0; transform: translateY(10px); }
+}
+
+/* Bar fill animations — grow in during beat 4 */
+.hero-bar {
+  transform: scaleX(0);
+  animation: heroBarGrow 12s ease-in-out infinite;
+}
+.hero-bar-1 { animation-delay: 9.3s; --bar-target: 0.56; }
+.hero-bar-2 { animation-delay: 9.5s; --bar-target: 0.28; }
+.hero-bar-3 { animation-delay: 9.7s; --bar-target: 0.16; }
+@keyframes heroBarGrow {
+  0%     { transform: scaleX(0); }
+  4%     { transform: scaleX(var(--bar-target, 0.5)); }
+  22%    { transform: scaleX(var(--bar-target, 0.5)); }
+  25%    { transform: scaleX(0); }
+  100%   { transform: scaleX(0); }
+}
+
+/* Poll options stagger */
+.hero-option { opacity: 0; transform: translateY(8px); animation: heroOptionIn 12s ease-in-out infinite; }
+.hero-option-1 { animation-delay: 6.2s; }
+.hero-option-2 { animation-delay: 6.4s; }
+.hero-option-3 { animation-delay: 6.6s; }
+@keyframes heroOptionIn {
+  0%     { opacity: 0; transform: translateY(8px); }
+  3%     { opacity: 1; transform: translateY(0); }
+  22%    { opacity: 1; transform: translateY(0); }
+  25%    { opacity: 0; transform: translateY(-4px); }
+  100%   { opacity: 0; transform: translateY(8px); }
+}
+
 /* Word reveal */
 .reveal-word { display: inline-block; opacity: 0; transform: translateY(28px); animation: rise 0.85s cubic-bezier(0.2, 0.8, 0.2, 1) forwards; }
 @keyframes rise { to { opacity: 1; transform: translateY(0); } }
