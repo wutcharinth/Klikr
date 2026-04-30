@@ -7,3 +7,8 @@ node_modules
 next-env.d.ts
 supabase/.branches
 supabase/.temp
+
+# Playwright
+test-results/
+playwright-report/
+playwright/.cache/
