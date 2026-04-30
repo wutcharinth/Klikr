@@ -22,6 +22,34 @@ export async function closeDb() {
   }
 }
 
+// Seed an auth user + presentation with no slides. Use addSlide() to attach
+// slides of any type. Returns ids the test needs.
+export async function seedSession(opts: { code: string }) {
+  const c = await db();
+  const ownerEmail = `qa+${opts.code.toLowerCase()}-${Math.random().toString(36).slice(2, 8)}@klikr.test`;
+  const existing = await c.query(`select id from auth.users where email = $1 limit 1`, [ownerEmail]);
+  let ownerId: string;
+  if (existing.rows.length > 0) {
+    ownerId = existing.rows[0].id;
+  } else {
+    const { rows: userRows } = await c.query(
+      `insert into auth.users (id, email, instance_id, aud, role, encrypted_password, email_confirmed_at, created_at, updated_at, raw_app_meta_data, raw_user_meta_data)
+       values (gen_random_uuid(), $1, '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', '', now(), now(), now(), '{}'::jsonb, '{}'::jsonb)
+       returning id`,
+      [ownerEmail],
+    );
+    ownerId = userRows[0].id;
+  }
+  await c.query(`delete from presentations where code = $1`, [opts.code]);
+  const { rows: presRows } = await c.query(
+    `insert into presentations (id, owner_id, code, title, state, current_slide_id, created_at)
+     values (gen_random_uuid(), $1, $2, 'QA test deck', 'lobby', null, now())
+     returning id`,
+    [ownerId, opts.code],
+  );
+  return { ownerId, ownerEmail, presentationId: presRows[0].id as string };
+}
+
 // Seed a complete test session: anon user + presentation + quiz slides.
 // Returns ids needed by the tests.
 export async function seedQuizSession(opts: { code: string }) {
@@ -79,6 +107,52 @@ export async function seedQuizSession(opts: { code: string }) {
     slide1Id: s1[0].id as string,
     slide2Id: s2[0].id as string,
   };
+}
+
+// Add a slide of an arbitrary type to an existing presentation. Returns the
+// new slide id. Position auto-increments past whatever's already there.
+export async function addSlide(opts: {
+  presentationId: string;
+  type: "mcq" | "wordcloud" | "open" | "qa" | "ranking" | "rating";
+  question: string;
+  config: Record<string, unknown>;
+}) {
+  const c = await db();
+  const { rows: posRows } = await c.query(
+    `select coalesce(max(position), 0) + 1 as next_pos from slides where presentation_id = $1`,
+    [opts.presentationId],
+  );
+  const position = posRows[0].next_pos as number;
+  const { rows } = await c.query(
+    `insert into slides (id, presentation_id, position, type, question, config, kahoot_mode, created_at)
+     values (gen_random_uuid(), $1, $2, $3, $4, $5::jsonb, false, now())
+     returning id`,
+    [opts.presentationId, position, opts.type, opts.question, JSON.stringify(opts.config)],
+  );
+  return rows[0].id as string;
+}
+
+// Mark a presentation as closed and stamp scores onto its participants. Used
+// by the podium UI test — no need to drive the host through end-session.
+export async function closePresentation(presentationId: string) {
+  const c = await db();
+  await c.query(`update presentations set state = 'closed' where id = $1`, [presentationId]);
+}
+
+export async function setParticipantScore(participantId: string, score: number) {
+  const c = await db();
+  await c.query(`update participants set score = $1 where id = $2`, [score, participantId]);
+}
+
+export async function insertParticipant(opts: { presentationId: string; nickname: string; score?: number }) {
+  const c = await db();
+  const { rows } = await c.query(
+    `insert into participants (presentation_id, nickname, participant_token, score)
+     values ($1, $2, gen_random_uuid()::text, $3)
+     returning id`,
+    [opts.presentationId, opts.nickname, opts.score ?? 0],
+  );
+  return rows[0].id as string;
 }
 
 export async function startSlide(presentationId: string, slideId: string) {
