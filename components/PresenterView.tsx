@@ -869,13 +869,12 @@ function Lobby({
             return (
               <li
                 key={p.id}
-                className={`${isLatest ? "anim-pop" : "row-enter"} rounded-full px-3 py-1.5 text-sm font-medium`}
+                className={`${isLatest ? "anim-pop name-glow" : "row-enter"} rounded-full px-3 py-1.5 text-sm font-medium`}
                 style={{
                   background: isLatest ? "rgba(0, 113, 227, .22)" : "rgba(0, 113, 227, .14)",
                   border: "1px solid rgba(0, 113, 227, .35)",
                   color: "var(--blue)",
-                  animationDelay: isLatest ? "0ms" : `${Math.min(i, 12) * 60}ms`,
-                  boxShadow: isLatest ? "0 0 0 4px rgba(0,113,227,0.18)" : undefined,
+                  animationDelay: isLatest ? "0ms" : `${Math.min(i, 12) * 50}ms`,
                 }}
               >
                 {p.nickname}

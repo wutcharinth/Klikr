@@ -248,9 +248,9 @@ function NicknameForm({ onJoin }: { onJoin: (n: string) => Promise<void> }) {
   const [busy, setBusy] = useState(false);
   return (
     <Stage>
-      <h2 className="text-xl font-semibold">Choose a nickname</h2>
+      <h2 className="anim-fade-up text-xl font-semibold">Choose a nickname</h2>
       <form
-        className="mt-4 space-y-3"
+        className="anim-fade-up delay-200 mt-4 space-y-3"
         onSubmit={async (e) => {
           e.preventDefault();
           if (!name.trim() || busy) return;

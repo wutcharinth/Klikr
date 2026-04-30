@@ -171,7 +171,7 @@ export function WordCloudView({ responses }: { responses: ResponseRow[] }) {
         return (
           <span
             key={entry.key}
-            className="anim-pop inline-block leading-[1] tracking-[-0.02em] transition-transform"
+            className="word-fly inline-block leading-[1] tracking-[-0.02em] transition-[font-size,font-weight] duration-500"
             style={{
               fontSize: size,
               fontWeight: weight,

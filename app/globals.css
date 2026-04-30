@@ -258,12 +258,16 @@
   }
 }
 
-/* ---------- Motion utilities ---------- */
+/* ---------- Motion utilities ----------
+ * Apple/Remotion-spring feel: short fade with a subtle overshoot. Multi-step
+ * keyframes approximate spring physics (damping ~14, stiffness ~200) without
+ * a JS runtime. Used across audience views, presenter shell, lobby chips,
+ * leaderboard rows, etc. — upgrade here propagates everywhere. */
 @layer utilities {
-  .anim-fade-up { animation: fadeUp 0.45s cubic-bezier(0.2, 0.8, 0.2, 1) forwards; opacity: 0; transform: translateY(14px); }
-  .anim-fade-in { animation: fadeIn 0.35s ease forwards; opacity: 0; }
-  .anim-scale-in { animation: scaleIn 0.4s cubic-bezier(0.2, 0.8, 0.2, 1) forwards; opacity: 0; transform: scale(0.95); }
-  .anim-pop { animation: popIn 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) forwards; opacity: 0; transform: scale(0.6); }
+  .anim-fade-up { animation: fadeUp 0.6s cubic-bezier(0.2, 0.8, 0.2, 1) forwards; opacity: 0; transform: translateY(20px); will-change: transform, opacity; }
+  .anim-fade-in { animation: fadeIn 0.4s ease forwards; opacity: 0; }
+  .anim-scale-in { animation: scaleIn 0.5s cubic-bezier(0.2, 0.8, 0.2, 1) forwards; opacity: 0; transform: scale(0.92); filter: blur(4px); will-change: transform, opacity, filter; }
+  .anim-pop { animation: popIn 0.55s cubic-bezier(0.34, 1.56, 0.64, 1) forwards; opacity: 0; transform: scale(0.6); will-change: transform, opacity; }
   .delay-100 { animation-delay: 0.05s; }
   .delay-200 { animation-delay: 0.1s; }
   .delay-300 { animation-delay: 0.15s; }
@@ -272,14 +276,20 @@
   .delay-700 { animation-delay: 0.35s; }
 }
 @keyframes fadeUp {
-  to { opacity: 1; transform: translateY(0); }
+  0%   { opacity: 0; transform: translateY(20px) scale(0.985); }
+  60%  { opacity: 1; transform: translateY(-2px) scale(1.005); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
 }
 @keyframes fadeIn { to { opacity: 1; } }
 @keyframes scaleIn {
-  to { opacity: 1; transform: scale(1); }
+  0%   { opacity: 0; transform: scale(0.92); filter: blur(4px); }
+  60%  { opacity: 1; transform: scale(1.015); filter: blur(0); }
+  100% { opacity: 1; transform: scale(1); filter: blur(0); }
 }
 @keyframes popIn {
-  to { opacity: 1; transform: scale(1); }
+  0%   { opacity: 0; transform: scale(0.6); }
+  55%  { opacity: 1; transform: scale(1.08); }
+  100% { opacity: 1; transform: scale(1); }
 }
 @keyframes shimmer {
   0%, 100% { background-position: -200% 0; }
@@ -456,16 +466,23 @@
   to   { transform: scaleX(1); }
 }
 
-/* Live-demo: word-cloud word fly-in. */
-.word-fly { display: inline-block; opacity: 0; transform: translateY(14px) scale(0.7); animation: wordFly 0.55s cubic-bezier(0.34, 1.56, 0.64, 1) forwards; }
+/* Word-cloud / new-word fly-in. Used for both the live-hero demo and the
+ * audience-side word cloud entries. Multi-step overshoot for a Remotion-
+ * spring feel. */
+.word-fly { display: inline-block; opacity: 0; transform: translateY(18px) scale(0.55); animation: wordFly 0.7s cubic-bezier(0.34, 1.56, 0.64, 1) forwards; will-change: transform, opacity; }
 @keyframes wordFly {
-  to { opacity: 1; transform: translateY(0) scale(1); }
+  0%   { opacity: 0; transform: translateY(18px) scale(0.55); }
+  55%  { opacity: 1; transform: translateY(-3px) scale(1.08); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
 }
 
-/* Live-demo: leaderboard row enter. */
-.row-enter { opacity: 0; transform: translateX(-12px); animation: rowEnter 0.5s cubic-bezier(0.2, 0.8, 0.2, 1) forwards; }
+/* Lobby / leaderboard row entrance. Slides in from the left with a subtle
+ * scale, then settles. */
+.row-enter { opacity: 0; transform: translateX(-16px) scale(0.97); animation: rowEnter 0.6s cubic-bezier(0.2, 0.8, 0.2, 1) forwards; will-change: transform, opacity; }
 @keyframes rowEnter {
-  to { opacity: 1; transform: translateX(0); }
+  0%   { opacity: 0; transform: translateX(-16px) scale(0.97); }
+  60%  { opacity: 1; transform: translateX(2px) scale(1.01); }
+  100% { opacity: 1; transform: translateX(0) scale(1); }
 }
 
 /* Live-demo: mimic a ranking item being lifted and settled into first place. */
@@ -538,14 +555,34 @@
   100% { box-shadow: 0 0 0 0   rgba(0, 113, 227, 0); }
 }
 
-/* Counter bump: scale + colour flash when the value increments. */
+/* New-joiner / new-message chip: the anim-pop spring brings it in, then a
+ * glow ring expands and fades — Apple-notification feel. The ::after avoids
+ * affecting layout. */
+.name-glow { position: relative; }
+.name-glow::after {
+  content: "";
+  position: absolute; inset: -2px; border-radius: 999px;
+  pointer-events: none;
+  box-shadow: 0 0 0 0 rgba(0, 113, 227, 0.55);
+  animation: nameGlow 1.4s cubic-bezier(0.4, 0, 0.6, 1) 0.15s forwards;
+}
+@keyframes nameGlow {
+  0%   { box-shadow: 0 0 0 0   rgba(0, 113, 227, 0.55); }
+  60%  { box-shadow: 0 0 0 14px rgba(0, 113, 227, 0); }
+  100% { box-shadow: 0 0 0 0   rgba(0, 113, 227, 0); }
+}
+
+/* Counter bump: scale + colour flash when the value increments. Spring-feel
+ * overshoot (1.4x) and a soft settle. */
 .count-bump {
   display: inline-block;
-  animation: countBump 0.55s cubic-bezier(0.34, 1.56, 0.64, 1);
+  animation: countBump 0.7s cubic-bezier(0.34, 1.56, 0.64, 1);
+  will-change: transform, color;
 }
 @keyframes countBump {
   0%   { transform: scale(1); color: var(--blue); }
-  35%  { transform: scale(1.35); color: var(--blue); }
+  30%  { transform: scale(1.4); color: var(--blue); }
+  60%  { transform: scale(0.96); color: var(--blue); }
   100% { transform: scale(1); color: var(--ink, var(--fg)); }
 }
 
