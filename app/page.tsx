@@ -74,7 +74,7 @@ export default async function Landing() {
             {t("subhead")}<span className="whitespace-nowrap">{t("subheadNoSignup")}</span>
           </p>
 
-          <div className="anim-fade-up delay-500 flex justify-start">
+          <div className="anim-fade-up delay-500 flex justify-center">
             <JoinForm action={joinAction} />
           </div>
 
