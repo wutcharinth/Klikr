@@ -10,26 +10,42 @@ export function ReactionOverlay({ presentationId }: { presentationId: string }) 
   const [bursts, setBursts] = useState<Burst[]>([]);
 
   useEffect(() => {
-    const channel = supabase
-      .channel(`reactions-${presentationId}`)
-      .on(
-        "postgres_changes",
-        { event: "INSERT", schema: "public", table: "reactions", filter: `presentation_id=eq.${presentationId}` },
-        (payload) => {
-          const r = payload.new as { id: string; emoji: string };
-          const b: Burst = {
-            id: r.id,
-            emoji: r.emoji,
-            x: Math.random() * 80 + 10,
-            delay: Math.random() * 0.2,
-          };
-          setBursts((prev) => [...prev, b]);
-          setTimeout(() => setBursts((prev) => prev.filter((x) => x.id !== b.id)), 3500);
-        },
-      )
-      .subscribe();
+    let channel: ReturnType<typeof supabase.channel> | null = null;
+    let cancelled = false;
+
+    (async () => {
+      // Pin the JWT on the realtime socket before subscribing — without
+      // this, the channel can subscribe with the anon role, and the
+      // reactions SELECT policy ("owners and editors") then filters out
+      // every event so the overlay never fires.
+      const { data } = await supabase.auth.getSession();
+      const token = data.session?.access_token;
+      if (token) supabase.realtime.setAuth(token);
+
+      if (cancelled) return;
+      channel = supabase
+        .channel(`reactions-${presentationId}`)
+        .on(
+          "postgres_changes",
+          { event: "INSERT", schema: "public", table: "reactions", filter: `presentation_id=eq.${presentationId}` },
+          (payload) => {
+            const r = payload.new as { id: string; emoji: string };
+            const b: Burst = {
+              id: r.id,
+              emoji: r.emoji,
+              x: Math.random() * 80 + 10,
+              delay: Math.random() * 0.2,
+            };
+            setBursts((prev) => [...prev, b]);
+            setTimeout(() => setBursts((prev) => prev.filter((x) => x.id !== b.id)), 3500);
+          },
+        )
+        .subscribe();
+    })();
+
     return () => {
-      supabase.removeChannel(channel);
+      cancelled = true;
+      if (channel) supabase.removeChannel(channel);
     };
   }, [supabase, presentationId]);
 
