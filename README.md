@@ -297,3 +297,7 @@ Every keyframe respects `prefers-reduced-motion: reduce`.
 ## License
 
 Private. All rights reserved.
+
+---
+
+Produced by [Oqiva Labs](https://oqiva-labs.pages.dev/).

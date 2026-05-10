@@ -131,6 +131,18 @@ export default async function AboutPage() {
           <Link href="/templates" className="btn-ghost">{t("browseTemplates")}</Link>
         </div>
       </section>
+
+      <p className="mt-10 text-center text-xs muted-text">
+        Produced by{" "}
+        <a
+          href="https://oqiva-labs.pages.dev/"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="hover:text-[var(--ink)] underline-offset-4 hover:underline"
+        >
+          Oqiva Labs
+        </a>
+      </p>
     </main>
   );
 }

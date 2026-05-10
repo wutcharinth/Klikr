@@ -123,6 +123,17 @@ export default async function Landing() {
               {t("aboutKlikr")}
             </Link>
           </p>
+          <p className="mt-3 text-center text-[11px] muted-text">
+            Produced by{" "}
+            <a
+              href="https://oqiva-labs.pages.dev/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="hover:text-[var(--ink)] underline-offset-4 hover:underline"
+            >
+              Oqiva Labs
+            </a>
+          </p>
         </Reveal>
       </section>
     </main>
