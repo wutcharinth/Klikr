@@ -4,7 +4,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 
 export type TakeoverPayload =
   | { kind: "quiz-correct"; points: number; rankNow: number; rankBefore: number; total: number }
-  | { kind: "quiz-wrong"; correctIndex: number; rankNow: number; total: number }
+  | { kind: "quiz-wrong"; rankNow: number; total: number }
   | { kind: "quiz-skipped"; rankNow: number; total: number }
   | { kind: "submitted"; ordinal: number; total: number }
   | { kind: "toast"; text: string };
@@ -60,4 +60,21 @@ export function useTakeover(): TakeoverState {
   const ctx = useContext(TakeoverContext);
   if (!ctx) throw new Error("useTakeover must be used inside TakeoverProvider");
   return ctx;
+}
+
+/** Dismisses any active takeover when the slide id changes. Mount inside the
+ *  provider, fed the current slide id; useful so a 1.8s "submitted" overlay
+ *  from the previous slide doesn't bleed onto the next one when the host
+ *  advances quickly. */
+export function TakeoverSlideWatcher({ slideId }: { slideId: string | null | undefined }) {
+  const { dismiss } = useTakeover();
+  const firstRef = useRef(true);
+  useEffect(() => {
+    if (firstRef.current) {
+      firstRef.current = false;
+      return;
+    }
+    dismiss();
+  }, [slideId, dismiss]);
+  return null;
 }

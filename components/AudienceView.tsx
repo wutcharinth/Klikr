@@ -7,7 +7,7 @@ import { joinSession, submitResponse, sendReaction, toggleQuestionVote, submitQu
 import { KahootAudienceView } from "./KahootAudienceView";
 import { AudienceFinalResults } from "./AudienceFinalResults";
 import { LogoMarkPlayer } from "./remotion/LogoMarkPlayer";
-import { TakeoverProvider, useTakeover } from "./audience/TakeoverContext";
+import { TakeoverProvider, TakeoverSlideWatcher, useTakeover } from "./audience/TakeoverContext";
 import { TakeoverLayer } from "./audience/TakeoverLayer";
 import { isAudioOn, setAudioOn } from "@/lib/audio";
 import { Volume2, VolumeX } from "lucide-react";
@@ -137,6 +137,7 @@ export function AudienceView({
 
   return (
     <TakeoverProvider>
+      <TakeoverSlideWatcher slideId={presentation.current_slide_id} />
       <Stage>
         {!connected ? (
           <div
@@ -587,7 +588,7 @@ function Quiz({
       } else if (isCorrect) {
         trigger({ kind: "quiz-correct", points: justEarned, rankNow, rankBefore, total });
       } else {
-        trigger({ kind: "quiz-wrong", correctIndex: cfg.correct_index, rankNow, total });
+        trigger({ kind: "quiz-wrong", rankNow, total });
       }
     })();
     return () => { cancelled = true; };

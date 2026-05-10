@@ -71,7 +71,7 @@ export function KahootAudienceView({
       const didNotAnswer = picked === null;
       if (didNotAnswer) trigger({ kind: "quiz-skipped", rankNow, total });
       else if (isCorrect) trigger({ kind: "quiz-correct", points: justEarned, rankNow, rankBefore, total });
-      else trigger({ kind: "quiz-wrong", correctIndex: cfg.correct_index, rankNow, total });
+      else trigger({ kind: "quiz-wrong", rankNow, total });
     })();
     return () => { cancelled = true; };
   }, [expired, cfg.correct_index, participantId, participantToken, presentationId, picked, trigger]);

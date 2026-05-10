@@ -56,7 +56,7 @@ export function SubmittedVariant({
     <div className="takeover-content">
       <div className="text-xs uppercase tracking-widest opacity-90">Submitted</div>
       <div className="big-num-pop text-6xl font-extrabold leading-none">{ordinal}{ordSuffix} in!</div>
-      <div className="text-xs uppercase tracking-widest opacity-90">{total} of {total} so far</div>
+      <div className="text-xs uppercase tracking-widest opacity-90">{ordinal} of {total} so far</div>
     </div>
   );
 }
