@@ -578,7 +578,6 @@ function Quiz({
               participantId,
               participantToken,
               valueIndex: i,
-              responseMs: elapsedMs,
             });
           }}
           className="press anim-fade-up w-full rounded-xl px-4 py-4 text-left text-base transition-all duration-200"
