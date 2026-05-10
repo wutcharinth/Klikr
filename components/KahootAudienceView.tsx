@@ -5,6 +5,7 @@ import { Triangle, Diamond, Circle, Square, CheckCircle } from "lucide-react";
 import type { Slide, QuizConfig } from "@/lib/types";
 import { submitResponse, getParticipantScores } from "@/app/play/[code]/actions";
 import { useTakeover } from "./audience/TakeoverContext";
+import { AudienceLeaderboard } from "./audience/AudienceLeaderboard";
 
 const TILES = [
   { color: "#E21B3C", Icon: Triangle },
@@ -75,7 +76,16 @@ export function KahootAudienceView({
     return () => { cancelled = true; };
   }, [expired, cfg.correct_index, participantId, participantToken, presentationId, picked, trigger]);
 
-  if (expired || picked !== null) {
+  if (expired) {
+    return (
+      <AudienceLeaderboard
+        presentationId={presentationId}
+        participantId={participantId}
+        participantToken={participantToken}
+      />
+    );
+  }
+  if (picked !== null) {
     return <PreReveal cfg={cfg} picked={picked} expired={expired} />;
   }
 

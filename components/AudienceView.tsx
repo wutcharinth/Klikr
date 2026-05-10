@@ -9,6 +9,7 @@ import { AudienceFinalResults } from "./AudienceFinalResults";
 import { LogoMarkPlayer } from "./remotion/LogoMarkPlayer";
 import { TakeoverProvider, TakeoverSlideWatcher, useTakeover } from "./audience/TakeoverContext";
 import { TakeoverLayer } from "./audience/TakeoverLayer";
+import { AudienceLeaderboard } from "./audience/AudienceLeaderboard";
 import { isAudioOn, setAudioOn } from "@/lib/audio";
 import { Volume2, VolumeX } from "lucide-react";
 
@@ -601,14 +602,16 @@ function Quiz({
     );
   }
 
-  // Post-reveal: TakeoverLayer covers the screen via the effect above. We
-  // render a tiny placeholder underneath so the slide-area isn't visually
-  // empty while the host moves on.
+  // Post-reveal: TakeoverLayer covers the screen for ~1.8s with the
+  // correct/wrong reveal, then the leaderboard sits underneath until the
+  // host advances. Polls so rank changes animate as other players finish.
   if (expired) {
     return (
-      <div className="flex flex-col items-center gap-2 py-12 text-center">
-        <p className="text-sm muted-text">Reveal up — hold tight.</p>
-      </div>
+      <AudienceLeaderboard
+        presentationId={presentationId}
+        participantId={participantId}
+        participantToken={participantToken}
+      />
     );
   }
 
