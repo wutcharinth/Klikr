@@ -1,11 +1,10 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import type { Presentation, Slide, MCQConfig, QuizConfig, WordCloudConfig, QAConfig, RatingConfig, RankingConfig, ResponseRow } from "@/lib/types";
-import { joinSession, submitResponse, sendReaction, toggleQuestionVote, submitQuestion } from "@/app/play/[code]/actions";
+import { joinSession, submitResponse, sendReaction, toggleQuestionVote, submitQuestion, getParticipantScores } from "@/app/play/[code]/actions";
 import { KahootAudienceView } from "./KahootAudienceView";
-import { RevealMedal, ScoreCard } from "./QuizFeedback";
 import { AudienceFinalResults } from "./AudienceFinalResults";
 import { LogoMarkPlayer } from "./remotion/LogoMarkPlayer";
 import { TakeoverProvider, useTakeover } from "./audience/TakeoverContext";
@@ -544,6 +543,42 @@ function Quiz({
     setPicked(null);
   }, [slide.id]);
 
+  const { trigger } = useTakeover();
+  const prevRankRef = useRef<number | null>(null);
+  const prevScoreRef = useRef<number>(0);
+  useEffect(() => {
+    if (!expired) return;
+    let cancelled = false;
+    (async () => {
+      const list = await getParticipantScores({
+        presentationId,
+        participantId,
+        participantToken,
+      });
+      if (cancelled) return;
+      const total = list.length;
+      const rankNow = Math.max(1, list.findIndex((p) => p.id === participantId) + 1);
+      const rankBefore = prevRankRef.current ?? total;
+      prevRankRef.current = rankNow;
+
+      const me = list.find((p) => p.id === participantId);
+      const cumulativeScore = me?.score ?? 0;
+      const justEarned = Math.max(0, cumulativeScore - prevScoreRef.current);
+      prevScoreRef.current = cumulativeScore;
+
+      const isCorrect = picked !== null && picked === cfg.correct_index;
+      const didNotAnswer = picked === null;
+      if (didNotAnswer) {
+        trigger({ kind: "quiz-skipped", rankNow, total });
+      } else if (isCorrect) {
+        trigger({ kind: "quiz-correct", points: justEarned, rankNow, rankBefore, total });
+      } else {
+        trigger({ kind: "quiz-wrong", correctIndex: cfg.correct_index, rankNow, total });
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [expired, cfg.correct_index, participantId, participantToken, presentationId, picked, trigger]);
+
   // Pre-reveal: locked-in confirmation while waiting for the timer to expire.
   if (picked !== null && !expired) {
     return (
@@ -556,20 +591,13 @@ function Quiz({
     );
   }
 
-  // Post-reveal: show correct/wrong feedback + score card. Mirrors Kahoot mode.
+  // Post-reveal: TakeoverLayer covers the screen via the effect above. We
+  // render a tiny placeholder underneath so the slide-area isn't visually
+  // empty while the host moves on.
   if (expired) {
-    const isCorrect = picked !== null && picked === cfg.correct_index;
-    const didNotAnswer = picked === null;
     return (
-      <div className="flex flex-col items-center gap-6 py-6">
-        <RevealMedal correct={isCorrect} skipped={didNotAnswer} confetti={isCorrect} />
-        <ScoreCard
-          presentationId={presentationId}
-          participantId={participantId}
-          participantToken={participantToken}
-          slideId={slide.id}
-          correct={isCorrect}
-        />
+      <div className="flex flex-col items-center gap-2 py-12 text-center">
+        <p className="text-sm muted-text">Reveal up — hold tight.</p>
       </div>
     );
   }
