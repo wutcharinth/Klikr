@@ -638,6 +638,7 @@ function WordCloudInput({
   const max = cfg.max_words_per_participant ?? 3;
   const [words, setWords] = useState<string[]>([]);
   const [text, setText] = useState("");
+  const { trigger } = useTakeover();
   const submit = async (next: string[]) => {
     setWords(next);
     await submitResponse({
@@ -646,6 +647,7 @@ function WordCloudInput({
       participantToken,
       valueText: next.join(" "),
     });
+    trigger({ kind: "toast", text: "🌪 Word in!" });
   };
   return (
     <div className="space-y-3">
@@ -770,6 +772,7 @@ function QAInput({
   const [busy, setBusy] = useState(false);
   const [pendingHint, setPendingHint] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const { trigger } = useTakeover();
 
   useEffect(() => {
     let cancelled = false;
@@ -828,6 +831,7 @@ function QAInput({
           setError(null);
           try {
             const result = await submitQuestion({ slideId: slide.id, participantId, participantToken, text: t });
+            trigger({ kind: "toast", text: "🙋 Question in!" });
             setText("");
             setPendingHint(result.status === "pending" ? "Question sent — awaiting approval." : null);
             setTimeout(() => setPendingHint(null), 4000);
