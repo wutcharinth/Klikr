@@ -9,6 +9,8 @@ import { AudienceFinalResults } from "./AudienceFinalResults";
 import { LogoMarkPlayer } from "./remotion/LogoMarkPlayer";
 import { TakeoverProvider, useTakeover } from "./audience/TakeoverContext";
 import { TakeoverLayer } from "./audience/TakeoverLayer";
+import { isAudioOn, setAudioOn } from "@/lib/audio";
+import { Volume2, VolumeX } from "lucide-react";
 
 type LocalParticipant = {
   id: string;
@@ -259,9 +261,21 @@ function Stage({ children }: { children: React.ReactNode }) {
 function NicknameForm({ onJoin }: { onJoin: (n: string) => Promise<void> }) {
   const [name, setName] = useState("");
   const [busy, setBusy] = useState(false);
+  const [audio, setAudio] = useState(false);
+  useEffect(() => { setAudio(isAudioOn()); }, []);
   return (
     <Stage>
-      <h2 className="anim-fade-up text-xl font-semibold">Choose a nickname</h2>
+      <div className="anim-fade-up flex items-center justify-between gap-3">
+        <h2 className="text-xl font-semibold">Choose a nickname</h2>
+        <button
+          type="button"
+          className="rounded-full p-2 muted-text hover:opacity-80"
+          aria-label={audio ? "Mute sounds" : "Enable sounds"}
+          onClick={() => { const next = !audio; setAudioOn(next); setAudio(next); }}
+        >
+          {audio ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />}
+        </button>
+      </div>
       <form
         className="anim-fade-up delay-200 mt-4 space-y-3"
         onSubmit={async (e) => {
