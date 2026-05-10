@@ -85,9 +85,13 @@ CI grep guard: imports of `RevealMedal` / `ScoreCard` should be zero after the c
 
 | Moment | Source | Action |
 |-|-|-|
-| Audience submits any slide | `submitResponse(...)` return value | client calls `trigger({ kind: "submitted", ordinal, total })` for non-quiz; `trigger({ kind: "toast", text: "Locked in" })` for quiz |
-| Host advances a quiz slide | realtime `presentations.UPDATE` on `current_slide_id` | client recomputes its own correctness + rank from the participants snapshot it already keeps; calls `trigger({ kind: "quiz-correct" \| "quiz-wrong" \| "quiz-skipped", ... })` |
-| Session ends | realtime `presentations.state = closed` | existing `AudienceFinalResults` is restyled as a full takeover variant `final-podium` (out of scope for v1; current component renders inline below the takeover layer) |
+| Audience submits any non-quiz slide | `submitResponse(...)` return value | client calls `trigger({ kind: "submitted", ordinal, total })` for one-and-done slides, `trigger({ kind: "toast", text })` for multi-submit |
+| Audience submits a quiz slide | local pre-reveal state | inline "Locked in" confirmation stays as today; **no toast fired** |
+| Quiz local timer expires | `useEffect` watching `remainingMs <= 0` | client calls `trigger({ kind: "quiz-correct" \| "quiz-wrong" \| "quiz-skipped", ... })` (replaces today's inline `RevealMedal` + `ScoreCard` block at AudienceView lines ~534–550) |
+| Host advances mid-takeover | realtime `presentations.UPDATE` on `current_slide_id` | active takeover is cancelled to keep up with the host |
+| Session ends | realtime `presentations.state = closed` | existing `AudienceFinalResults` keeps rendering inline (out of scope for v1) |
+
+Important: quiz reveal in Klikr is **timer-driven, not host-driven**. The audience client renders the reveal as soon as `expired = true`. The takeover layer hooks into that same expiry effect — we're replacing what gets rendered, not adding a new lifecycle.
 
 ### Server change (single file)
 
