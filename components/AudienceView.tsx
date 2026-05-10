@@ -8,6 +8,8 @@ import { KahootAudienceView } from "./KahootAudienceView";
 import { RevealMedal, ScoreCard } from "./QuizFeedback";
 import { AudienceFinalResults } from "./AudienceFinalResults";
 import { LogoMarkPlayer } from "./remotion/LogoMarkPlayer";
+import { TakeoverProvider, useTakeover } from "./audience/TakeoverContext";
+import { TakeoverLayer } from "./audience/TakeoverLayer";
 
 type LocalParticipant = {
   id: string;
@@ -87,35 +89,44 @@ export function AudienceView({
 
   if (presentation.state === "lobby") {
     return (
-      <Stage>
-        <div className="flex justify-center" aria-hidden>
-          <LogoMarkPlayer variant="idle" width={260} height={80} />
-        </div>
-        <h2 className="mt-4 text-2xl font-semibold">Hi {participant.nickname}!</h2>
-        <p className="mt-2 text-slate-500">Waiting for the presenter to start…</p>
-        <p className="mt-4 text-xs muted-text">Keep this tab open — answers will appear as the host moves on.</p>
-      </Stage>
+      <TakeoverProvider>
+        <Stage>
+          <div className="flex justify-center" aria-hidden>
+            <LogoMarkPlayer variant="idle" width={260} height={80} />
+          </div>
+          <h2 className="mt-4 text-2xl font-semibold">Hi {participant.nickname}!</h2>
+          <p className="mt-2 text-slate-500">Waiting for the presenter to start…</p>
+          <p className="mt-4 text-xs muted-text">Keep this tab open — answers will appear as the host moves on.</p>
+        </Stage>
+        <TakeoverLayer />
+      </TakeoverProvider>
     );
   }
 
   if (presentation.state === "closed") {
     return (
-      <AudienceFinalResults
-        presentationId={presentation.id}
-        participantId={participant.id}
-        participantToken={participant.participantToken}
-        nickname={participant.nickname}
-        hasAnyQuiz={slides.some((s) => s.type === "quiz")}
-      />
+      <TakeoverProvider>
+        <AudienceFinalResults
+          presentationId={presentation.id}
+          participantId={participant.id}
+          participantToken={participant.participantToken}
+          nickname={participant.nickname}
+          hasAnyQuiz={slides.some((s) => s.type === "quiz")}
+        />
+        <TakeoverLayer />
+      </TakeoverProvider>
     );
   }
 
   const currentSlide = slides.find((s) => s.id === presentation.current_slide_id) ?? null;
   if (!currentSlide) {
     return (
-      <Stage>
-        <p className="text-slate-500">Up next…</p>
-      </Stage>
+      <TakeoverProvider>
+        <Stage>
+          <p className="text-slate-500">Up next…</p>
+        </Stage>
+        <TakeoverLayer />
+      </TakeoverProvider>
     );
   }
 
@@ -124,113 +135,116 @@ export function AudienceView({
     : null;
 
   return (
-    <Stage>
-      {!connected ? (
-        <div
-          className="anim-fade-up mb-4 flex items-center gap-2 rounded-full px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.16em]"
-          style={{ background: "rgba(245,158,11,0.10)", color: "#b45309", border: "1px solid rgba(245,158,11,0.35)" }}
-          role="status"
-          aria-live="polite"
-        >
-          <span
-            aria-hidden
-            style={{ width: 7, height: 7, borderRadius: 999, background: "#f59e0b", display: "inline-block" }}
-            className="live-dot"
-          />
-          Reconnecting…
-        </div>
-      ) : null}
-      <div key={currentSlide.id} className="slide-enter">
-        <p className="text-[10px] uppercase tracking-[0.18em] muted-text">{currentSlide.type}</p>
-        <h2 className="mt-1 text-2xl font-semibold tracking-tight">{currentSlide.question}</h2>
-        {currentSlide.image_url ? (
-          <div className="anim-fade-up mt-4">
-            <img
-              src={currentSlide.image_url}
-              alt=""
-              className="w-full max-h-56 object-cover rounded-xl"
-              style={{ border: "1px solid var(--line)" }}
+    <TakeoverProvider>
+      <Stage>
+        {!connected ? (
+          <div
+            className="anim-fade-up mb-4 flex items-center gap-2 rounded-full px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.16em]"
+            style={{ background: "rgba(245,158,11,0.10)", color: "#b45309", border: "1px solid rgba(245,158,11,0.35)" }}
+            role="status"
+            aria-live="polite"
+          >
+            <span
+              aria-hidden
+              style={{ width: 7, height: 7, borderRadius: 999, background: "#f59e0b", display: "inline-block" }}
+              className="live-dot"
             />
-            {currentSlide.image_credit && (
-              <p className="mt-1 text-[10px] muted-text">
-                Photo by{" "}
-                <a href={currentSlide.image_credit.photographer_url} target="_blank" rel="noopener noreferrer">
-                  {currentSlide.image_credit.photographer}
-                </a>{" "}
-                on{" "}
-                <a href="https://unsplash.com/?utm_source=klikr&utm_medium=referral" target="_blank" rel="noopener noreferrer">
-                  Unsplash
-                </a>
-              </p>
-            )}
+            Reconnecting…
           </div>
         ) : null}
-        <div className="mt-6">
-          {currentSlide.type === "mcq" ? (
-            <MCQ slide={currentSlide} participantId={participant.id} participantToken={participant.participantToken} />
+        <div key={currentSlide.id} className="slide-enter">
+          <p className="text-[10px] uppercase tracking-[0.18em] muted-text">{currentSlide.type}</p>
+          <h2 className="mt-1 text-2xl font-semibold tracking-tight">{currentSlide.question}</h2>
+          {currentSlide.image_url ? (
+            <div className="anim-fade-up mt-4">
+              <img
+                src={currentSlide.image_url}
+                alt=""
+                className="w-full max-h-56 object-cover rounded-xl"
+                style={{ border: "1px solid var(--line)" }}
+              />
+              {currentSlide.image_credit && (
+                <p className="mt-1 text-[10px] muted-text">
+                  Photo by{" "}
+                  <a href={currentSlide.image_credit.photographer_url} target="_blank" rel="noopener noreferrer">
+                    {currentSlide.image_credit.photographer}
+                  </a>{" "}
+                  on{" "}
+                  <a href="https://unsplash.com/?utm_source=klikr&utm_medium=referral" target="_blank" rel="noopener noreferrer">
+                    Unsplash
+                  </a>
+                </p>
+              )}
+            </div>
           ) : null}
-          {currentSlide.type === "quiz" ? (
-            currentSlide.kahoot_mode ? (
-              <KahootAudienceView
+          <div className="mt-6">
+            {currentSlide.type === "mcq" ? (
+              <MCQ slide={currentSlide} participantId={participant.id} participantToken={participant.participantToken} />
+            ) : null}
+            {currentSlide.type === "quiz" ? (
+              currentSlide.kahoot_mode ? (
+                <KahootAudienceView
+                  slide={currentSlide}
+                  participantId={participant.id}
+                  participantToken={participant.participantToken}
+                  presentationId={presentation.id}
+                  startedAt={slideStartedAt}
+                />
+              ) : (
+                <Quiz
+                  slide={currentSlide}
+                  participantId={participant.id}
+                  participantToken={participant.participantToken}
+                  presentationId={presentation.id}
+                  startedAt={slideStartedAt}
+                />
+              )
+            ) : null}
+            {currentSlide.type === "embed" ? (
+              <p className="text-sm muted-text">Look at the host's screen — there's nothing to tap on this one.</p>
+            ) : null}
+            {currentSlide.type === "wordcloud" ? (
+              <WordCloudInput
                 slide={currentSlide}
                 participantId={participant.id}
                 participantToken={participant.participantToken}
-                presentationId={presentation.id}
-                startedAt={slideStartedAt}
               />
-            ) : (
-              <Quiz
+            ) : null}
+            {currentSlide.type === "open" ? (
+              <OpenInput slide={currentSlide} participantId={participant.id} participantToken={participant.participantToken} />
+            ) : null}
+            {currentSlide.type === "qa" ? (
+              <QAInput
                 slide={currentSlide}
                 participantId={participant.id}
                 participantToken={participant.participantToken}
-                presentationId={presentation.id}
-                startedAt={slideStartedAt}
+                supabase={supabase}
               />
-            )
-          ) : null}
-          {currentSlide.type === "embed" ? (
-            <p className="text-sm muted-text">Look at the host's screen — there's nothing to tap on this one.</p>
-          ) : null}
-          {currentSlide.type === "wordcloud" ? (
-            <WordCloudInput
-              slide={currentSlide}
-              participantId={participant.id}
-              participantToken={participant.participantToken}
-            />
-          ) : null}
-          {currentSlide.type === "open" ? (
-            <OpenInput slide={currentSlide} participantId={participant.id} participantToken={participant.participantToken} />
-          ) : null}
-          {currentSlide.type === "qa" ? (
-            <QAInput
-              slide={currentSlide}
-              participantId={participant.id}
-              participantToken={participant.participantToken}
-              supabase={supabase}
-            />
-          ) : null}
-          {currentSlide.type === "rating" ? (
-            <RatingInput
-              slide={currentSlide}
-              participantId={participant.id}
-              participantToken={participant.participantToken}
-            />
-          ) : null}
-          {currentSlide.type === "ranking" ? (
-            <RankingInput
-              slide={currentSlide}
-              participantId={participant.id}
-              participantToken={participant.participantToken}
-            />
-          ) : null}
+            ) : null}
+            {currentSlide.type === "rating" ? (
+              <RatingInput
+                slide={currentSlide}
+                participantId={participant.id}
+                participantToken={participant.participantToken}
+              />
+            ) : null}
+            {currentSlide.type === "ranking" ? (
+              <RankingInput
+                slide={currentSlide}
+                participantId={participant.id}
+                participantToken={participant.participantToken}
+              />
+            ) : null}
+          </div>
         </div>
-      </div>
-      <ReactionsBar
-        presentationId={presentation.id}
-        participantId={participant.id}
-        participantToken={participant.participantToken}
-      />
-    </Stage>
+        <ReactionsBar
+          presentationId={presentation.id}
+          participantId={participant.id}
+          participantToken={participant.participantToken}
+        />
+      </Stage>
+      <TakeoverLayer />
+    </TakeoverProvider>
   );
 }
 
@@ -295,17 +309,21 @@ function MCQ({
   const [picked, setPicked] = useState<number | null>(null);
   const [picks, setPicks] = useState<Set<number>>(new Set());
   const [submitted, setSubmitted] = useState(false);
+  const { trigger } = useTakeover();
 
   if (multi) {
     const submit = async () => {
       if (picks.size === 0 || submitted) return;
       setSubmitted(true);
-      await submitResponse({
+      const res = await submitResponse({
         slideId: slide.id,
         participantId,
         participantToken,
         valueText: JSON.stringify([...picks].sort((a, b) => a - b)),
       });
+      if (res && "ordinal" in res && typeof res.ordinal === "number") {
+        trigger({ kind: "submitted", ordinal: res.ordinal, total: res.total as number });
+      }
     };
     return (
       <div className="space-y-2">
@@ -364,7 +382,10 @@ function MCQ({
           disabled={picked !== null}
           onClick={async () => {
             setPicked(i);
-            await submitResponse({ slideId: slide.id, participantId, participantToken, valueIndex: i });
+            const res = await submitResponse({ slideId: slide.id, participantId, participantToken, valueIndex: i });
+            if (res && "ordinal" in res && typeof res.ordinal === "number") {
+              trigger({ kind: "submitted", ordinal: res.ordinal, total: res.total as number });
+            }
           }}
           className={
             "press anim-fade-up w-full rounded-xl px-4 py-4 text-left text-base transition-all duration-200 "
@@ -406,6 +427,7 @@ function RankingInput({
   const [order, setOrder] = useState<number[]>(() => cfg.items.map((_, i) => i));
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { trigger } = useTakeover();
 
   const move = (i: number, dir: -1 | 1) => {
     const j = i + dir;
@@ -422,12 +444,15 @@ function RankingInput({
     setError(null);
     try {
       setSubmitted(true);
-      await submitResponse({
+      const res = await submitResponse({
         slideId: slide.id,
         participantId,
         participantToken,
         valueText: JSON.stringify(order),
       });
+      if (res && "ordinal" in res && typeof res.ordinal === "number") {
+        trigger({ kind: "submitted", ordinal: res.ordinal, total: res.total as number });
+      }
     } catch (e) {
       setSubmitted(false);
       setError(e instanceof Error ? e.message : String(e));
@@ -687,6 +712,7 @@ function OpenInput({
   const [text, setText] = useState("");
   const [sent, setSent] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { trigger } = useTakeover();
   return (
     <form
       onSubmit={async (e) => {
@@ -695,7 +721,10 @@ function OpenInput({
         setError(null);
         setSent(true);
         try {
-          await submitResponse({ slideId: slide.id, participantId, participantToken, valueText: text.trim() });
+          const res = await submitResponse({ slideId: slide.id, participantId, participantToken, valueText: text.trim() });
+          if (res && "ordinal" in res && typeof res.ordinal === "number") {
+            trigger({ kind: "submitted", ordinal: res.ordinal, total: res.total as number });
+          }
         } catch (err) {
           setSent(false);
           setError(err instanceof Error ? err.message : String(err));
@@ -883,6 +912,7 @@ function RatingInput({
 }) {
   const cfg = slide.config as RatingConfig;
   const [picked, setPicked] = useState<number | null>(null);
+  const { trigger } = useTakeover();
   const range = cfg.scale === 5 ? [1, 2, 3, 4, 5] : [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
   return (
     <div className="space-y-4">
@@ -893,7 +923,10 @@ function RatingInput({
             disabled={picked !== null}
             onClick={async () => {
               setPicked(n);
-              await submitResponse({ slideId: slide.id, participantId, participantToken, valueIndex: n });
+              const res = await submitResponse({ slideId: slide.id, participantId, participantToken, valueIndex: n });
+              if (res && "ordinal" in res && typeof res.ordinal === "number") {
+                trigger({ kind: "submitted", ordinal: res.ordinal, total: res.total as number });
+              }
             }}
             className="press anim-fade-up rounded-lg text-base font-semibold transition-all"
             style={{
