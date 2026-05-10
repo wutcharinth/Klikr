@@ -161,6 +161,27 @@ export async function submitResponse(input: {
     { onConflict: "slide_id,participant_id" },
   );
   if (error) throw error;
+
+  // Non-quiz slides: return submission stats so the audience client can show
+  // a "Nth in" takeover. Quiz slides skip this; the takeover for quiz fires on
+  // local timer expiry, not on submit.
+  if (slide.type !== "quiz") {
+    const [respRes, partRes] = await Promise.all([
+      supabase
+        .from("responses")
+        .select("*", { count: "exact", head: true })
+        .eq("slide_id", input.slideId),
+      supabase
+        .from("participants")
+        .select("*", { count: "exact", head: true })
+        .eq("presentation_id", participant.presentation_id),
+    ]);
+    return {
+      ordinal: respRes.count ?? 1,
+      total: Math.max(respRes.count ?? 1, partRes.count ?? 1),
+    };
+  }
+  return {};
 }
 
 export async function getParticipantScores(input: {
