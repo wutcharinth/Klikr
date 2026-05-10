@@ -133,14 +133,23 @@ export default async function AboutPage() {
       </section>
 
       <p className="mt-10 text-center text-xs muted-text">
-        Produced by{" "}
+        A personal project ·{" "}
         <a
-          href="https://oqiva-labs.pages.dev/"
+          href="https://www.linkedin.com/in/wutcharin/"
           target="_blank"
           rel="noopener noreferrer"
           className="hover:text-[var(--ink)] underline-offset-4 hover:underline"
         >
-          Oqiva Labs
+          LinkedIn
+        </a>{" "}
+        ·{" "}
+        <a
+          href="https://wutcharin.com/"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="hover:text-[var(--ink)] underline-offset-4 hover:underline"
+        >
+          wutcharin.com
         </a>
       </p>
     </main>

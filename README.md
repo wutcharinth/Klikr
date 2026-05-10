@@ -300,4 +300,4 @@ Private. All rights reserved.
 
 ---
 
-Produced by [Oqiva Labs](https://oqiva-labs.pages.dev/).
+A personal project by Wutcharin — [LinkedIn](https://www.linkedin.com/in/wutcharin/) · [wutcharin.com](https://wutcharin.com/).

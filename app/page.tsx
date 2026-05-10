@@ -124,14 +124,23 @@ export default async function Landing() {
             </Link>
           </p>
           <p className="mt-3 text-center text-[11px] muted-text">
-            Produced by{" "}
+            A personal project ·{" "}
             <a
-              href="https://oqiva-labs.pages.dev/"
+              href="https://www.linkedin.com/in/wutcharin/"
               target="_blank"
               rel="noopener noreferrer"
               className="hover:text-[var(--ink)] underline-offset-4 hover:underline"
             >
-              Oqiva Labs
+              LinkedIn
+            </a>{" "}
+            ·{" "}
+            <a
+              href="https://wutcharin.com/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="hover:text-[var(--ink)] underline-offset-4 hover:underline"
+            >
+              wutcharin.com
             </a>
           </p>
         </Reveal>
