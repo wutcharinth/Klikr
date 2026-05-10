@@ -1,10 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Triangle, Diamond, Circle, Square, CheckCircle } from "lucide-react";
 import type { Slide, QuizConfig } from "@/lib/types";
-import { submitResponse } from "@/app/play/[code]/actions";
-import { RevealMedal, ScoreCard } from "./QuizFeedback";
+import { submitResponse, getParticipantScores } from "@/app/play/[code]/actions";
+import { useTakeover } from "./audience/TakeoverContext";
 
 const TILES = [
   { color: "#E21B3C", Icon: Triangle },
@@ -47,18 +47,37 @@ export function KahootAudienceView({
     setPicked(null);
   }, [slide.id]);
 
+  // Reveal moment: timer expired. Fetch the latest leaderboard, derive rank
+  // and just-earned points, fire the takeover. Refs persist across consecutive
+  // quiz slides so we can render rank-delta and just-earned points.
+  const { trigger } = useTakeover();
+  const prevRankRef = useRef<number | null>(null);
+  const prevScoreRef = useRef<number>(0);
+  useEffect(() => {
+    if (!expired) return;
+    let cancelled = false;
+    (async () => {
+      const list = await getParticipantScores({ presentationId, participantId, participantToken });
+      if (cancelled) return;
+      const total = list.length;
+      const rankNow = Math.max(1, list.findIndex((p) => p.id === participantId) + 1);
+      const rankBefore = prevRankRef.current ?? total;
+      prevRankRef.current = rankNow;
+      const me = list.find((p) => p.id === participantId);
+      const cumulativeScore = me?.score ?? 0;
+      const justEarned = Math.max(0, cumulativeScore - prevScoreRef.current);
+      prevScoreRef.current = cumulativeScore;
+      const isCorrect = picked !== null && picked === cfg.correct_index;
+      const didNotAnswer = picked === null;
+      if (didNotAnswer) trigger({ kind: "quiz-skipped", rankNow, total });
+      else if (isCorrect) trigger({ kind: "quiz-correct", points: justEarned, rankNow, rankBefore, total });
+      else trigger({ kind: "quiz-wrong", correctIndex: cfg.correct_index, rankNow, total });
+    })();
+    return () => { cancelled = true; };
+  }, [expired, cfg.correct_index, participantId, participantToken, presentationId, picked, trigger]);
+
   if (expired || picked !== null) {
-    return (
-      <PostQuizFeedback
-        slide={slide}
-        cfg={cfg}
-        picked={picked}
-        expired={expired}
-        participantId={participantId}
-        participantToken={participantToken}
-        presentationId={presentationId}
-      />
-    );
+    return <PreReveal cfg={cfg} picked={picked} expired={expired} />;
   }
 
   const remainingS = Math.max(0, Math.ceil(limit - elapsed));
@@ -77,7 +96,6 @@ export function KahootAudienceView({
               key={i}
               onClick={async () => {
                 setPicked(i);
-                if (typeof navigator !== "undefined" && "vibrate" in navigator) navigator.vibrate(50);
                 await submitResponse({
                   slideId: slide.id,
                   participantId,
@@ -107,24 +125,18 @@ export function KahootAudienceView({
   );
 }
 
-function PostQuizFeedback({
-  slide,
+// Pre-reveal "locked in" screen + post-reveal placeholder. The big
+// correct/wrong/skipped reveal lives in TakeoverLayer; we just need
+// something underneath so the slide area isn't visually empty.
+function PreReveal({
   cfg,
   picked,
   expired,
-  participantId,
-  participantToken,
-  presentationId,
 }: {
-  slide: Slide;
   cfg: QuizConfig;
   picked: number | null;
   expired: boolean;
-  participantId: string;
-  participantToken: string;
-  presentationId: string;
 }) {
-  // Pre-reveal "got it, hold tight" — they picked but timer hasn't fired yet.
   if (!expired && picked !== null) {
     const tile = TILES[picked];
     const pickedText = cfg.options[picked];
@@ -132,9 +144,9 @@ function PostQuizFeedback({
       <div className="flex flex-col items-center justify-center py-10">
         <div
           className="flex h-20 w-20 items-center justify-center rounded-full"
-          style={{ background: tile.color, color: "#fff" }}
+          style={{ background: tile?.color, color: "#fff" }}
         >
-          <tile.Icon className="h-10 w-10" />
+          {tile ? <tile.Icon className="h-10 w-10" /> : null}
         </div>
         <p className="mt-5 text-center text-sm uppercase tracking-[0.18em] muted-text">Your answer</p>
         <p className="mt-1 px-4 text-center text-xl font-semibold leading-snug">{pickedText}</p>
@@ -145,72 +157,9 @@ function PostQuizFeedback({
     );
   }
 
-  // Reveal screen: show correct/wrong feedback and the score card.
-  const isCorrect = picked !== null && picked === cfg.correct_index;
-  const didNotAnswer = picked === null;
-  const correctTile = TILES[cfg.correct_index];
-  const correctText = cfg.options[cfg.correct_index];
-  const pickedTile = picked !== null ? TILES[picked] : null;
-  const pickedText = picked !== null ? cfg.options[picked] : null;
-
   return (
-    <div className="flex flex-col items-center gap-5 py-6">
-      <RevealMedal correct={isCorrect} skipped={didNotAnswer} confetti={isCorrect} />
-
-      {/* Always surface the correct answer text + the audience's pick so they
-          know exactly what they got right or wrong, even if they tuned out
-          the host screen. */}
-      <div className="w-full max-w-sm space-y-2">
-        <div
-          className="flex items-center gap-3 rounded-xl p-3 text-white"
-          style={{ background: correctTile?.color ?? "#22c55e" }}
-        >
-          <span
-            className="flex h-8 w-8 flex-none items-center justify-center rounded-lg"
-            style={{ background: "rgba(255,255,255,0.22)" }}
-            aria-hidden
-          >
-            {correctTile ? <correctTile.Icon className="h-5 w-5" /> : null}
-          </span>
-          <div className="min-w-0 flex-1 leading-tight">
-            <p className="text-[10px] uppercase tracking-[0.18em] opacity-80">Correct answer</p>
-            <p className="text-sm font-semibold break-words">{correctText}</p>
-          </div>
-        </div>
-        {!didNotAnswer && !isCorrect && pickedTile && pickedText && (
-          <div
-            className="flex items-center gap-3 rounded-xl p-3"
-            style={{
-              background: "rgba(239,68,68,0.10)",
-              border: "1px solid rgba(239,68,68,0.35)",
-            }}
-          >
-            <span
-              className="flex h-8 w-8 flex-none items-center justify-center rounded-lg text-white"
-              style={{ background: pickedTile.color, opacity: 0.7 }}
-              aria-hidden
-            >
-              <pickedTile.Icon className="h-5 w-5" />
-            </span>
-            <div className="min-w-0 flex-1 leading-tight">
-              <p className="text-[10px] uppercase tracking-[0.18em]" style={{ color: "#dc2626" }}>
-                Your answer
-              </p>
-              <p className="text-sm font-medium break-words" style={{ color: "var(--ink, var(--fg))" }}>
-                {pickedText}
-              </p>
-            </div>
-          </div>
-        )}
-      </div>
-
-      <ScoreCard
-        presentationId={presentationId}
-        participantId={participantId}
-        participantToken={participantToken}
-        slideId={slide.id}
-        correct={isCorrect}
-      />
+    <div className="flex flex-col items-center gap-2 py-12 text-center">
+      <p className="text-sm muted-text">Reveal up — hold tight.</p>
     </div>
   );
 }
