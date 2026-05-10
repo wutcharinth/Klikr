@@ -47,61 +47,31 @@ export function KahootAudienceView({
     setPicked(null);
   }, [slide.id]);
 
-  // Reveal moment: timer expired. Fetch the latest leaderboard, derive rank
-  // and just-earned points, fire the takeover. Refs persist across consecutive
-  // quiz slides so we can render rank-delta and just-earned points.
+  // Reveal: fire takeover the instant `expired` flips, with optimistic points
+  // captured at tap-time (mirrors the score_quiz_slide formula). Avoids the
+  // race where the host force-ends a question — by the time `expired` flips
+  // server scoring has already run and any "wait for score change" approach
+  // sees no delta.
   const { trigger } = useTakeover();
   const prevRankRef = useRef<number | null>(null);
-  // Reveal: poll until our score actually changes — score_quiz_slide runs
-  // when the host advances, NOT when the local timer expires. Firing on
-  // expiry alone shows stale points (the previous question's value).
+  const earnedPointsRef = useRef<number>(0);
   useEffect(() => {
     if (!expired) return;
     let cancelled = false;
-    let baseline: number | null = null;
-    let attempts = 0;
-
-    const tick = async () => {
-      if (cancelled) return;
+    (async () => {
       const list = await getParticipantScores({ presentationId, participantId, participantToken });
       if (cancelled) return;
-
       const total = list.length;
       const rankNow = Math.max(1, list.findIndex((p) => p.id === participantId) + 1);
       const rankBefore = prevRankRef.current ?? total;
-      const me = list.find((p) => p.id === participantId);
-      const score = me?.score ?? 0;
-      if (baseline === null) baseline = score;
-      const delta = score - baseline;
+      prevRankRef.current = rankNow;
 
       const isCorrect = picked !== null && picked === cfg.correct_index;
       const didNotAnswer = picked === null;
-
-      if (didNotAnswer) {
-        prevRankRef.current = rankNow;
-        trigger({ kind: "quiz-skipped", rankNow, total });
-        return;
-      }
-      if (!isCorrect) {
-        prevRankRef.current = rankNow;
-        trigger({ kind: "quiz-wrong", rankNow, total });
-        return;
-      }
-      if (delta > 0) {
-        prevRankRef.current = rankNow;
-        trigger({ kind: "quiz-correct", points: delta, rankNow, rankBefore, total });
-        return;
-      }
-
-      attempts++;
-      if (attempts > 12) {
-        prevRankRef.current = rankNow;
-        trigger({ kind: "quiz-correct", points: 0, rankNow, rankBefore, total });
-        return;
-      }
-      setTimeout(tick, 1000);
-    };
-    tick();
+      if (didNotAnswer) trigger({ kind: "quiz-skipped", rankNow, total });
+      else if (isCorrect) trigger({ kind: "quiz-correct", points: earnedPointsRef.current, rankNow, rankBefore, total });
+      else trigger({ kind: "quiz-wrong", rankNow, total });
+    })();
     return () => { cancelled = true; };
   }, [expired, cfg.correct_index, participantId, participantToken, presentationId, picked, trigger]);
 
@@ -124,6 +94,13 @@ export function KahootAudienceView({
             <button
               key={i}
               onClick={async () => {
+                // Optimistic points captured at tap, mirroring server formula.
+                const limitMs = Math.max(1, cfg.time_limit_s ?? 20) * 1000;
+                const tapElapsed = Math.max(0, Math.min(limitMs, Date.now() - (startedAt ?? Date.now())));
+                const isCorrect = i === cfg.correct_index;
+                earnedPointsRef.current = isCorrect
+                  ? 500 + Math.max(0, Math.round(500 * (1 - tapElapsed / limitMs)))
+                  : 0;
                 setPicked(i);
                 await submitResponse({
                   slideId: slide.id,

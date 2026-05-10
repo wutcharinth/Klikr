@@ -560,60 +560,32 @@ function Quiz({
 
   const { trigger } = useTakeover();
   const prevRankRef = useRef<number | null>(null);
-  // Reveal moment: the audience's local timer just expired. score_quiz_slide
-  // hasn't run yet — that happens server-side when the host advances. So for
-  // correct picks we have to poll until our score actually changes; otherwise
-  // we'd fire "+0 pts" with stale data and the player sees the previous
-  // round's points on the next round's takeover.
+  // Optimistic points captured at tap-time. Mirrors the server's scoring
+  // formula in supabase/migrations/0024_quiz_scoring_fix.sql so we can show
+  // the player their points the instant the reveal starts — no waiting for
+  // the host to advance, no waiting for realtime to deliver the score.
+  const earnedPointsRef = useRef<number>(0);
   useEffect(() => {
     if (!expired) return;
     let cancelled = false;
-    let baseline: number | null = null;
-    let attempts = 0;
-
-    const tick = async () => {
-      if (cancelled) return;
+    (async () => {
       const list = await getParticipantScores({ presentationId, participantId, participantToken });
       if (cancelled) return;
-
       const total = list.length;
       const rankNow = Math.max(1, list.findIndex((p) => p.id === participantId) + 1);
       const rankBefore = prevRankRef.current ?? total;
-      const me = list.find((p) => p.id === participantId);
-      const score = me?.score ?? 0;
-      if (baseline === null) baseline = score;
-      const delta = score - baseline;
+      prevRankRef.current = rankNow;
 
       const isCorrect = picked !== null && picked === cfg.correct_index;
       const didNotAnswer = picked === null;
-
       if (didNotAnswer) {
-        prevRankRef.current = rankNow;
         trigger({ kind: "quiz-skipped", rankNow, total });
-        return;
-      }
-      if (!isCorrect) {
-        prevRankRef.current = rankNow;
+      } else if (isCorrect) {
+        trigger({ kind: "quiz-correct", points: earnedPointsRef.current, rankNow, rankBefore, total });
+      } else {
         trigger({ kind: "quiz-wrong", rankNow, total });
-        return;
       }
-      if (delta > 0) {
-        prevRankRef.current = rankNow;
-        trigger({ kind: "quiz-correct", points: delta, rankNow, rankBefore, total });
-        return;
-      }
-
-      attempts++;
-      if (attempts > 12) {
-        // Fallback — host hasn't advanced after 12s. Fire anyway so the
-        // player isn't stuck staring at a placeholder.
-        prevRankRef.current = rankNow;
-        trigger({ kind: "quiz-correct", points: 0, rankNow, rankBefore, total });
-        return;
-      }
-      setTimeout(tick, 1000);
-    };
-    tick();
+    })();
     return () => { cancelled = true; };
   }, [expired, cfg.correct_index, participantId, participantToken, presentationId, picked, trigger]);
 
@@ -663,6 +635,15 @@ function Quiz({
           key={i}
           disabled={picked !== null || expired}
           onClick={async () => {
+            // Capture optimistic points at tap-time, mirroring score_quiz_slide:
+            //   correct → 500 + max(0, round(500 * (1 - response_ms/limit_ms)))
+            //   wrong / skipped → 0
+            const limitMs = Math.max(1, cfg.time_limit_s) * 1000;
+            const tapElapsed = Math.max(0, Math.min(limitMs, Date.now() - (startedAt ?? Date.now())));
+            const isCorrect = i === cfg.correct_index;
+            earnedPointsRef.current = isCorrect
+              ? 500 + Math.max(0, Math.round(500 * (1 - tapElapsed / limitMs)))
+              : 0;
             setPicked(i);
             await submitResponse({
               slideId: slide.id,
