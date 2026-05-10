@@ -52,27 +52,56 @@ export function KahootAudienceView({
   // quiz slides so we can render rank-delta and just-earned points.
   const { trigger } = useTakeover();
   const prevRankRef = useRef<number | null>(null);
-  const prevScoreRef = useRef<number>(0);
+  // Reveal: poll until our score actually changes — score_quiz_slide runs
+  // when the host advances, NOT when the local timer expires. Firing on
+  // expiry alone shows stale points (the previous question's value).
   useEffect(() => {
     if (!expired) return;
     let cancelled = false;
-    (async () => {
+    let baseline: number | null = null;
+    let attempts = 0;
+
+    const tick = async () => {
+      if (cancelled) return;
       const list = await getParticipantScores({ presentationId, participantId, participantToken });
       if (cancelled) return;
+
       const total = list.length;
       const rankNow = Math.max(1, list.findIndex((p) => p.id === participantId) + 1);
       const rankBefore = prevRankRef.current ?? total;
-      prevRankRef.current = rankNow;
       const me = list.find((p) => p.id === participantId);
-      const cumulativeScore = me?.score ?? 0;
-      const justEarned = Math.max(0, cumulativeScore - prevScoreRef.current);
-      prevScoreRef.current = cumulativeScore;
+      const score = me?.score ?? 0;
+      if (baseline === null) baseline = score;
+      const delta = score - baseline;
+
       const isCorrect = picked !== null && picked === cfg.correct_index;
       const didNotAnswer = picked === null;
-      if (didNotAnswer) trigger({ kind: "quiz-skipped", rankNow, total });
-      else if (isCorrect) trigger({ kind: "quiz-correct", points: justEarned, rankNow, rankBefore, total });
-      else trigger({ kind: "quiz-wrong", rankNow, total });
-    })();
+
+      if (didNotAnswer) {
+        prevRankRef.current = rankNow;
+        trigger({ kind: "quiz-skipped", rankNow, total });
+        return;
+      }
+      if (!isCorrect) {
+        prevRankRef.current = rankNow;
+        trigger({ kind: "quiz-wrong", rankNow, total });
+        return;
+      }
+      if (delta > 0) {
+        prevRankRef.current = rankNow;
+        trigger({ kind: "quiz-correct", points: delta, rankNow, rankBefore, total });
+        return;
+      }
+
+      attempts++;
+      if (attempts > 12) {
+        prevRankRef.current = rankNow;
+        trigger({ kind: "quiz-correct", points: 0, rankNow, rankBefore, total });
+        return;
+      }
+      setTimeout(tick, 1000);
+    };
+    tick();
     return () => { cancelled = true; };
   }, [expired, cfg.correct_index, participantId, participantToken, presentationId, picked, trigger]);
 
