@@ -4,8 +4,8 @@ import { CheckCircle, XCircle, Clock } from "lucide-react";
 import { MiniConfettiBurst } from "../QuizFeedback";
 
 export function QuizCorrectVariant({
-  points, rankNow, rankBefore, total,
-}: { points: number; rankNow: number; rankBefore: number; total: number }) {
+  points, rankNow, rankBefore, total, streak,
+}: { points: number; rankNow: number; rankBefore: number; total: number; streak?: number }) {
   const delta = rankBefore - rankNow; // positive = climbed
   return (
     <div className="takeover-content">
@@ -18,17 +18,23 @@ export function QuizCorrectVariant({
       <div className="text-xs uppercase tracking-widest opacity-90">
         {delta > 0 ? `↑ from #${rankBefore}` : delta < 0 ? `↓ from #${rankBefore}` : `held #${rankNow}`} · of {total}
       </div>
+      {streak && streak >= 2 ? (
+        <div className="anim-pop mt-1 rounded-full bg-white/20 px-3 py-1 text-sm font-bold">
+          🔥 {streak} in a row!
+        </div>
+      ) : null}
     </div>
   );
 }
 
 export function QuizWrongVariant({
-  rankNow, total,
-}: { rankNow: number; total: number }) {
+  rankNow, total, correctText,
+}: { rankNow: number; total: number; correctText?: string }) {
   return (
     <div className="takeover-content shake-burst">
       <XCircle className="h-20 w-20" strokeWidth={2.4} />
       <div className="text-2xl font-bold">Not quite</div>
+      {correctText ? <CorrectAnswerLine text={correctText} /> : null}
       <div className="big-num-pop text-7xl font-extrabold leading-none">#{rankNow}</div>
       <div className="text-xs uppercase tracking-widest opacity-90">of {total}</div>
     </div>
@@ -36,14 +42,24 @@ export function QuizWrongVariant({
 }
 
 export function QuizSkippedVariant({
-  rankNow, total,
-}: { rankNow: number; total: number }) {
+  rankNow, total, correctText,
+}: { rankNow: number; total: number; correctText?: string }) {
   return (
     <div className="takeover-content">
       <Clock className="h-20 w-20" strokeWidth={2.4} />
       <div className="text-2xl font-bold">Time&apos;s up</div>
+      {correctText ? <CorrectAnswerLine text={correctText} /> : null}
       <div className="big-num-pop text-7xl font-extrabold leading-none">#{rankNow}</div>
       <div className="text-xs uppercase tracking-widest opacity-90">of {total}</div>
+    </div>
+  );
+}
+
+function CorrectAnswerLine({ text }: { text: string }) {
+  return (
+    <div className="max-w-[18rem] rounded-xl bg-white/15 px-4 py-2 text-center">
+      <span className="text-[10px] uppercase tracking-widest opacity-80">Answer</span>
+      <p className="text-lg font-semibold leading-snug break-words">{text}</p>
     </div>
   );
 }

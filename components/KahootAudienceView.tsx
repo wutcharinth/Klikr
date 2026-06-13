@@ -6,6 +6,7 @@ import type { Slide, QuizConfig } from "@/lib/types";
 import { submitResponse, getParticipantScores } from "@/app/play/[code]/actions";
 import { useTakeover } from "./audience/TakeoverContext";
 import { AudienceLeaderboard } from "./audience/AudienceLeaderboard";
+import { bumpStreak, resetStreak } from "@/lib/streak";
 
 const TILES = [
   { color: "#E21B3C", Icon: Triangle },
@@ -69,12 +70,20 @@ export function KahootAudienceView({
 
       const isCorrect = picked !== null && picked === cfg.correct_index;
       const didNotAnswer = picked === null;
-      if (didNotAnswer) trigger({ kind: "quiz-skipped", rankNow, total });
-      else if (isCorrect) trigger({ kind: "quiz-correct", points: earnedPointsRef.current, rankNow, rankBefore, total });
-      else trigger({ kind: "quiz-wrong", rankNow, total });
+      const correctText = cfg.options[cfg.correct_index];
+      if (didNotAnswer) {
+        resetStreak(presentationId);
+        trigger({ kind: "quiz-skipped", rankNow, total, correctText });
+      } else if (isCorrect) {
+        const streak = bumpStreak(presentationId);
+        trigger({ kind: "quiz-correct", points: earnedPointsRef.current, rankNow, rankBefore, total, streak });
+      } else {
+        resetStreak(presentationId);
+        trigger({ kind: "quiz-wrong", rankNow, total, correctText });
+      }
     })();
     return () => { cancelled = true; };
-  }, [expired, cfg.correct_index, participantId, participantToken, presentationId, picked, trigger]);
+  }, [expired, cfg.correct_index, cfg.options, participantId, participantToken, presentationId, picked, trigger]);
 
   if (expired) {
     return (
@@ -85,11 +94,12 @@ export function KahootAudienceView({
       />
     );
   }
+  const remainingS = Math.max(0, Math.ceil(limit - elapsed));
+
   if (picked !== null) {
-    return <PreReveal cfg={cfg} picked={picked} expired={expired} />;
+    return <PreReveal cfg={cfg} picked={picked} expired={expired} remainingS={remainingS} limit={limit} />;
   }
 
-  const remainingS = Math.max(0, Math.ceil(limit - elapsed));
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between text-xs muted-text">
@@ -148,10 +158,14 @@ function PreReveal({
   cfg,
   picked,
   expired,
+  remainingS,
+  limit,
 }: {
   cfg: QuizConfig;
   picked: number | null;
   expired: boolean;
+  remainingS?: number;
+  limit?: number;
 }) {
   if (!expired && picked !== null) {
     const tile = TILES[picked];
@@ -169,6 +183,9 @@ function PreReveal({
         <p className="mt-5 flex items-center gap-2 text-sm muted-text">
           <CheckCircle className="h-4 w-4" /> Locked in — hold tight for the result.
         </p>
+        {remainingS !== undefined && limit !== undefined ? (
+          <WaitCountdown remainingS={remainingS} limit={limit} />
+        ) : null}
       </div>
     );
   }
@@ -176,6 +193,31 @@ function PreReveal({
   return (
     <div className="flex flex-col items-center gap-2 py-12 text-center">
       <p className="text-sm muted-text">Reveal up — hold tight.</p>
+    </div>
+  );
+}
+
+// Shared live countdown shown on the "locked in" waiting screen so the player
+// keeps a sense of time while the timer runs down. Colour shifts
+// green → amber → red, matching the presenter-side urgency thresholds.
+export function WaitCountdown({ remainingS, limit }: { remainingS: number; limit: number }) {
+  const color =
+    remainingS > limit / 2 ? "#22c55e" : remainingS > limit / 4 ? "#eab308" : "#ef4444";
+  const pct = limit > 0 ? Math.max(0, Math.min(100, (remainingS / limit) * 100)) : 0;
+  return (
+    <div className="mt-6 w-full max-w-[16rem]">
+      <div className="flex items-baseline justify-between">
+        <span className="text-[10px] uppercase tracking-[0.18em] muted-text">Time left</span>
+        <span className="mono text-lg font-bold" style={{ color, fontVariantNumeric: "tabular-nums" }}>
+          {remainingS}s
+        </span>
+      </div>
+      <div className="mt-1.5 h-1.5 overflow-hidden rounded-full" style={{ background: "var(--line)" }}>
+        <div
+          className="h-full rounded-full"
+          style={{ width: `${pct}%`, background: color, transition: "width 200ms linear, background 400ms ease" }}
+        />
+      </div>
     </div>
   );
 }

@@ -4,13 +4,14 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import type { Presentation, Slide, MCQConfig, QuizConfig, WordCloudConfig, QAConfig, RatingConfig, RankingConfig, ResponseRow } from "@/lib/types";
 import { joinSession, submitResponse, sendReaction, toggleQuestionVote, submitQuestion, getParticipantScores } from "@/app/play/[code]/actions";
-import { KahootAudienceView } from "./KahootAudienceView";
+import { KahootAudienceView, WaitCountdown } from "./KahootAudienceView";
 import { AudienceFinalResults } from "./AudienceFinalResults";
 import { LogoMarkPlayer } from "./remotion/LogoMarkPlayer";
 import { TakeoverProvider, TakeoverSlideWatcher, useTakeover } from "./audience/TakeoverContext";
 import { TakeoverLayer } from "./audience/TakeoverLayer";
 import { AudienceLeaderboard } from "./audience/AudienceLeaderboard";
 import { isAudioOn, setAudioOn } from "@/lib/audio";
+import { bumpStreak, resetStreak } from "@/lib/streak";
 import { Volume2, VolumeX } from "lucide-react";
 
 type LocalParticipant = {
@@ -579,16 +580,20 @@ function Quiz({
 
       const isCorrect = picked !== null && picked === cfg.correct_index;
       const didNotAnswer = picked === null;
+      const correctText = cfg.options[cfg.correct_index];
       if (didNotAnswer) {
-        trigger({ kind: "quiz-skipped", rankNow, total });
+        resetStreak(presentationId);
+        trigger({ kind: "quiz-skipped", rankNow, total, correctText });
       } else if (isCorrect) {
-        trigger({ kind: "quiz-correct", points: earnedPointsRef.current, rankNow, rankBefore, total });
+        const streak = bumpStreak(presentationId);
+        trigger({ kind: "quiz-correct", points: earnedPointsRef.current, rankNow, rankBefore, total, streak });
       } else {
-        trigger({ kind: "quiz-wrong", rankNow, total });
+        resetStreak(presentationId);
+        trigger({ kind: "quiz-wrong", rankNow, total, correctText });
       }
     })();
     return () => { cancelled = true; };
-  }, [expired, cfg.correct_index, participantId, participantToken, presentationId, picked, trigger]);
+  }, [expired, cfg.correct_index, cfg.options, participantId, participantToken, presentationId, picked, trigger]);
 
   // Pre-reveal: locked-in confirmation while waiting for the timer to expire.
   if (picked !== null && !expired) {
@@ -598,6 +603,7 @@ function Quiz({
           <CheckBadge /> Locked in — submitted in {(elapsedMs / 1000).toFixed(1)}s
         </div>
         <p className="mt-3 text-sm muted-text">Hold tight for the result.</p>
+        <WaitCountdown remainingS={Math.ceil(remainingMs / 1000)} limit={cfg.time_limit_s} />
       </div>
     );
   }

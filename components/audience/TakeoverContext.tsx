@@ -3,9 +3,9 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 
 export type TakeoverPayload =
-  | { kind: "quiz-correct"; points: number; rankNow: number; rankBefore: number; total: number }
-  | { kind: "quiz-wrong"; rankNow: number; total: number }
-  | { kind: "quiz-skipped"; rankNow: number; total: number }
+  | { kind: "quiz-correct"; points: number; rankNow: number; rankBefore: number; total: number; streak?: number }
+  | { kind: "quiz-wrong"; rankNow: number; total: number; correctText?: string }
+  | { kind: "quiz-skipped"; rankNow: number; total: number; correctText?: string }
   | { kind: "submitted"; ordinal: number; total: number }
   | { kind: "toast"; text: string };
 
