@@ -112,13 +112,15 @@ test("Quiz reveal fires the correct takeover when the timer expires", async ({ p
      where id = $1`,
     [
       slideId,
-      JSON.stringify({ options: ["3", "4", "5"], correct_index: 1, time_limit_s: 2 }),
+      JSON.stringify({ options: ["3", "4", "5"], correct_index: 1, time_limit_s: 4 }),
     ],
   );
 
   try {
     await joinAndAdvance({ page, code, presentationId: seed.presentationId, slideId, nickname: "QuizBot" });
-    await page.getByRole("button", { name: /^4$/ }).click();
+    // Answer buttons render a letter prefix + the option, e.g. "B 4" — match the
+    // option text as a substring rather than the whole accessible name.
+    await page.getByRole("button", { name: "4" }).click();
     await expect(page.getByText(/locked in/i)).toBeVisible();
     // Timer expires after 2s — full takeover with the "correct" gradient.
     await expect(page.locator(".takeover-bg-correct")).toBeVisible({ timeout: 6_000 });
