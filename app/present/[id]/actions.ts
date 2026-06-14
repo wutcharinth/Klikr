@@ -47,7 +47,14 @@ export async function moveSlide(presentationId: string, direction: "next" | "pre
   if (nextIdx < 0 || nextIdx >= slides.length) return;
 
   if (direction === "next" && idx >= 0 && slides[idx].type === "quiz") {
-    await scoreQuizSlide(presentationId, slides[idx]);
+    // Scoring must never block navigation — if it throws (e.g. a malformed
+    // slide config), advance anyway. The slide is typically already scored at
+    // timer expiry, and the host must always be able to move on.
+    try {
+      await scoreQuizSlide(presentationId, slides[idx]);
+    } catch (err) {
+      console.error("scoreQuizSlide failed during moveSlide; advancing anyway", err);
+    }
   }
 
   const { error } = await supabase
@@ -74,7 +81,15 @@ export async function endPresentation(presentationId: string) {
       .eq("id", pres.current_slide_id)
       .single<Pick<Slide, "id" | "type" | "config" | "position">>();
     if (slide?.type === "quiz") {
-      await scoreQuizSlide(presentationId, slide);
+      // Ending must never be blocked by scoring — if the final-slide score RPC
+      // throws (e.g. a malformed slide config), close the session anyway. The
+      // host explicitly chose to end; the final slide is usually already scored
+      // at timer expiry.
+      try {
+        await scoreQuizSlide(presentationId, slide);
+      } catch (err) {
+        console.error("scoreQuizSlide failed during endPresentation; closing anyway", err);
+      }
     }
   }
   const { error } = await supabase
