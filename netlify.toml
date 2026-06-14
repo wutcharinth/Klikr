@@ -1,8 +1,10 @@
-# Netlify build config. The Next.js runtime is auto-detected, so we only set the
-# build environment here. `next build` succeeds locally and via `netlify build`
-# (and the app deploys fine that way), but Netlify's cloud builder failed with a
-# generic "exit code 2" during "building site" — the classic signature of an
-# out-of-memory kill on a large Next + Remotion build. Raise Node's heap so the
-# cloud build has headroom. Node version comes from .nvmrc (22).
+# Netlify build config (the Next.js runtime is auto-detected).
+#
+# The site has NODE_ENV=production set as an env var, which makes Netlify's
+# `npm ci` skip devDependencies. But this app's build tooling — typescript,
+# tailwindcss, postcss, autoprefixer, eslint, @types/* — lives in
+# devDependencies, so `next build` failed in the cloud with exit code 2 while
+# succeeding locally (local reused a node_modules that already had the dev
+# deps). Force dev deps to install so the production build has its tooling.
 [build.environment]
-  NODE_OPTIONS = "--max-old-space-size=4096"
+  NPM_FLAGS = "--include=dev"
