@@ -1,0 +1,8 @@
+# Netlify build config. The Next.js runtime is auto-detected, so we only set the
+# build environment here. `next build` succeeds locally and via `netlify build`
+# (and the app deploys fine that way), but Netlify's cloud builder failed with a
+# generic "exit code 2" during "building site" — the classic signature of an
+# out-of-memory kill on a large Next + Remotion build. Raise Node's heap so the
+# cloud build has headroom. Node version comes from .nvmrc (22).
+[build.environment]
+  NODE_OPTIONS = "--max-old-space-size=4096"
