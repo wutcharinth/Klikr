@@ -10,7 +10,7 @@ jobs:
   playwright:
     name: Playwright (${{ matrix.project }})
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     # Skip the job when secrets aren't configured. Add POSTGRES_URL,
     # SUPABASE_SERVICE_ROLE_KEY, NEXT_PUBLIC_SUPABASE_URL, and
     # NEXT_PUBLIC_SUPABASE_ANON_KEY to repo secrets to enable.
@@ -31,7 +31,19 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
-      - run: npx playwright install --with-deps chromium
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+          restore-keys: |
+            playwright-${{ runner.os }}-
+      # System deps first (apt), then browsers. Bounded so a stalled CDN fetch
+      # fails in minutes instead of eating the whole job timeout.
+      - run: npx playwright install-deps chromium
+        timeout-minutes: 6
+      - run: npx playwright install chromium
+        timeout-minutes: 8
       - run: npx playwright test --project=${{ matrix.project }}
       - if: failure()
         uses: actions/upload-artifact@v4
