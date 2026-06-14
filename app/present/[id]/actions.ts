@@ -86,22 +86,29 @@ export async function endPresentation(presentationId: string) {
 
 export async function scoreActiveQuizSlide(presentationId: string, slideId: string, options?: { force?: boolean }) {
   const supabase = await createClient();
-  const { data, error } = await supabase
+  // Separate lookups, NOT a `slides!inner` embed: presentations<->slides has
+  // two FKs (slides.presentation_id and presentations.current_slide_id), so the
+  // embed is ambiguous and errors with PGRST201. That error was thrown and
+  // swallowed by the caller, so expiry-scoring silently failed and scores only
+  // landed at moveSlide — i.e. one question behind.
+  const { data: pres, error } = await supabase
     .from("presentations")
-    .select("id, state, current_slide_id, current_slide_started_at, slides!inner(id, type, config)")
+    .select("state, current_slide_id")
     .eq("id", presentationId)
-    .eq("slides.id", slideId)
     .maybeSingle();
   if (error) throw error;
-  if (!data || data.state !== "active" || data.current_slide_id !== slideId) return;
+  if (!pres || pres.state !== "active" || pres.current_slide_id !== slideId) return;
 
-  const joined = data.slides as unknown as Pick<Slide, "id" | "type" | "config"> | Pick<Slide, "id" | "type" | "config">[] | null;
-  const slide = Array.isArray(joined) ? joined[0] : joined;
+  const { data: slideRow } = await supabase
+    .from("slides")
+    .select("id, type, config")
+    .eq("id", slideId)
+    .maybeSingle();
+  const slide = (slideRow ?? null) as Pick<Slide, "id" | "type" | "config"> | null;
   if (!slide || slide.type !== "quiz") return;
 
   const cfg = slide.config as { time_limit_s?: number };
   const limitMs = Math.max(1, cfg.time_limit_s ?? 20) * 1000;
-  const startedAt = data.current_slide_started_at ? new Date(data.current_slide_started_at).getTime() : 0;
   
   // Trust the host's client. If they call this (even without force), 
   // their timer has expired. This prevents clock drift from breaking scoring.

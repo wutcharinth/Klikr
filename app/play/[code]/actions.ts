@@ -254,7 +254,7 @@ export async function setQuestionStatus(input: {
   // Verify the user owns the presentation this response belongs to.
   const { data: row } = await supabase
     .from("responses")
-    .select("id, slides!inner(presentation_id, presentations!inner(owner_id))")
+    .select("id, slides!inner(presentation_id, presentations!slides_presentation_id_fkey(owner_id))")
     .eq("id", input.responseId)
     .maybeSingle();
   type Joined = { slides: { presentations: { owner_id: string } | { owner_id: string }[] } | { presentations: { owner_id: string } | { owner_id: string }[] }[] };
