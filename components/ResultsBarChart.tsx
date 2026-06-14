@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { Slide, ResponseRow, MCQConfig, QuizConfig } from "@/lib/types";
 
 export function ResultsBarChart({
@@ -107,21 +107,28 @@ export function QuizCountdown({
   const cfg = slide.config as QuizConfig;
   const limit = cfg.time_limit_s ?? 20;
   const start = startedAt ? new Date(startedAt).getTime() : Date.now();
-  const [now, setNow] = useState(() => Date.now());
-
-  useEffect(() => {
-    const id = setInterval(() => setNow(Date.now()), 100);
-    return () => clearInterval(id);
-  }, []);
-
-  const elapsed = Math.max(0, (now - start) / 1000);
-  const remaining = Math.max(0, limit - elapsed);
-  const expired = remaining <= 0;
   const total = responses.length;
 
+  // One-shot expiry timer so the options list isn't re-rendered every 100ms;
+  // only the small countdown pill (CountdownPill) ticks.
+  const onExpiredRef = useRef(onExpired);
   useEffect(() => {
-    if (expired) onExpired?.();
-  }, [expired, onExpired]);
+    onExpiredRef.current = onExpired;
+  });
+  const [expired, setExpired] = useState(() => (Date.now() - start) / 1000 >= limit);
+  useEffect(() => {
+    const remainingMs = Math.max(0, limit * 1000 - (Date.now() - start));
+    if (remainingMs <= 0) {
+      setExpired(true);
+      onExpiredRef.current?.();
+      return;
+    }
+    const id = setTimeout(() => {
+      setExpired(true);
+      onExpiredRef.current?.();
+    }, remainingMs);
+    return () => clearTimeout(id);
+  }, [start, limit]);
 
   if (expired) {
     return (
@@ -145,9 +152,6 @@ export function QuizCountdown({
     );
   }
 
-  const ringColor =
-    remaining > limit / 2 ? "#22c55e" : remaining > limit / 4 ? "#eab308" : "#ef4444";
-
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="flex items-center justify-between">
@@ -155,16 +159,7 @@ export function QuizCountdown({
           <span style={{ color: "var(--ink, var(--fg))" }}>{total}</span>{" "}
           {total === 1 ? "answer" : "answers"} in
         </p>
-        <div
-          className="mono inline-flex items-baseline gap-1 rounded-full px-3 py-1 text-sm"
-          style={{
-            background: `${ringColor}1a`,
-            color: ringColor,
-            border: `1px solid ${ringColor}40`,
-          }}
-        >
-          <span className="text-xl font-bold">{Math.ceil(remaining)}</span>s
-        </div>
+        <CountdownPill start={start} limit={limit} />
       </div>
       <ul className="mt-6 grid flex-1 grid-cols-1 gap-3 sm:grid-cols-2">
         {cfg.options.map((opt, i) => (
@@ -186,6 +181,31 @@ export function QuizCountdown({
           </li>
         ))}
       </ul>
+    </div>
+  );
+}
+
+// Ticking countdown pill, isolated so the options list above doesn't re-render
+// every 100ms while the clock runs. Mounted only during the live countdown.
+function CountdownPill({ start, limit }: { start: number; limit: number }) {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 100);
+    return () => clearInterval(id);
+  }, []);
+  const remaining = Math.max(0, limit - Math.max(0, (now - start) / 1000));
+  const ringColor =
+    remaining > limit / 2 ? "#22c55e" : remaining > limit / 4 ? "#eab308" : "#ef4444";
+  return (
+    <div
+      className="mono inline-flex items-baseline gap-1 rounded-full px-3 py-1 text-sm"
+      style={{
+        background: `${ringColor}1a`,
+        color: ringColor,
+        border: `1px solid ${ringColor}40`,
+      }}
+    >
+      <span className="text-xl font-bold">{Math.ceil(remaining)}</span>s
     </div>
   );
 }

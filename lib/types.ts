@@ -98,6 +98,10 @@ export type Presentation = {
   theme?: Theme;
   is_template?: boolean;
   source_template_id?: string | null;
+  // Monotonic counter bumped whenever a quiz slide is scored. The audience
+  // subscribes to this row via Realtime and refetches scores when it changes,
+  // so totals update during the same question's reveal (not one question late).
+  scored_rev?: number;
 };
 
 export type Participant = {

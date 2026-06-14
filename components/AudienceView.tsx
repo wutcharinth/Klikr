@@ -2,14 +2,14 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import type { Presentation, Slide, MCQConfig, QuizConfig, WordCloudConfig, QAConfig, RatingConfig, RankingConfig, ResponseRow } from "@/lib/types";
+import type { Presentation, Slide, MCQConfig, QuizConfig, WordCloudConfig, QAConfig, RatingConfig, RankingConfig, ResponseRow, Participant } from "@/lib/types";
 import { joinSession, submitResponse, sendReaction, toggleQuestionVote, submitQuestion, getParticipantScores } from "@/app/play/[code]/actions";
 import { KahootAudienceView, WaitCountdown } from "./KahootAudienceView";
 import { AudienceFinalResults } from "./AudienceFinalResults";
 import { LogoMarkPlayer } from "./remotion/LogoMarkPlayer";
 import { TakeoverProvider, TakeoverSlideWatcher, useTakeover } from "./audience/TakeoverContext";
 import { TakeoverLayer } from "./audience/TakeoverLayer";
-import { AudienceLeaderboard } from "./audience/AudienceLeaderboard";
+import { StagedLeaderboard } from "./audience/AudienceLeaderboard";
 import { isAudioOn, setAudioOn } from "@/lib/audio";
 import { bumpStreak, resetStreak } from "@/lib/streak";
 import { Volume2, VolumeX } from "lucide-react";
@@ -136,11 +136,29 @@ export function AudienceView({
   const slideStartedAt = presentation.current_slide_started_at
     ? new Date(presentation.current_slide_started_at).getTime()
     : null;
+  const hasQuiz = slides.some((s) => s.type === "quiz");
+  // The only moment a score changes is when the current quiz slide is scored —
+  // at its timer expiry. Hand the pill that timestamp so it can refetch then
+  // instead of polling the whole game.
+  const quizExpiresAt =
+    currentSlide.type === "quiz" && slideStartedAt != null
+      ? slideStartedAt + ((currentSlide.config as QuizConfig).time_limit_s ?? 20) * 1000
+      : null;
 
   return (
     <TakeoverProvider>
       <TakeoverSlideWatcher slideId={presentation.current_slide_id} />
       <Stage>
+        {hasQuiz ? (
+          <MyScorePill
+            presentationId={presentation.id}
+            participantId={participant.id}
+            participantToken={participant.participantToken}
+            scoredRev={presentation.scored_rev ?? 0}
+            slideId={presentation.current_slide_id}
+            quizExpiresAt={quizExpiresAt}
+          />
+        ) : null}
         {!connected ? (
           <div
             className="anim-fade-up mb-4 flex items-center gap-2 rounded-full px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.16em]"
@@ -193,6 +211,7 @@ export function AudienceView({
                   participantToken={participant.participantToken}
                   presentationId={presentation.id}
                   startedAt={slideStartedAt}
+                  scoredRev={presentation.scored_rev ?? 0}
                 />
               ) : (
                 <Quiz
@@ -201,6 +220,7 @@ export function AudienceView({
                   participantToken={participant.participantToken}
                   presentationId={presentation.id}
                   startedAt={slideStartedAt}
+                  scoredRev={presentation.scored_rev ?? 0}
                 />
               )
             ) : null}
@@ -258,6 +278,82 @@ function Stage({ children }: { children: React.ReactNode }) {
       <h1 className="mb-6 text-xs font-semibold uppercase tracking-[0.2em]" style={{ color: "var(--blue)" }}>Klikr</h1>
       <div className="panel p-6">{children}</div>
     </main>
+  );
+}
+
+// Always-on personal score for the player's phone — visible across every slide
+// of a quiz deck, so each player sees their own running total at a glance
+// instead of only glimpsing it on the post-reveal leaderboard. A score only
+// changes when a quiz slide is scored, so this refetches on the scored_rev
+// signal (instant; migration 0026), on every slide change, and in a short
+// burst around the current quiz's expiry — never on a constant poll.
+function MyScorePill({
+  presentationId,
+  participantId,
+  participantToken,
+  scoredRev,
+  slideId,
+  quizExpiresAt,
+}: {
+  presentationId: string;
+  participantId: string;
+  participantToken: string;
+  scoredRev: number;
+  slideId: string | null;
+  quizExpiresAt: number | null;
+}) {
+  const [me, setMe] = useState<{ score: number; rank: number; total: number } | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    const fetchMine = async () => {
+      let list: Participant[];
+      try {
+        list = await getParticipantScores({ presentationId, participantId, participantToken });
+      } catch {
+        return; // keep last known score rather than blanking
+      }
+      if (cancelled) return;
+      const idx = list.findIndex((p) => p.id === participantId);
+      if (idx === -1) return;
+      setMe({ score: list[idx].score, rank: idx + 1, total: list.length });
+    };
+    // Refresh once on mount / slide change / scored_rev signal. (Slide change
+    // also catches a score applied when the host advanced off the prior quiz.)
+    fetchMine();
+    // The host scores ~0–1s after the quiz timer expires. Without the realtime
+    // scored_rev signal we fire a short burst around that moment to catch the
+    // new total — then stop. No constant polling: the score can't change again
+    // until the next quiz is scored (which re-runs this effect via the deps).
+    let burst: ReturnType<typeof setTimeout>[] = [];
+    if (quizExpiresAt != null) {
+      const base = Math.max(0, quizExpiresAt - Date.now());
+      burst = [0, 500, 1200, 2200, 3500].map((off) => setTimeout(fetchMine, base + off));
+    }
+    return () => {
+      cancelled = true;
+      burst.forEach(clearTimeout);
+    };
+  }, [presentationId, participantId, participantToken, scoredRev, slideId, quizExpiresAt]);
+
+  if (!me) return null;
+  return (
+    <div
+      className="anim-fade-up sticky top-2 z-10 mb-4 flex items-center justify-between gap-3 rounded-full px-4 py-2 text-white shadow-sm"
+      style={{ background: "linear-gradient(135deg, var(--blue), #00C2FF)" }}
+      aria-live="polite"
+    >
+      <span className="text-[10px] font-semibold uppercase tracking-[0.16em] opacity-90">Your score</span>
+      <span className="flex items-baseline gap-2">
+        <span
+          key={me.score}
+          className="count-bump text-lg font-bold"
+          style={{ fontVariantNumeric: "tabular-nums" }}
+        >
+          {me.score.toLocaleString()}
+        </span>
+        {me.total > 1 ? <span className="text-[11px] font-medium opacity-90">#{me.rank}</span> : null}
+      </span>
+    </div>
   );
 }
 
@@ -536,12 +632,14 @@ function Quiz({
   participantToken,
   presentationId,
   startedAt,
+  scoredRev,
 }: {
   slide: Slide;
   participantId: string;
   participantToken: string;
   presentationId: string;
   startedAt: number | null;
+  scoredRev: number;
 }) {
   const cfg = slide.config as QuizConfig;
   const [picked, setPicked] = useState<number | null>(null);
@@ -613,10 +711,11 @@ function Quiz({
   // host advances. Polls so rank changes animate as other players finish.
   if (expired) {
     return (
-      <AudienceLeaderboard
+      <StagedLeaderboard
         presentationId={presentationId}
         participantId={participantId}
         participantToken={participantToken}
+        scoredRev={scoredRev}
       />
     );
   }

@@ -5,7 +5,7 @@ import { Triangle, Diamond, Circle, Square, CheckCircle } from "lucide-react";
 import type { Slide, QuizConfig } from "@/lib/types";
 import { submitResponse, getParticipantScores } from "@/app/play/[code]/actions";
 import { useTakeover } from "./audience/TakeoverContext";
-import { AudienceLeaderboard } from "./audience/AudienceLeaderboard";
+import { StagedLeaderboard } from "./audience/AudienceLeaderboard";
 import { bumpStreak, resetStreak } from "@/lib/streak";
 
 const TILES = [
@@ -21,12 +21,14 @@ export function KahootAudienceView({
   participantToken,
   presentationId,
   startedAt,
+  scoredRev,
 }: {
   slide: Slide;
   participantId: string;
   participantToken: string;
   presentationId: string;
   startedAt: number | null;
+  scoredRev: number;
 }) {
   const cfg = slide.config as QuizConfig;
   const [picked, setPicked] = useState<number | null>(null);
@@ -87,10 +89,11 @@ export function KahootAudienceView({
 
   if (expired) {
     return (
-      <AudienceLeaderboard
+      <StagedLeaderboard
         presentationId={presentationId}
         participantId={participantId}
         participantToken={participantToken}
+        scoredRev={scoredRev}
       />
     );
   }

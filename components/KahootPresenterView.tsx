@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Triangle, Diamond, Circle, Square } from "lucide-react";
 import type { Slide, ResponseRow, QuizConfig } from "@/lib/types";
 
@@ -27,20 +27,29 @@ export function KahootPresenterView({
   const limit = cfg.time_limit_s ?? 20;
 
   const start = startedAt ? new Date(startedAt).getTime() : Date.now();
-  const [now, setNow] = useState(Date.now());
-  useEffect(() => {
-    const id = setInterval(() => setNow(Date.now()), 100);
-    return () => clearInterval(id);
-  }, []);
-  const elapsed = Math.max(0, (now - start) / 1000);
-  const remaining = Math.max(0, limit - elapsed);
-  const progress = Math.min(1, elapsed / limit);
-  const expired = remaining <= 0;
-  const ringColor = remaining > limit / 2 ? "#26890C" : remaining > limit / 4 ? "#FFA602" : "#E21B3C";
 
+  // Expiry is a single one-shot timer rather than a per-tick poll, so this
+  // large component (4 big tiles + confetti) re-renders only when the answer
+  // is revealed — not 10×/sec. The smooth countdown visuals live in leaf
+  // components (QuizTimerRing / QuizUrgencyBar) whose re-renders stay local.
+  const onExpiredRef = useRef(onExpired);
   useEffect(() => {
-    if (expired) onExpired?.();
-  }, [expired, onExpired]);
+    onExpiredRef.current = onExpired;
+  });
+  const [expired, setExpired] = useState(() => (Date.now() - start) / 1000 >= limit);
+  useEffect(() => {
+    const remainingMs = Math.max(0, limit * 1000 - (Date.now() - start));
+    if (remainingMs <= 0) {
+      setExpired(true);
+      onExpiredRef.current?.();
+      return;
+    }
+    const id = setTimeout(() => {
+      setExpired(true);
+      onExpiredRef.current?.();
+    }, remainingMs);
+    return () => clearTimeout(id);
+  }, [start, limit]);
 
   const counts = opts.map((_, i) => responses.filter((r) => r.value_index === i).length);
   const total = counts.reduce((a, b) => a + b, 0);
@@ -55,24 +64,13 @@ export function KahootPresenterView({
           </h2>
         </div>
         <div className="flex flex-none items-center gap-3">
-          <TimerRing remaining={remaining} progress={progress} color={ringColor} expired={expired} />
+          <QuizTimerRing start={start} limit={limit} expired={expired} />
         </div>
       </div>
 
       {/* Full-width urgency bar — visible from the back of the room as time
           runs down; colour tracks the timer ring (green → amber → red). */}
-      {!expired && (
-        <div className="h-3 overflow-hidden rounded-full" style={{ background: "var(--line)" }}>
-          <div
-            className="h-full rounded-full"
-            style={{
-              width: `${Math.max(0, (1 - progress) * 100)}%`,
-              background: ringColor,
-              transition: "width 0.2s linear, background 0.5s ease",
-            }}
-          />
-        </div>
-      )}
+      {!expired && <QuizUrgencyBar start={start} limit={limit} />}
 
       {slide.image_url && (
         <div>
@@ -255,10 +253,33 @@ function ConfettiBurst() {
   );
 }
 
-function TimerRing({ remaining, progress, color, expired }: { remaining: number; progress: number; color: string; expired: boolean }) {
+// Kahoot urgency palette: green → amber → red as the clock runs down.
+function urgencyColor(remaining: number, limit: number) {
+  return remaining > limit / 2 ? "#26890C" : remaining > limit / 4 ? "#FFA602" : "#E21B3C";
+}
+
+// Self-contained countdown clock. Owns its own ~100ms tick so only the leaf
+// re-renders each frame, not the heavy parent. Stops ticking once `active` is
+// false (the question has expired).
+function useCountdown(start: number, limit: number, active: boolean) {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    if (!active) return;
+    const id = setInterval(() => setNow(Date.now()), 100);
+    return () => clearInterval(id);
+  }, [active]);
+  const elapsed = Math.max(0, (now - start) / 1000);
+  const remaining = Math.max(0, limit - elapsed);
+  const progress = Math.min(1, elapsed / limit);
+  return { remaining, progress };
+}
+
+function QuizTimerRing({ start, limit, expired }: { start: number; limit: number; expired: boolean }) {
+  const { remaining, progress } = useCountdown(start, limit, !expired);
   const r = 70;
   const size = 176;
   const c = 2 * Math.PI * r;
+  const color = urgencyColor(remaining, limit);
   return (
     <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
       <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="var(--line)" strokeWidth={12} />
@@ -271,7 +292,7 @@ function TimerRing({ remaining, progress, color, expired }: { remaining: number;
         strokeWidth={12}
         strokeLinecap="round"
         strokeDasharray={c}
-        strokeDashoffset={c * progress}
+        strokeDashoffset={expired ? c : c * progress}
         transform={`rotate(-90 ${size / 2} ${size / 2})`}
         style={{ transition: "stroke-dashoffset 0.2s linear, stroke 0.5s ease" }}
       />
@@ -279,5 +300,21 @@ function TimerRing({ remaining, progress, color, expired }: { remaining: number;
         {expired ? "✓" : Math.ceil(remaining)}
       </text>
     </svg>
+  );
+}
+
+function QuizUrgencyBar({ start, limit }: { start: number; limit: number }) {
+  const { remaining, progress } = useCountdown(start, limit, true);
+  return (
+    <div className="h-3 overflow-hidden rounded-full" style={{ background: "var(--line)" }}>
+      <div
+        className="h-full rounded-full"
+        style={{
+          width: `${Math.max(0, (1 - progress) * 100)}%`,
+          background: urgencyColor(remaining, limit),
+          transition: "width 0.2s linear, background 0.5s ease",
+        }}
+      />
+    </div>
   );
 }

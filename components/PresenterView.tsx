@@ -169,16 +169,18 @@ export function PresenterView({
   const loadParticipants = useCallback(() => {
     return supabase
       .from("participants")
-      .select("*")
+      .select("id, presentation_id, nickname, score, created_at")
       .eq("presentation_id", presentation.id)
       .order("score", { ascending: false })
       .order("created_at", { ascending: true })
+      .returns<Participant[]>()
       .then(({ data }) => {
         if (data) setParticipants(data);
       });
   }, [supabase, presentation.id]);
 
   useEffect(() => {
+    let realtimeOk = false;
     const channel = supabase
       .channel(`pres-${presentation.id}`)
       .on(
@@ -207,18 +209,31 @@ export function PresenterView({
           setParticipants((prev) => prev.map(p => p.id === fresh.id ? fresh : p));
         },
       )
-      .subscribe();
+      .subscribe((status) => {
+        realtimeOk = status === "SUBSCRIBED";
+      });
     
-    // Fallback polling: if Railway's websockets drop, this guarantees
-    // the host UI still updates instantly.
+    // Initial load for instant first paint. After that realtime keeps the
+    // roster fresh; the interval only fetches while the websocket is down
+    // (Railway can drop it), so a healthy session has no 2s re-render churn.
     loadParticipants();
-    const pollInterval = setInterval(loadParticipants, 2000);
+    const pollInterval = setInterval(() => {
+      if (!realtimeOk) loadParticipants();
+    }, 5000);
     
     return () => {
       clearInterval(pollInterval);
       supabase.removeChannel(channel);
     };
   }, [supabase, presentation.id, loadParticipants]);
+
+  // Refetch the roster the instant any quiz slide is scored. The host already
+  // reloads on its own timer-expiry and gets participant realtime, but this
+  // also covers the moveSlide / endPresentation scoring paths (and flaky
+  // realtime) by reacting to the scored_rev bump on the presentations row.
+  useEffect(() => {
+    loadParticipants();
+  }, [presentation.scored_rev, loadParticipants]);
 
   useEffect(() => {
     setLeaderboardSlideId(null);
@@ -230,6 +245,7 @@ export function PresenterView({
       return;
     }
     let cancelled = false;
+    let realtimeOk = false;
     supabase
       .from("responses")
       .select("*")
@@ -254,10 +270,15 @@ export function PresenterView({
           }
         },
       )
-      .subscribe();
+      .subscribe((status) => {
+        realtimeOk = status === "SUBSCRIBED";
+      });
       
-    // Fallback polling for responses too (Word Cloud, Polls, etc)
+    // Fallback polling for responses too (Word Cloud, Polls, etc) — only while
+    // the websocket is down, so a healthy session re-renders on real changes
+    // rather than every 2s.
     const pollResponses = () => {
+      if (realtimeOk) return;
       supabase
         .from("responses")
         .select("*")
@@ -266,7 +287,7 @@ export function PresenterView({
           if (!cancelled && data) setResponses(data);
         });
     };
-    const pollInterval = setInterval(pollResponses, 2000);
+    const pollInterval = setInterval(pollResponses, 5000);
     
     return () => {
       cancelled = true;

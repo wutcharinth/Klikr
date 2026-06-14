@@ -6,7 +6,12 @@ import { getParticipantScores } from "@/app/play/[code]/actions";
 import { LeaderboardRows, annotateRanks, type LbRow } from "../LeaderboardRows";
 
 const TOP_N = 5;
-const POLL_MS = 1500;
+// How long to hold the "calculating scores…" beat before showing the board
+// anyway, if the scored_rev confirmation never arrives (e.g. migration 0026 not
+// applied). Tuned to sit just under the reveal/takeover (~1.8s) so the board is
+// ready as the takeover lifts — seamless — while still giving the host's score
+// write (~0.5–1s after time's up) time to land. With the signal it's instant.
+const STAGING_MS = 1500;
 
 type AnnotatedRow = Participant & { rank: number; delta: number; hadPrev: boolean };
 
@@ -14,10 +19,15 @@ export function AudienceLeaderboard({
   presentationId,
   participantId,
   participantToken,
+  scoredRev,
 }: {
   presentationId: string;
   participantId: string;
   participantToken: string;
+  // Bumped by the host (via the presentations row) whenever a quiz slide is
+  // scored. Used as a refetch trigger so the board reflects the new totals the
+  // instant scoring lands, instead of waiting up to POLL_MS for the next poll.
+  scoredRev: number;
 }) {
   const [rows, setRows] = useState<AnnotatedRow[]>([]);
   const prevRankRef = useRef<Record<string, number>>({});
@@ -35,12 +45,18 @@ export function AudienceLeaderboard({
       setRows(annotateRanks(data, prevRankRef.current));
     };
     fetchAll();
-    const t = setInterval(fetchAll, POLL_MS);
+    // The board only mounts once this round is scored (see StagedLeaderboard),
+    // so the mount fetch already reflects the new totals. The short burst is
+    // just resilience for clock skew (board revealed a beat before scoring
+    // landed); after that the scores are final until the next slide, so we
+    // stop — no idle polling. scored_rev re-runs this effect if the realtime
+    // signal arrives later.
+    const burst = [400, 1000, 2000].map((d) => setTimeout(fetchAll, d));
     return () => {
       cancelled = true;
-      clearInterval(t);
+      burst.forEach(clearTimeout);
     };
-  }, [presentationId, participantId, participantToken]);
+  }, [presentationId, participantId, participantToken, scoredRev]);
 
   const me = rows.find((r) => r.id === participantId) ?? null;
   const total = rows.length;
@@ -65,6 +81,56 @@ export function AudienceLeaderboard({
         </div>
       ) : null}
     </div>
+  );
+}
+
+// Staging gate: don't show the scoreboard until THIS round has actually been
+// scored, so it never flashes the previous round's totals. "Scored" = the
+// scored_rev signal bumped past its value when the reveal began (migration
+// 0026 → instant), or STAGING_MS elapsed as the migration-free fallback. This
+// is the deliberate "calculating scores…" beat between the answer reveal and
+// the scoreboard, mirroring Kahoot.
+export function StagedLeaderboard({
+  presentationId,
+  participantId,
+  participantToken,
+  scoredRev,
+}: {
+  presentationId: string;
+  participantId: string;
+  participantToken: string;
+  scoredRev: number;
+}) {
+  const baselineRev = useRef(scoredRev);
+  const [ready, setReady] = useState(false);
+  useEffect(() => {
+    if (scoredRev > baselineRev.current) {
+      setReady(true);
+      return;
+    }
+    const t = setTimeout(() => setReady(true), STAGING_MS);
+    return () => clearTimeout(t);
+  }, [scoredRev]);
+
+  if (!ready) {
+    return (
+      <div className="anim-fade-up flex flex-col items-center justify-center gap-4 py-16 text-center">
+        <div
+          className="h-9 w-9 animate-spin rounded-full border-2"
+          style={{ borderColor: "var(--line)", borderTopColor: "var(--blue)" }}
+          aria-hidden
+        />
+        <p className="text-sm font-medium muted-text">Calculating scores…</p>
+      </div>
+    );
+  }
+  return (
+    <AudienceLeaderboard
+      presentationId={presentationId}
+      participantId={participantId}
+      participantToken={participantToken}
+      scoredRev={scoredRev}
+    />
   );
 }
 

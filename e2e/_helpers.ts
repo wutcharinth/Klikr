@@ -207,6 +207,17 @@ export async function getParticipant(participantId: string) {
   return rows[0] ?? null;
 }
 
+// The audience refetches its leaderboard whenever this counter changes, so a
+// real scoring must bump it (and an idempotent re-score must not).
+export async function getScoredRev(presentationId: string) {
+  const c = await db();
+  const { rows } = await c.query(
+    `select scored_rev from presentations where id = $1`,
+    [presentationId],
+  );
+  return (rows[0]?.scored_rev ?? 0) as number;
+}
+
 export async function teardown(presentationId: string, ownerEmail: string) {
   // Cleanup is best-effort: if the pooled connection was reaped, reconnect once
   // and retry, but never let a cleanup failure fail an otherwise-passing test.

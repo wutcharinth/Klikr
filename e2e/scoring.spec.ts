@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { closeDb, db, getParticipant, scoreSlideAsOwner, seedQuizSession, startSlide, teardown } from "./_helpers";
+import { closeDb, db, getParticipant, getScoredRev, scoreSlideAsOwner, seedQuizSession, startSlide, teardown } from "./_helpers";
 
 // DB-level QA of the score_quiz_slide RPC. Verifies the bug we fixed: a
 // correct answer must net non-zero points, even when response_ms is null
@@ -164,6 +164,50 @@ test("scoring: idempotent — scoring twice does not double-count", async () => 
 
     expect(first.score).toBeGreaterThan(0);
     expect(second.score).toBe(first.score);
+  } finally {
+    await teardown(seed.presentationId, seed.ownerEmail);
+  }
+});
+
+test("scoring: bumps scored_rev on a real scoring, not on an idempotent re-score", async () => {
+  // Skip gracefully if migration 0026 hasn't been applied to this DB yet, so a
+  // push doesn't red CI before the column exists. Once applied, this asserts.
+  const probe = await db();
+  const col = await probe.query(
+    `select 1 from information_schema.columns
+       where table_schema = 'public' and table_name = 'presentations' and column_name = 'scored_rev'`,
+  );
+  test.skip(col.rows.length === 0, "scored_rev absent — apply migration 0026_scored_rev_signal.sql");
+
+  const seed = await seedQuizSession({ code: CODE });
+  try {
+    await startSlide(seed.presentationId, seed.slide1Id);
+
+    const c = await db();
+    const { rows } = await c.query(
+      `insert into participants (presentation_id, nickname, participant_token)
+       values ($1, 'Rev', gen_random_uuid()::text)
+       returning id`,
+      [seed.presentationId],
+    );
+    const pid = rows[0].id as string;
+
+    await c.query(
+      `insert into responses (slide_id, participant_id, value_index, response_ms)
+       values ($1, $2, 0, 1000)`,
+      [seed.slide1Id, pid],
+    );
+
+    // A real scoring (rows inserted) signals the audience to refetch.
+    const revBefore = await getScoredRev(seed.presentationId);
+    await scoreSlideAsOwner(seed.slide1Id, seed.ownerId);
+    const revAfter = await getScoredRev(seed.presentationId);
+    expect(revAfter).toBe(revBefore + 1);
+
+    // Re-scoring inserts nothing (on conflict do nothing), so it must NOT bump
+    // again — no needless audience refetch.
+    await scoreSlideAsOwner(seed.slide1Id, seed.ownerId);
+    expect(await getScoredRev(seed.presentationId)).toBe(revAfter);
   } finally {
     await teardown(seed.presentationId, seed.ownerEmail);
   }
