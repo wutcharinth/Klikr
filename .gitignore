@@ -13,3 +13,7 @@ test-results/
 playwright-report/
 playwright/.cache/
 .superpowers/
+
+# Agent skills installed via `npx skills` (local tooling, not app code)
+.agents/
+.claude/skills/
