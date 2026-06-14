@@ -10,6 +10,11 @@ jobs:
   playwright:
     name: Playwright (${{ matrix.project }})
     runs-on: ubuntu-latest
+    # Official Playwright image ships the matching browsers + system deps
+    # pre-baked (no `playwright install` step that can hang on download/extract)
+    # and runs Node 22 / npm 10 — which the committed lockfile is generated for.
+    container:
+      image: mcr.microsoft.com/playwright:v1.59.1-noble
     timeout-minutes: 20
     # Skip the job when secrets aren't configured. Add POSTGRES_URL,
     # SUPABASE_SERVICE_ROLE_KEY, NEXT_PUBLIC_SUPABASE_URL, and
@@ -26,12 +31,7 @@ jobs:
       SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: npm
       - run: npm ci
-      - run: npx playwright install --with-deps chromium
       - run: npx playwright test --project=${{ matrix.project }}
       - if: failure()
         uses: actions/upload-artifact@v4

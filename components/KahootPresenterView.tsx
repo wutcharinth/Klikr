@@ -59,6 +59,21 @@ export function KahootPresenterView({
         </div>
       </div>
 
+      {/* Full-width urgency bar — visible from the back of the room as time
+          runs down; colour tracks the timer ring (green → amber → red). */}
+      {!expired && (
+        <div className="h-3 overflow-hidden rounded-full" style={{ background: "var(--line)" }}>
+          <div
+            className="h-full rounded-full"
+            style={{
+              width: `${Math.max(0, (1 - progress) * 100)}%`,
+              background: ringColor,
+              transition: "width 0.2s linear, background 0.5s ease",
+            }}
+          />
+        </div>
+      )}
+
       {slide.image_url && (
         <div>
           <img src={slide.image_url} alt="" className="max-h-72 w-full rounded-xl object-cover" style={{ border: "1px solid var(--line)" }} />
@@ -186,10 +201,16 @@ export function KahootPresenterView({
           </div>
         </div>
       ) : (
-        <div className="flex items-center justify-between text-2xl muted-text">
-          <span>
-            <span className="mono count-bump inline-block text-3xl font-semibold" style={{ fontVariantNumeric: "tabular-nums" }}>{total}</span>{" "}
-            {total === 1 ? "answer" : "answers"} in
+        <div className="flex flex-col items-center justify-center py-2">
+          <span
+            key={total}
+            className="mono count-bump text-7xl font-bold leading-none sm:text-8xl"
+            style={{ fontVariantNumeric: "tabular-nums" }}
+          >
+            {total}
+          </span>
+          <span className="mt-2 text-base uppercase tracking-[0.18em] muted-text">
+            {total === 1 ? "answer in" : "answers in"}
           </span>
         </div>
       )}

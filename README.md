@@ -297,3 +297,7 @@ Every keyframe respects `prefers-reduced-motion: reduce`.
 ## License
 
 Private. All rights reserved.
+
+---
+
+A personal project by Wutcharin — [LinkedIn](https://www.linkedin.com/in/wutcharin/) · [wutcharin.com](https://wutcharin.com/).

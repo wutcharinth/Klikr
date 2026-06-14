@@ -123,6 +123,26 @@ export default async function Landing() {
               {t("aboutKlikr")}
             </Link>
           </p>
+          <p className="mt-3 text-center text-[11px] muted-text">
+            A personal project ·{" "}
+            <a
+              href="https://www.linkedin.com/in/wutcharin/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="hover:text-[var(--ink)] underline-offset-4 hover:underline"
+            >
+              LinkedIn
+            </a>{" "}
+            ·{" "}
+            <a
+              href="https://wutcharin.com/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="hover:text-[var(--ink)] underline-offset-4 hover:underline"
+            >
+              wutcharin.com
+            </a>
+          </p>
         </Reveal>
       </section>
     </main>

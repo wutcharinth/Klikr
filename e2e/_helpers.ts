@@ -10,8 +10,16 @@ export async function db() {
   if (client) return client;
   const url = process.env.POSTGRES_URL;
   if (!url) throw new Error("POSTGRES_URL not set. Run via `railway run -s Postgres`.");
-  client = new Client({ connectionString: url });
-  await client.connect();
+  const c = new Client({ connectionString: url, keepAlive: true });
+  // Pooled connections (Supabase session pooler) can be reaped mid-run. Drop
+  // the cached handle on error so the next db() reconnects instead of reusing
+  // a dead client — otherwise one drop cascades "Connection terminated" into
+  // every subsequent query and retry.
+  c.on("error", () => {
+    if (client === c) client = null;
+  });
+  await c.connect();
+  client = c;
   return client;
 }
 
@@ -200,8 +208,22 @@ export async function getParticipant(participantId: string) {
 }
 
 export async function teardown(presentationId: string, ownerEmail: string) {
-  const c = await db();
-  // ON DELETE CASCADE handles slides/participants/responses.
-  await c.query(`delete from presentations where id = $1`, [presentationId]);
-  await c.query(`delete from auth.users where email = $1`, [ownerEmail]);
+  // Cleanup is best-effort: if the pooled connection was reaped, reconnect once
+  // and retry, but never let a cleanup failure fail an otherwise-passing test.
+  const run = async () => {
+    const c = await db();
+    // ON DELETE CASCADE handles slides/participants/responses.
+    await c.query(`delete from presentations where id = $1`, [presentationId]);
+    await c.query(`delete from auth.users where email = $1`, [ownerEmail]);
+  };
+  try {
+    await run();
+  } catch {
+    client = null; // force reconnect
+    try {
+      await run();
+    } catch {
+      // leftover rows use a unique per-test code/email and are harmless.
+    }
+  }
 }

@@ -131,6 +131,27 @@ export default async function AboutPage() {
           <Link href="/templates" className="btn-ghost">{t("browseTemplates")}</Link>
         </div>
       </section>
+
+      <p className="mt-10 text-center text-xs muted-text">
+        A personal project ·{" "}
+        <a
+          href="https://www.linkedin.com/in/wutcharin/"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="hover:text-[var(--ink)] underline-offset-4 hover:underline"
+        >
+          LinkedIn
+        </a>{" "}
+        ·{" "}
+        <a
+          href="https://wutcharin.com/"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="hover:text-[var(--ink)] underline-offset-4 hover:underline"
+        >
+          wutcharin.com
+        </a>
+      </p>
     </main>
   );
 }

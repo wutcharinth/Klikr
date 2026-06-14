@@ -9,6 +9,20 @@ export async function joinSession(presentationId: string, nickname: string) {
   const supabase = createServiceClient();
   const trimmed = nickname.trim().slice(0, 32);
   if (!trimmed) throw new Error("Nickname required");
+
+  // Reject joins on closed/missing sessions so a leaked or guessed presentation
+  // id can't farm participant rows after the host has wrapped up.
+  const { data: pres, error: presErr } = await supabase
+    .from("presentations")
+    .select("id, state")
+    .eq("id", presentationId)
+    .maybeSingle();
+  if (presErr) throw presErr;
+  if (!pres) throw new Error("Session not found");
+  if (pres.state !== "lobby" && pres.state !== "active") {
+    throw new Error("This session is no longer open");
+  }
+
   const { data, error } = await supabase
     .from("participants")
     .insert({ presentation_id: presentationId, nickname: trimmed })
@@ -53,12 +67,22 @@ export async function submitResponse(input: {
   participantToken: string;
   valueText?: string | null;
   valueIndex?: number | null;
-  responseMs?: number | null;
 }) {
   const { supabase, participant } = await assertParticipant(input);
-  await assertCurrentSlide(supabase, participant.presentation_id, input.slideId);
 
-  // Pull slide so we can validate type-specific payloads + run the content filter.
+  // Single query covers the active-slide gate AND pulls slide config + start
+  // time so we can compute response_ms server-side. Trusting client-supplied
+  // response_ms lets a participant claim 0ms and harvest the full speed bonus.
+  const { data: pres, error: presErr } = await supabase
+    .from("presentations")
+    .select("state, current_slide_id, current_slide_started_at")
+    .eq("id", participant.presentation_id)
+    .maybeSingle();
+  if (presErr) throw presErr;
+  if (!pres || pres.state !== "active" || pres.current_slide_id !== input.slideId) {
+    throw new Error("This slide is not accepting responses");
+  }
+
   const { data: slide } = await supabase
     .from("slides")
     .select("id, type, config")
@@ -112,17 +136,52 @@ export async function submitResponse(input: {
     throw new Error("Your response was filtered.");
   }
 
+  // Quiz scoring is speed-weighted, so we must measure response_ms server-side.
+  // Falls back to limit_ms (= zero speed bonus) if the slide somehow has no
+  // started_at, since score_quiz_slide treats null as instant (max bonus).
+  let responseMs: number | null = null;
+  if (slide.type === "quiz") {
+    const cfg = slide.config as { time_limit_s?: number };
+    const limitMs = Math.max(1, cfg.time_limit_s ?? 20) * 1000;
+    const startedAt = pres.current_slide_started_at
+      ? new Date(pres.current_slide_started_at).getTime()
+      : 0;
+    const elapsed = startedAt > 0 ? Date.now() - startedAt : limitMs;
+    responseMs = Math.max(0, Math.min(limitMs, elapsed));
+  }
+
   const { error } = await supabase.from("responses").upsert(
     {
       slide_id: input.slideId,
       participant_id: input.participantId,
       value_text: valueText,
       value_index: valueIndex,
-      response_ms: input.responseMs ?? null,
+      response_ms: responseMs,
     },
     { onConflict: "slide_id,participant_id" },
   );
   if (error) throw error;
+
+  // Non-quiz slides: return submission stats so the audience client can show
+  // a "Nth in" takeover. Quiz slides skip this; the takeover for quiz fires on
+  // local timer expiry, not on submit.
+  if (slide.type !== "quiz") {
+    const [respRes, partRes] = await Promise.all([
+      supabase
+        .from("responses")
+        .select("*", { count: "exact", head: true })
+        .eq("slide_id", input.slideId),
+      supabase
+        .from("participants")
+        .select("*", { count: "exact", head: true })
+        .eq("presentation_id", participant.presentation_id),
+    ]);
+    return {
+      ordinal: respRes.count ?? 1,
+      total: Math.max(respRes.count ?? 1, partRes.count ?? 1),
+    };
+  }
+  return {};
 }
 
 export async function getParticipantScores(input: {

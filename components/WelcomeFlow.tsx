@@ -1,9 +1,28 @@
 "use client";
 
 import { useState } from "react";
+import { useFormStatus } from "react-dom";
 import Link from "next/link";
 import { LayoutTemplate, Sparkles, Plus, QrCode, ArrowRight, PartyPopper } from "lucide-react";
 import { completeOnboarding } from "@/app/(auth)/actions";
+
+function SkipButton() {
+  const { pending } = useFormStatus();
+  return (
+    <button disabled={pending} className="text-xs muted-text hover:text-[var(--ink)] disabled:opacity-60">
+      {pending ? "Skipping…" : "Skip the tour →"}
+    </button>
+  );
+}
+
+function FinishButton() {
+  const { pending } = useFormStatus();
+  return (
+    <button disabled={pending} className="btn-primary disabled:opacity-60">
+      {pending ? "Loading…" : "Take me to my dashboard"} <ArrowRight className="h-4 w-4" />
+    </button>
+  );
+}
 
 const STEPS = ["start", "audience", "promise"] as const;
 type Step = typeof STEPS[number];
@@ -29,9 +48,7 @@ export default function WelcomeFlow() {
 
       <div className="mt-6 flex justify-center">
         <form action={completeOnboarding}>
-          <button className="text-xs muted-text hover:text-[var(--ink)]">
-            Skip the tour →
-          </button>
+          <SkipButton />
         </form>
       </div>
     </main>
@@ -123,9 +140,7 @@ function Promise() {
       </p>
       <div className="mt-8 flex justify-end">
         <form action={completeOnboarding}>
-          <button className="btn-primary">
-            Take me to my dashboard <ArrowRight className="h-4 w-4" />
-          </button>
+          <FinishButton />
         </form>
       </div>
     </>

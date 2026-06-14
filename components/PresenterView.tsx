@@ -17,11 +17,12 @@ import { ReactionOverlay } from "./ReactionOverlay";
 import { EmbedSlide } from "./EmbedSlide";
 import { KahootPresenterView } from "./KahootPresenterView";
 import { QuizPodium } from "./QuizPodium";
+import { LeaderboardRows, annotateRanks, type LbRow } from "./LeaderboardRows";
 import { QrCode } from "./QrCode";
 import { PresenterMusicToggle } from "./PresenterMusicToggle";
 import { SessionStatusPill } from "./SessionStatusPill";
 import { PresenterShortcutsHelp } from "./PresenterShortcutsHelp";
-import { Keyboard, Maximize2, Minimize2 } from "lucide-react";
+import { Keyboard, Maximize2, Minimize2, FastForward } from "lucide-react";
 import type { EmbedConfig, QAConfig } from "@/lib/types";
 
 export function PresenterView({
@@ -45,6 +46,41 @@ export function PresenterView({
   const [leaderboardSlideId, setLeaderboardSlideId] = useState<string | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
+
+  // Optional auto-advance: after a quiz is scored, automatically show the
+  // leaderboard then move to the next question on a timer. Off by default; the
+  // host stays in control — any manual nav cancels the pending sequence.
+  const [autoAdvance, setAutoAdvance] = useState(false);
+  const [autoCountdown, setAutoCountdown] = useState<number | null>(null);
+  const autoTimersRef = useRef<Array<ReturnType<typeof setTimeout>>>([]);
+  // Persistent previous-rank snapshot for the between-question leaderboard, so
+  // delta arrows reflect movement since the last round (survives remounts).
+  const leaderboardPrevRankRef = useRef<Record<string, number>>({});
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    setAutoAdvance(localStorage.getItem("klikr:autoadvance") === "on");
+  }, []);
+  const clearAutoTimers = useCallback(() => {
+    autoTimersRef.current.forEach((t) => {
+      clearTimeout(t);
+      clearInterval(t);
+    });
+    autoTimersRef.current = [];
+    setAutoCountdown(null);
+  }, []);
+  const toggleAutoAdvance = useCallback(() => {
+    setAutoAdvance((v) => {
+      const next = !v;
+      if (typeof window !== "undefined") localStorage.setItem("klikr:autoadvance", next ? "on" : "off");
+      if (!next) clearAutoTimers();
+      return next;
+    });
+  }, [clearAutoTimers]);
+  // Safety net: clear any pending sequence whenever the active slide changes
+  // (manual nav, realtime advance, unmount) so it never fires onto a new slide.
+  useEffect(() => {
+    return () => clearAutoTimers();
+  }, [presentation.current_slide_id, clearAutoTimers]);
 
   // Track fullscreen state — handles user-driven Esc + button taps + keyboard.
   useEffect(() => {
@@ -326,6 +362,7 @@ export function PresenterView({
     try {
       await scoreActiveQuizSlide(presentation.id, slideId, { force });
       await loadParticipants();
+      if (autoAdvance) armAutoAdvance(slideId);
     } catch (err) {
       console.error("scoreActiveQuizSlide failed", err);
       setScoredSlideIds((prev) => {
@@ -336,11 +373,40 @@ export function PresenterView({
     }
   }
 
+  // Arm the timed leaderboard → next sequence. Stage 1 shows the leaderboard
+  // after a beat; stage 2 counts down then advances. Stored timer ids are
+  // cleared by any manual nav or slide change so it can never fire late.
+  function armAutoAdvance(slideId: string) {
+    clearAutoTimers();
+    const LEADERBOARD_DELAY_MS = 2500;
+    const NEXT_SECONDS = 5;
+    autoTimersRef.current.push(
+      setTimeout(() => {
+        setLeaderboardSlideId(slideId);
+        let n = NEXT_SECONDS;
+        setAutoCountdown(n);
+        const iv = setInterval(() => {
+          n -= 1;
+          if (n <= 0) {
+            clearInterval(iv);
+            setAutoCountdown(null);
+            goToNextSlide();
+          } else {
+            setAutoCountdown(n);
+          }
+        }, 1000);
+        autoTimersRef.current.push(iv);
+      }, LEADERBOARD_DELAY_MS),
+    );
+  }
+
   async function endQuizQuestionNow(slideId: string) {
+    clearAutoTimers();
     await scoreQuizOnExpiry(slideId, true);
   }
 
   async function endSessionNow() {
+    clearAutoTimers();
     if (!confirm("End the session for everyone?")) return;
     // Optimistic local update so the UI flips even if the realtime
     // event takes a moment (or doesn't fire at all).
@@ -355,6 +421,7 @@ export function PresenterView({
   }
 
   function goToNextSlide() {
+    clearAutoTimers();
     setLeaderboardSlideId(null);
     moveSlide(presentation.id, "next");
   }
@@ -386,6 +453,22 @@ export function PresenterView({
                 ⬇ CSV
               </a>
               <PresenterMusicToggle />
+              <button
+                type="button"
+                onClick={toggleAutoAdvance}
+                title={autoAdvance ? "Auto-advance on — questions flow automatically" : "Auto-advance off — you control each step"}
+                aria-label={autoAdvance ? "Turn off auto-advance" : "Turn on auto-advance"}
+                aria-pressed={autoAdvance}
+                className="flex h-8 items-center gap-1.5 rounded-full px-2.5 transition-colors"
+                style={{
+                  background: autoAdvance ? "rgba(0,113,227,0.12)" : "transparent",
+                  border: "1px solid var(--line)",
+                  color: autoAdvance ? "var(--blue)" : "var(--muted)",
+                }}
+              >
+                <FastForward className="h-3.5 w-3.5" />
+                <span className="text-[10px] uppercase tracking-[0.14em]">Auto</span>
+              </button>
               <ModeToggleButton mode={effectiveMode} onToggle={toggleMode} />
               <button
                 type="button"
@@ -410,7 +493,7 @@ export function PresenterView({
           </div>
           <div key={`${currentSlide.id}-${showQuizLeaderboard ? "leaderboard" : "slide"}`} className="slide-enter flex min-h-0 flex-1 flex-col">
             {showQuizLeaderboard ? (
-              <QuizLeaderboardScreen participants={participants} />
+              <QuizLeaderboardScreen participants={participants} prevRankRef={leaderboardPrevRankRef} />
             ) : isKahoot ? (
               <KahootPresenterView
                 slide={currentSlide}
@@ -505,6 +588,7 @@ export function PresenterView({
         <div className="flex items-center justify-between px-2 sm:px-6">
           <button
             onClick={() => {
+              clearAutoTimers();
               if (showQuizLeaderboard) {
                 setLeaderboardSlideId(null);
                 return;
@@ -516,6 +600,17 @@ export function PresenterView({
           >
             ← Prev
           </button>
+          {autoCountdown !== null && (
+            <button
+              onClick={clearAutoTimers}
+              className="flex items-center gap-2 rounded-full px-4 py-1.5 text-sm font-medium transition-colors"
+              style={{ background: "rgba(0,113,227,0.12)", border: "1px solid rgba(0,113,227,0.35)", color: "var(--blue)" }}
+              title="Cancel auto-advance"
+            >
+              <FastForward className="h-4 w-4" />
+              Auto ▸ next in {autoCountdown}s · tap to cancel
+            </button>
+          )}
           {isQuiz && !showQuizLeaderboard ? (
             <div className="flex items-center gap-2">
               {!quizExpired && (
@@ -530,7 +625,10 @@ export function PresenterView({
               {quizExpired ? (
                 <>
                   <button
-                    onClick={() => setLeaderboardSlideId(currentSlide.id)}
+                    onClick={() => {
+                      clearAutoTimers();
+                      setLeaderboardSlideId(currentSlide.id);
+                    }}
                     className="btn-ghost"
                   >
                     Show leaderboard
@@ -584,10 +682,23 @@ export function PresenterView({
   );
 }
 
-function QuizLeaderboardScreen({ participants }: { participants: Participant[] }) {
-  const sorted = [...participants]
-    .sort((a, b) => b.score - a.score || new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
-    .slice(0, 8);
+function QuizLeaderboardScreen({
+  participants,
+  prevRankRef,
+}: {
+  participants: Participant[];
+  prevRankRef: React.MutableRefObject<Record<string, number>>;
+}) {
+  // Annotate ranks/deltas against the previous standings so rows can animate
+  // their climb/drop with arrows, mirroring the audience board. Computed in an
+  // effect (annotateRanks mutates the snapshot ref — never during render). The
+  // ref lives in the parent so it survives this screen's remounts and the first
+  // paint of each round shows movement since the last leaderboard.
+  const [rows, setRows] = useState<LbRow[]>([]);
+  useEffect(() => {
+    const annotated = annotateRanks(participants, prevRankRef.current).slice(0, 8);
+    setRows(annotated.map((r) => ({ ...r, visualIndex: r.rank - 1 })));
+  }, [participants, prevRankRef]);
 
   return (
     <div className="flex min-h-0 flex-1 flex-col justify-center">
@@ -598,43 +709,15 @@ function QuizLeaderboardScreen({ participants }: { participants: Participant[] }
         <h2 className="mt-2 text-center text-4xl font-semibold tracking-tight sm:text-6xl">
           Current standings
         </h2>
-        {sorted.length === 0 ? (
+        {rows.length === 0 ? (
           <div className="panel-soft mt-10 p-10 text-center">
             <p className="text-lg font-medium">No scores yet.</p>
             <p className="mt-2 text-sm muted-text">Scores appear after a quiz question is answered and timed out.</p>
           </div>
         ) : (
-          <ol className="mt-10 space-y-3">
-            {sorted.map((p, i) => {
-              const rank = i + 1;
-              return (
-                <li
-                  key={p.id}
-                  className="row-enter flex items-center gap-4 rounded-2xl px-5 py-4 text-lg sm:px-6 sm:py-5"
-                  style={{
-                    animationDelay: `${i * 70}ms`,
-                    background: rank === 1 ? "rgba(0, 113, 227, 0.12)" : "rgba(255, 255, 255, 0.03)",
-                    border: "1px solid " + (rank === 1 ? "rgba(0, 113, 227, 0.35)" : "var(--line)"),
-                  }}
-                >
-                  <span
-                    className="mono flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-base font-bold"
-                    style={{
-                      background: rank === 1 ? "var(--blue)" : "var(--line)",
-                      color: rank === 1 ? "#fff" : "var(--ink)",
-                      fontVariantNumeric: "tabular-nums",
-                    }}
-                  >
-                    {rank}
-                  </span>
-                  <span className="min-w-0 flex-1 truncate font-semibold">{p.nickname}</span>
-                  <span className="mono text-2xl font-bold" style={{ fontVariantNumeric: "tabular-nums", color: "var(--blue)" }}>
-                    {p.score.toLocaleString()}
-                  </span>
-                </li>
-              );
-            })}
-          </ol>
+          <div className="mt-10">
+            <LeaderboardRows rows={rows} variant="presenter" podium />
+          </div>
         )}
       </div>
     </div>

@@ -681,3 +681,120 @@
   .sheen::after, .headline-shine, .float-slow, .pulse-ring::before, .bar-grow, .word-fly, .row-enter, .orb { animation: none !important; }
   .tilt:hover { transform: none; }
 }
+
+/* === Audience Takeover === */
+
+.takeover-bg-correct,
+.takeover-bg-wrong,
+.takeover-bg-submit,
+.takeover-bg-skipped {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  color: white;
+  text-align: center;
+  padding: 24px;
+  gap: 12px;
+  overflow: hidden;
+}
+
+.takeover-bg-correct  { background: linear-gradient(135deg, #22c55e 0%, #14b8a6 100%); }
+.takeover-bg-wrong    { background: linear-gradient(135deg, #ef4444 0%, #7c3aed 100%); }
+.takeover-bg-submit   { background: linear-gradient(135deg, #0071e3 0%, #ff3366 100%); }
+.takeover-bg-skipped  { background: linear-gradient(135deg, #64748b 0%, #334155 100%); }
+
+.takeover-bg-correct::before,
+.takeover-bg-wrong::before,
+.takeover-bg-submit::before {
+  content: "";
+  position: absolute;
+  inset: -25%;
+  background: inherit;
+  filter: blur(40px);
+  opacity: 0.6;
+  animation: takeoverDrift 4s ease-in-out infinite alternate;
+  will-change: transform;
+}
+
+@keyframes takeoverDrift {
+  from { transform: translate3d(-3%, -2%, 0) scale(1.05); }
+  to   { transform: translate3d( 3%,  2%, 0) scale(1.10); }
+}
+
+.takeover-content {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  animation: takeoverEnter 0.45s cubic-bezier(0.34, 1.86, 0.5, 1) both;
+}
+
+@keyframes takeoverEnter {
+  from { transform: scale(0.6); opacity: 0; }
+  to   { transform: scale(1);   opacity: 1; }
+}
+
+.big-num-pop {
+  display: inline-block;
+  animation: bigNumPop 0.7s cubic-bezier(0.34, 1.86, 0.5, 1) both;
+}
+
+@keyframes bigNumPop {
+  from { transform: scale(0.4); opacity: 0; }
+  60%  { transform: scale(1.1); opacity: 1; }
+  to   { transform: scale(1);   opacity: 1; }
+}
+
+.shake-burst {
+  animation: shakeBurst 0.55s cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
+}
+
+@keyframes shakeBurst {
+  0%, 100% { transform: translateX(0); }
+  10%, 30%, 50%, 70%, 90% { transform: translateX(-12px); }
+  20%, 40%, 60%, 80% { transform: translateX(12px); }
+}
+
+.takeover-toast {
+  position: fixed;
+  z-index: 80;
+  left: 50%;
+  bottom: 32px;
+  transform: translateX(-50%);
+  background: linear-gradient(135deg, #0071e3 0%, #ff3366 100%);
+  color: white;
+  padding: 12px 18px;
+  border-radius: 16px;
+  font-weight: 700;
+  box-shadow: 0 10px 40px rgba(255, 51, 102, 0.45);
+  animation: toastSlideUp 0.4s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+@keyframes toastSlideUp {
+  from { transform: translate(-50%, 50px); opacity: 0; }
+  to   { transform: translate(-50%, 0);    opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .takeover-bg-correct::before,
+  .takeover-bg-wrong::before,
+  .takeover-bg-submit::before { animation: none; }
+  .takeover-content,
+  .big-num-pop,
+  .takeover-toast { animation: takeoverFadeIn 0.2s ease both; }
+  .shake-burst { animation: none; }
+}
+
+@keyframes takeoverFadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}

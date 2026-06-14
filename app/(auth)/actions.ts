@@ -11,14 +11,16 @@ export async function logout() {
 
 export async function completeOnboarding() {
   const supabase = await createClient();
-  const { data: u } = await supabase.auth.getUser();
-  if (!u.user) redirect("/login");
-  // Best-effort upsert. If the `profiles` table doesn't exist yet (migrations
-  // not applied), don't block the user — just send them through.
+  // getSession() reads the cookie locally (~0ms) vs getUser() which round-
+  // trips to Supabase Auth (~200ms). RLS on the profiles update enforces
+  // identity, so we don't need a verified user here — just an authenticated
+  // cookie and the user id from it.
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) redirect("/login");
   const { error } = await supabase
     .from("profiles")
     .update({ onboarded_at: new Date().toISOString() })
-    .eq("id", u.user.id);
+    .eq("id", session.user.id);
   if (error) console.warn("completeOnboarding: profiles update failed:", error.message);
   redirect("/dashboard");
 }
