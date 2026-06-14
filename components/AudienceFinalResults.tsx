@@ -1,13 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import confetti from "canvas-confetti";
 import { Trophy } from "lucide-react";
 import type { Participant } from "@/lib/types";
 import { AudienceAppFeedback } from "./AudienceAppFeedback";
 import { encouragementFor } from "./QuizFeedback";
 import { getParticipantScores } from "@/app/play/[code]/actions";
 import { LogoMarkPlayer } from "./remotion/LogoMarkPlayer";
+import { PodiumPlayer } from "./remotion/PodiumPlayer";
 
 const MEDAL = ["🥇", "🥈", "🥉"];
 const MEDAL_BG = ["#FFD54F", "#B0BEC5", "#D7864D"];
@@ -87,28 +87,6 @@ function FinalResultsBody({
   const total = sorted.length;
   const rank = myIdx >= 0 ? myIdx + 1 : null;
 
-  // Reveal sequence: rank 3 → 2 → 1 (200ms → 1100ms → 2000ms), confetti on 1.
-  const [revealed, setRevealed] = useState(0);
-  const reduced = usePrefersReducedMotion();
-
-  useEffect(() => {
-    if (top3.length === 0) return;
-    if (reduced) {
-      setRevealed(3);
-      return;
-    }
-    const timeouts: ReturnType<typeof setTimeout>[] = [];
-    timeouts.push(setTimeout(() => setRevealed(1), 200));
-    timeouts.push(setTimeout(() => setRevealed(2), 1100));
-    timeouts.push(
-      setTimeout(() => {
-        setRevealed(3);
-        confetti({ particleCount: 120, spread: 60, origin: { y: 0.4 } });
-      }, 2000),
-    );
-    return () => timeouts.forEach(clearTimeout);
-  }, [top3.length, reduced]);
-
   const isTop3 = rank !== null && rank <= 3;
   const pct = total > 0 ? (rank ?? total) / total : 1;
   const headline = me ? encouragementFor(pct, rank ?? total) : "Thanks for playing.";
@@ -153,49 +131,22 @@ function FinalResultsBody({
         <p className="mt-5 text-sm font-medium">{headline}</p>
       </div>
 
-      {/* Mini top-3 podium — vertical stacked rows, mobile-friendly. */}
-      <div className="mt-8">
-        <p className="text-[10px] uppercase tracking-[0.2em] muted-text">
-          <Trophy className="-mt-0.5 mr-1.5 inline-block h-3 w-3" />
-          Final podium
-        </p>
-        <ol className="mt-3 space-y-2">
-          {/* Render in reveal order: rank 3 first, then 2, then 1 — but visually
-              we want rank 1 on top. So we render top→bottom (1, 2, 3) and gate
-              each on the reveal step. */}
-          {top3.map((p, i) => {
-            const r = i + 1;
-            const visible = revealed >= 4 - r; // r=3 visible at revealed>=1, r=2 at >=2, r=1 at >=3
-            const isMe = p.id === participantId;
-            return (
-              <li
-                key={p.id}
-                className="flex items-center gap-3 rounded-2xl px-4 py-3 transition-all duration-400"
-                style={{
-                  background: isMe ? "rgba(0,113,227,0.10)" : "rgba(0,0,0,0.03)",
-                  border: "1px solid " + (isMe ? "rgba(0,113,227,0.4)" : "var(--line)"),
-                  opacity: visible ? 1 : 0,
-                  transform: visible ? "translateY(0)" : "translateY(20px)",
-                  transitionTimingFunction: "cubic-bezier(0.2, 0.8, 0.2, 1)",
-                }}
-              >
-                <span
-                  className="flex h-9 w-9 items-center justify-center rounded-full text-lg"
-                  style={{ background: MEDAL_BG[r - 1] }}
-                  aria-hidden
-                >
-                  {MEDAL[r - 1]}
-                </span>
-                <span className="flex-1 truncate text-base font-medium">
-                  {p.nickname}
-                  {isMe ? <span className="ml-1.5 text-[10px] muted-text">(you)</span> : null}
-                </span>
-                <span className="mono tabular-nums text-sm muted-text">{p.score.toLocaleString()}</span>
-              </li>
-            );
-          })}
-        </ol>
-      </div>
+      {/* Cinematic top-3 podium reveal (Remotion, plays once). */}
+      {top3.length > 0 ? (
+        <div className="mt-8">
+          <p className="text-[10px] uppercase tracking-[0.2em] muted-text">
+            <Trophy className="-mt-0.5 mr-1.5 inline-block h-3 w-3" />
+            Final podium
+          </p>
+          <div className="mt-3">
+            <PodiumPlayer
+              entries={top3.map((p) => ({ nickname: p.nickname, score: p.score }))}
+              width={340}
+              height={400}
+            />
+          </div>
+        </div>
+      ) : null}
 
       <div className="mt-8">
         <AudienceAppFeedback />
@@ -228,17 +179,4 @@ function Stage({ children }: { children: React.ReactNode }) {
       <div className="panel p-6">{children}</div>
     </main>
   );
-}
-
-function usePrefersReducedMotion() {
-  const [reduced, setReduced] = useState(false);
-  useEffect(() => {
-    if (typeof window === "undefined" || !window.matchMedia) return;
-    const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
-    setReduced(mq.matches);
-    const handler = (e: MediaQueryListEvent) => setReduced(e.matches);
-    mq.addEventListener("change", handler);
-    return () => mq.removeEventListener("change", handler);
-  }, []);
-  return reduced;
 }

@@ -1,84 +1,15 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
-import confetti from "canvas-confetti";
-import { Trophy, Medal, Volume2, VolumeX } from "lucide-react";
+import { Trophy } from "lucide-react";
 import type { Participant } from "@/lib/types";
-import { createClient } from "@/lib/supabase/client";
-
-const HEIGHTS = [180, 240, 140]; // 1st, 2nd, 3rd block heights
-const COLORS = ["#FFD54F", "#B0BEC5", "#D7864D"];
-
-type QuizStats = { correct: number; total: number };
+import { PodiumPlayer } from "./remotion/PodiumPlayer";
 
 export function QuizPodium({ participants, presentationId }: { participants: Participant[]; presentationId: string }) {
-  const supabase = useMemo(() => createClient(), []);
-  const [quizStats, setQuizStats] = useState<Record<string, QuizStats>>({});
-  const [totalQuizSlides, setTotalQuizSlides] = useState(0);
-
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      const { data: slides } = await supabase
-        .from("slides")
-        .select("id, config")
-        .eq("presentation_id", presentationId)
-        .eq("type", "quiz");
-      if (cancelled || !slides) return;
-      setTotalQuizSlides(slides.length);
-      if (slides.length === 0) {
-        setQuizStats({});
-        return;
-      }
-      const correctByIdx = new Map<string, number | null>();
-      for (const s of slides) {
-        const ci = (s.config as { correct_index?: number } | null)?.correct_index;
-        correctByIdx.set(s.id, typeof ci === "number" ? ci : null);
-      }
-      const slideIds = Array.from(correctByIdx.keys());
-      const { data: responses } = await supabase
-        .from("responses")
-        .select("slide_id, participant_id, value_index")
-        .in("slide_id", slideIds);
-      if (cancelled || !responses) return;
-      const stats: Record<string, QuizStats> = {};
-      for (const r of responses) {
-        const correct = correctByIdx.get(r.slide_id);
-        if (correct === null || correct === undefined) continue;
-        const s = (stats[r.participant_id] ??= { correct: 0, total: slides.length });
-        if (r.value_index === correct) s.correct += 1;
-      }
-      setQuizStats(stats);
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [supabase, presentationId]);
-
   const sorted = [...participants].sort(
     (a, b) => b.score - a.score || new Date(a.created_at).getTime() - new Date(b.created_at).getTime(),
   );
   const top = sorted.slice(0, 3);
   const rest = sorted.slice(3);
-
-  const [revealed, setRevealed] = useState(0);
-  const [muted, setMuted] = useState(true);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
-
-  useEffect(() => {
-    if (top.length === 0) return;
-    const timeouts: ReturnType<typeof setTimeout>[] = [];
-    timeouts.push(setTimeout(() => setRevealed(1), 200));
-    timeouts.push(setTimeout(() => setRevealed(2), 1100));
-    timeouts.push(
-      setTimeout(() => {
-        setRevealed(3);
-        confetti({ particleCount: 200, spread: 90, origin: { y: 0.5 } });
-        if (!muted && audioRef.current) audioRef.current.play().catch(() => {});
-      }, 2000)
-    );
-    return () => timeouts.forEach(clearTimeout);
-  }, [top.length, muted]);
 
   if (top.length === 0) {
     return (
@@ -89,12 +20,6 @@ export function QuizPodium({ participants, presentationId }: { participants: Par
     );
   }
 
-  // Layout: [2nd] [1st] [3rd]
-  const order: { idx: number; rank: number }[] = [];
-  if (top[1]) order.push({ idx: 1, rank: 2 });
-  order.push({ idx: 0, rank: 1 });
-  if (top[2]) order.push({ idx: 2, rank: 3 });
-
   return (
     <div className="panel relative overflow-hidden p-10">
       <div className="flex items-center justify-between">
@@ -102,57 +27,25 @@ export function QuizPodium({ participants, presentationId }: { participants: Par
           <Trophy className="h-5 w-5" style={{ color: "var(--blue)" }} />
           <h2 className="text-xl font-semibold tracking-tight">Final podium</h2>
         </div>
-        <div className="flex items-center gap-2">
-          <button onClick={() => setMuted((m) => !m)} className="btn-ghost text-xs muted-text">
-            {muted ? <VolumeX className="h-3.5 w-3.5" /> : <Volume2 className="h-3.5 w-3.5" />}
-          </button>
-          <button
-            onClick={() => navigator.clipboard.writeText(`${window.location.origin}/results/${presentationId}`)}
-            className="btn-ghost text-xs"
-          >
-            Share results
-          </button>
-        </div>
+        <button
+          onClick={() => navigator.clipboard.writeText(`${window.location.origin}/results/${presentationId}`)}
+          className="btn-ghost text-xs"
+        >
+          Share results
+        </button>
       </div>
 
-      <div className="mt-12 flex items-end justify-center gap-4">
-        {order.map(({ idx, rank }) => {
-          const p = top[idx];
-          const visible = revealed >= rank;
-          const stats = quizStats[p.id];
-          const correct = stats?.correct ?? 0;
-          const total = stats?.total ?? totalQuizSlides;
-          return (
-            <div key={p.id} className="flex flex-col items-center transition-all" style={{ opacity: visible ? 1 : 0, transform: visible ? "translateY(0)" : "translateY(40px)" }}>
-              <div className="flex h-16 w-16 items-center justify-center rounded-full text-2xl font-bold" style={{ background: COLORS[rank - 1], color: "#1d1d1f" }}>
-                {rank === 1 ? <Trophy className="h-7 w-7" /> : <Medal className="h-7 w-7" />}
-              </div>
-              <p className="mt-3 text-base font-semibold">{p.nickname}</p>
-              <p className="mt-1 text-lg font-bold" style={{ color: "var(--blue)" }}>
-                {p.score.toLocaleString()} pts
-              </p>
-              {total > 0 && (
-                <p className="mt-0.5 text-xs muted-text mono" style={{ fontVariantNumeric: "tabular-nums" }}>
-                  {correct} / {total} correct
-                </p>
-              )}
-              <div
-                className="mt-3 flex w-32 items-center justify-center rounded-t-xl text-3xl font-bold"
-                style={{
-                  height: HEIGHTS[rank - 1],
-                  background: COLORS[rank - 1],
-                  color: "#1d1d1f",
-                }}
-              >
-                {rank === 1 ? "🥇" : rank === 2 ? "🥈" : "🥉"}
-              </div>
-            </div>
-          );
-        })}
+      {/* Cinematic top-3 reveal (Remotion, plays once). */}
+      <div className="mt-6">
+        <PodiumPlayer
+          entries={top.map((p) => ({ nickname: p.nickname, score: p.score }))}
+          width={960}
+          height={520}
+        />
       </div>
 
       {rest.length > 0 && (
-        <div className="mt-10">
+        <div className="mt-8">
           <p className="text-[11px] uppercase tracking-wider muted-text">Also in the running</p>
           <ol className="mt-3 grid gap-1 text-sm">
             {rest.map((p, i) => (
@@ -164,8 +57,6 @@ export function QuizPodium({ participants, presentationId }: { participants: Par
           </ol>
         </div>
       )}
-
-      <audio ref={audioRef} src="/podium-chime.mp3" preload="none" />
     </div>
   );
 }

@@ -6,6 +6,7 @@ import { PollMotion } from "./compositions/PollMotion";
 import { WordCloudMotion } from "./compositions/WordCloudMotion";
 import { QAMotion } from "./compositions/QAMotion";
 import { QuizMotion } from "./compositions/QuizMotion";
+import { PodiumMotion } from "./compositions/PodiumMotion";
 import { AIDeckGenerationMotion } from "./compositions/AIDeckGenerationMotion";
 import { HowItWorksMotion } from "./compositions/HowItWorksMotion";
 import { defaultTheme } from "./theme/tokens";
@@ -96,6 +97,22 @@ export const RemotionRoot: React.FC = () => {
         width={1280}
         height={720}
         defaultProps={{ theme: defaultTheme }}
+      />
+      <Composition
+        id="PodiumMotion"
+        component={PodiumMotion}
+        durationInFrames={170}
+        fps={30}
+        width={960}
+        height={560}
+        defaultProps={{
+          theme: defaultTheme,
+          entries: [
+            { nickname: "Marco", score: 9840 },
+            { nickname: "Priya", score: 8720 },
+            { nickname: "Dana", score: 7410 },
+          ],
+        }}
       />
       <Composition
         id="AIDeckGenerationMotion"
