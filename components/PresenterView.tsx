@@ -426,9 +426,12 @@ export function PresenterView({
     await scoreQuizOnExpiry(slideId, true);
   }
 
+  // Confirmation is handled inline by EndSessionButton — NOT window.confirm,
+  // which browsers silently suppress after a few dialogs ("prevent this page
+  // from creating additional dialogs"), which made End session a no-op. Same
+  // reason we don't alert() on failure.
   async function endSessionNow() {
     clearAutoTimers();
-    if (!confirm("End the session for everyone?")) return;
     // Optimistic local update so the UI flips even if the realtime
     // event takes a moment (or doesn't fire at all).
     setPresentation((p) => ({ ...p, state: "closed" }));
@@ -436,7 +439,6 @@ export function PresenterView({
       await endPresentation(presentation.id);
     } catch (err) {
       console.error("endPresentation failed", err);
-      alert("Could not end the session. Try again.");
       setPresentation((p) => ({ ...p, state: "active" }));
     }
   }
@@ -655,12 +657,7 @@ export function PresenterView({
                     Show leaderboard
                   </button>
                   {isLast ? (
-                    <button
-                      onClick={endSessionNow}
-                      className="btn-primary"
-                    >
-                      End session
-                    </button>
+                    <EndSessionButton onConfirm={endSessionNow} variant="primary" />
                   ) : (
                     <button
                       onClick={goToNextSlide}
@@ -677,13 +674,7 @@ export function PresenterView({
               )}
             </div>
           ) : isLast ? (
-            <button
-              onClick={endSessionNow}
-              className="btn-ghost"
-              style={{ color: "var(--danger)", borderColor: "rgba(252,165,165,.3)" }}
-            >
-              End session
-            </button>
+            <EndSessionButton onConfirm={endSessionNow} variant="ghost" />
           ) : (
             <button
               onClick={goToNextSlide}
@@ -795,6 +786,45 @@ function QAModerationTray({ responses, qaCfg }: { responses: ResponseRow[]; qaCf
         ))}
       </ul>
     </div>
+  );
+}
+
+// Inline two-step confirm for ending the session. Avoids window.confirm, which
+// browsers suppress after repeated dialogs (silently no-opping the action).
+// First tap arms it; "End now" confirms; auto-disarms after 4s.
+function EndSessionButton({ onConfirm, variant }: { onConfirm: () => void; variant: "primary" | "ghost" }) {
+  const [armed, setArmed] = useState(false);
+  useEffect(() => {
+    if (!armed) return;
+    const t = setTimeout(() => setArmed(false), 4000);
+    return () => clearTimeout(t);
+  }, [armed]);
+
+  if (armed) {
+    return (
+      <span className="flex items-center gap-2">
+        <span className="text-xs muted-text">End for everyone?</span>
+        <button
+          onClick={onConfirm}
+          className="btn-primary"
+          style={{ background: "var(--danger)", borderColor: "var(--danger)" }}
+        >
+          End now
+        </button>
+        <button onClick={() => setArmed(false)} className="btn-ghost text-xs">
+          Cancel
+        </button>
+      </span>
+    );
+  }
+  return (
+    <button
+      onClick={() => setArmed(true)}
+      className={variant === "ghost" ? "btn-ghost" : "btn-primary"}
+      style={variant === "ghost" ? { color: "var(--danger)", borderColor: "rgba(252,165,165,.3)" } : undefined}
+    >
+      End session
+    </button>
   );
 }
 
