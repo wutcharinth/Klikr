@@ -22,6 +22,7 @@ type ExportData = {
     response_ms: number | null;
     created_at: string;
   }[];
+  quizScores: { slide_id: string; participant_id: string; points: number }[];
   voteCounts: Map<string, number>;
 };
 
@@ -56,11 +57,19 @@ async function loadData(id: string): Promise<ExportData | null> {
     voteCounts.set(v.response_id, (voteCounts.get(v.response_id) ?? 0) + 1);
   }
 
+  // Per-question scores (one row per participant per quiz slide). Powers the
+  // per-participant x per-question score sheet.
+  const quizSlideIds = (slides ?? []).filter((s) => s.type === "quiz").map((s) => s.id);
+  const { data: quizScores } = quizSlideIds.length
+    ? await supabase.from("quiz_slide_scores").select("slide_id, participant_id, points").in("slide_id", quizSlideIds)
+    : { data: [] as ExportData["quizScores"] };
+
   return {
     presentation,
     slides: slides ?? [],
     participants: participants ?? [],
     responses: (responses ?? []) as ExportData["responses"],
+    quizScores: (quizScores ?? []) as ExportData["quizScores"],
     voteCounts,
   };
 }
@@ -68,10 +77,13 @@ async function loadData(id: string): Promise<ExportData | null> {
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const url = new URL(req.url);
-  const format = (url.searchParams.get("format") ?? "csv") as "csv" | "xlsx" | "pdf";
+  const format = (url.searchParams.get("format") ?? "csv") as "csv" | "xlsx" | "pdf" | "scores";
 
   const data = await loadData(id);
   if (!data) return new Response("Not found", { status: 404 });
+
+  // Per-participant x per-question score sheet — CSV (opens in Excel), free.
+  if (format === "scores") return scoresCsvResponse(data);
 
   if (format === "xlsx") {
     if (!(await can("export_xlsx"))) {
@@ -126,7 +138,46 @@ function csvResponse({ presentation, slides, participants, responses, voteCounts
   });
 }
 
-async function xlsxResponse({ presentation, slides, participants, responses, voteCounts }: ExportData): Promise<Response> {
+// Per-participant x per-question score matrix: one row per participant, one
+// column per quiz slide (in slide order), plus a Total. Sorted high-to-low.
+function buildScoreMatrix(
+  slides: ExportData["slides"],
+  participants: ExportData["participants"],
+  quizScores: ExportData["quizScores"],
+): { header: string[]; rows: (string | number)[][] } {
+  const quizSlides = slides.filter((s) => s.type === "quiz").sort((a, b) => a.position - b.position);
+  const scoreByKey = new Map<string, number>();
+  for (const qs of quizScores) scoreByKey.set(`${qs.slide_id}:${qs.participant_id}`, qs.points);
+
+  const header = [
+    "Participant",
+    ...quizSlides.map((s, i) => (s.question ? `Q${i + 1}: ${s.question}`.slice(0, 80) : `Q${i + 1}`)),
+    "Total",
+  ];
+  const sorted = [...participants].sort(
+    (a, b) => b.score - a.score || new Date(a.created_at).getTime() - new Date(b.created_at).getTime(),
+  );
+  const rows = sorted.map((p) => {
+    const cells = quizSlides.map((s) => scoreByKey.get(`${s.id}:${p.id}`) ?? 0);
+    const total = cells.reduce((sum, n) => sum + n, 0);
+    return [p.nickname, ...cells, total];
+  });
+  return { header, rows };
+}
+
+function scoresCsvResponse(data: ExportData): Response {
+  const { header, rows } = buildScoreMatrix(data.slides, data.participants, data.quizScores);
+  const lines = [header.map(csvEscape).join(","), ...rows.map((r) => r.map(csvEscape).join(","))];
+  const safe = (data.presentation.title || "klikr").replace(/[^a-z0-9-_]+/gi, "_");
+  return new Response(lines.join("\n"), {
+    headers: {
+      "content-type": "text/csv; charset=utf-8",
+      "content-disposition": `attachment; filename="${safe}-${data.presentation.code}-scores.csv"`,
+    },
+  });
+}
+
+async function xlsxResponse({ presentation, slides, participants, responses, quizScores, voteCounts }: ExportData): Promise<Response> {
   const sheets: { name: string; rows: unknown[][] }[] = [
     {
       name: "Summary",
@@ -146,6 +197,12 @@ async function xlsxResponse({ presentation, slides, participants, responses, vot
       ],
     },
   ];
+
+  // Per-participant x per-question score sheet.
+  const scoreMatrix = buildScoreMatrix(slides, participants, quizScores);
+  if (scoreMatrix.rows.length > 0) {
+    sheets.push({ name: "Scores", rows: [scoreMatrix.header, ...scoreMatrix.rows] });
+  }
 
   const partById = new Map(participants.map((p) => [p.id, p]));
   for (const s of slides) {

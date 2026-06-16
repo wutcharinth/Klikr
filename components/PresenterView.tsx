@@ -347,6 +347,14 @@ export function PresenterView({
               >
                 ⬇ Export CSV
               </a>
+              <a
+                href={`/api/export/${presentation.id}?format=scores`}
+                download
+                className="btn-ghost text-sm"
+                title="Per-participant score per question, as a spreadsheet (opens in Excel)"
+              >
+                ⬇ Score sheet
+              </a>
               <a href="/dashboard" className="btn-primary text-sm">
                 Back to dashboard
               </a>

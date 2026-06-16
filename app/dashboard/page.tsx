@@ -225,6 +225,14 @@ export default async function Dashboard({ searchParams }: { searchParams?: Searc
                     <Download className="h-3.5 w-3.5" />
                   </a>
                   <a
+                    href={`/api/export/${p.id}?format=scores`}
+                    download
+                    className="btn-ghost h-9 px-3 text-xs muted-text"
+                    title="Score sheet — each participant's score per question (opens in Excel)"
+                  >
+                    Scores
+                  </a>
+                  <a
                     href={`/api/export/${p.id}?format=xlsx`}
                     className="btn-ghost h-9 px-3 text-xs muted-text"
                     title="Export Excel"
