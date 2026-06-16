@@ -789,39 +789,20 @@ function QAModerationTray({ responses, qaCfg }: { responses: ResponseRow[]; qaCf
   );
 }
 
-// Inline two-step confirm for ending the session. Avoids window.confirm, which
-// browsers suppress after repeated dialogs (silently no-opping the action).
-// First tap arms it; "End now" confirms; auto-disarms after 4s.
+// Single, direct "End session" — one click ends the game and moves everyone to
+// the podium. No window.confirm (browsers suppress it after repeated dialogs)
+// and no two-step (the second "End now" tap wasn't obvious and read as "the
+// button doesn't work"). Styled destructive so the intent is clear.
 function EndSessionButton({ onConfirm, variant }: { onConfirm: () => void; variant: "primary" | "ghost" }) {
-  const [armed, setArmed] = useState(false);
-  useEffect(() => {
-    if (!armed) return;
-    const t = setTimeout(() => setArmed(false), 4000);
-    return () => clearTimeout(t);
-  }, [armed]);
-
-  if (armed) {
-    return (
-      <span className="flex items-center gap-2">
-        <span className="text-xs muted-text">End for everyone?</span>
-        <button
-          onClick={onConfirm}
-          className="btn-primary"
-          style={{ background: "var(--danger)", borderColor: "var(--danger)" }}
-        >
-          End now
-        </button>
-        <button onClick={() => setArmed(false)} className="btn-ghost text-xs">
-          Cancel
-        </button>
-      </span>
-    );
-  }
   return (
     <button
-      onClick={() => setArmed(true)}
+      onClick={onConfirm}
       className={variant === "ghost" ? "btn-ghost" : "btn-primary"}
-      style={variant === "ghost" ? { color: "var(--danger)", borderColor: "rgba(252,165,165,.3)" } : undefined}
+      style={
+        variant === "ghost"
+          ? { color: "var(--danger)", borderColor: "rgba(252,165,165,.3)" }
+          : { background: "var(--danger)", borderColor: "var(--danger)" }
+      }
     >
       End session
     </button>
