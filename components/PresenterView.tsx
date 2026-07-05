@@ -46,6 +46,9 @@ export function PresenterView({
   const [leaderboardSlideId, setLeaderboardSlideId] = useState<string | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
+  const [starting, setStarting] = useState(false);
+  const [startError, setStartError] = useState<string | null>(null);
+  const [navError, setNavError] = useState<string | null>(null);
 
   // Optional auto-advance: after a quiz is scored, automatically show the
   // leaderboard then move to the next question on a timer. Off by default; the
@@ -214,15 +217,23 @@ export function PresenterView({
       });
     
     // Initial load for instant first paint. After that realtime keeps the
-    // roster fresh; the interval only fetches while the websocket is down
+    // roster fresh; the fast interval only fetches while the websocket is down
     // (Railway can drop it), so a healthy session has no 2s re-render churn.
+    // The slow interval is a belt-and-suspenders safety net: a channel can
+    // report "SUBSCRIBED" while still silently dropping specific row events
+    // (e.g. an RLS/auth edge case), and a host staring at a lobby that never
+    // updates has no other way to notice — so we never go fully quiet.
     loadParticipants();
-    const pollInterval = setInterval(() => {
+    const fastPoll = setInterval(() => {
       if (!realtimeOk) loadParticipants();
     }, 5000);
-    
+    const safetyPoll = setInterval(() => {
+      if (realtimeOk) loadParticipants();
+    }, 20000);
+
     return () => {
-      clearInterval(pollInterval);
+      clearInterval(fastPoll);
+      clearInterval(safetyPoll);
       supabase.removeChannel(channel);
     };
   }, [supabase, presentation.id, loadParticipants]);
@@ -274,11 +285,14 @@ export function PresenterView({
         realtimeOk = status === "SUBSCRIBED";
       });
       
-    // Fallback polling for responses too (Word Cloud, Polls, etc) — only while
-    // the websocket is down, so a healthy session re-renders on real changes
-    // rather than every 2s.
-    const pollResponses = () => {
-      if (realtimeOk) return;
+    // Fallback polling for responses too (Word Cloud, Polls, etc) — the fast
+    // interval only fires while the websocket is down, so a healthy session
+    // re-renders on real changes rather than every 2s. The slow interval is a
+    // safety net for the same silent-drop risk as the participants roster
+    // above (channel says "SUBSCRIBED" but a specific row's events never
+    // arrive) — votes/answers are the whole point of the presenter screen, so
+    // this can't be allowed to go stale indefinitely.
+    const fetchResponses = () => {
       supabase
         .from("responses")
         .select("*")
@@ -287,11 +301,17 @@ export function PresenterView({
           if (!cancelled && data) setResponses(data);
         });
     };
-    const pollInterval = setInterval(pollResponses, 5000);
-    
+    const fastPoll = setInterval(() => {
+      if (!realtimeOk) fetchResponses();
+    }, 5000);
+    const safetyPoll = setInterval(() => {
+      if (realtimeOk) fetchResponses();
+    }, 20000);
+
     return () => {
       cancelled = true;
-      clearInterval(pollInterval);
+      clearInterval(fastPoll);
+      clearInterval(safetyPoll);
       supabase.removeChannel(channel);
     };
   }, [supabase, currentSlide]);
@@ -300,6 +320,33 @@ export function PresenterView({
     ...(presentation.theme ?? {}),
     mode: effectiveMode,
   };
+
+  // Click Start → flip to "active" immediately (mirrors endSessionNow's
+  // optimistic pattern below) rather than waiting on the realtime echo of our
+  // own write, which can lag or — per the participants/responses polling
+  // fallbacks elsewhere in this file — occasionally never arrive. Without this,
+  // a slow/dropped echo left the host stuck looking at the lobby with no
+  // indication anything happened, indistinguishable from the button being
+  // broken. On failure, revert and show why so the host can retry.
+  async function startNow() {
+    if (starting) return;
+    setStarting(true);
+    setStartError(null);
+    const prevSlideId = presentation.current_slide_id;
+    const prevStartedAt = presentation.current_slide_started_at;
+    const first = slides[0]?.id ?? null;
+    const now = new Date().toISOString();
+    setPresentation((p) => ({ ...p, state: "active", current_slide_id: first, current_slide_started_at: now }));
+    try {
+      await startPresentation(presentation.id);
+    } catch (err) {
+      console.error("startPresentation failed", err);
+      setPresentation((p) => ({ ...p, state: "lobby", current_slide_id: prevSlideId, current_slide_started_at: prevStartedAt }));
+      setStartError(err instanceof Error ? err.message : "Couldn't start the session. Check your connection and try again.");
+    } finally {
+      setStarting(false);
+    }
+  }
 
   if (presentation.state === "lobby") {
     return (
@@ -311,7 +358,9 @@ export function PresenterView({
           joinUrl={joinUrl}
           mode={effectiveMode}
           onToggleMode={toggleMode}
-          onStart={() => startPresentation(presentation.id)}
+          onStart={startNow}
+          starting={starting}
+          startError={startError}
         />
       </ThemedShell>
     );
@@ -440,6 +489,7 @@ export function PresenterView({
   // reason we don't alert() on failure.
   async function endSessionNow() {
     clearAutoTimers();
+    setNavError(null);
     // Optimistic local update so the UI flips even if the realtime
     // event takes a moment (or doesn't fire at all).
     setPresentation((p) => ({ ...p, state: "closed" }));
@@ -448,13 +498,38 @@ export function PresenterView({
     } catch (err) {
       console.error("endPresentation failed", err);
       setPresentation((p) => ({ ...p, state: "active" }));
+      setNavError(err instanceof Error ? err.message : "Couldn't end the session. Check your connection and try again.");
     }
   }
 
-  function goToNextSlide() {
+  // Both nav actions surface a visible error on failure instead of silently
+  // doing nothing — clicking Next/Prev with no feedback reads as a broken
+  // button, same class of bug as the Start flow above.
+  async function goToNextSlide() {
     clearAutoTimers();
     setLeaderboardSlideId(null);
-    moveSlide(presentation.id, "next");
+    setNavError(null);
+    try {
+      await moveSlide(presentation.id, "next");
+    } catch (err) {
+      console.error("moveSlide next failed", err);
+      setNavError(err instanceof Error ? err.message : "Couldn't advance to the next slide. Check your connection and try again.");
+    }
+  }
+
+  async function goToPrevSlide() {
+    clearAutoTimers();
+    if (showQuizLeaderboard) {
+      setLeaderboardSlideId(null);
+      return;
+    }
+    setNavError(null);
+    try {
+      await moveSlide(presentation.id, "prev");
+    } catch (err) {
+      console.error("moveSlide prev failed", err);
+      setNavError(err instanceof Error ? err.message : "Couldn't go back to the previous slide. Check your connection and try again.");
+    }
   }
 
   return (
@@ -616,16 +691,14 @@ export function PresenterView({
           </div>
         </div>
 
+        {navError && (
+          <p className="px-2 text-xs sm:px-6" style={{ color: "var(--danger, #fca5a5)" }} role="alert">
+            {navError}
+          </p>
+        )}
         <div className="flex items-center justify-between px-2 sm:px-6">
           <button
-            onClick={() => {
-              clearAutoTimers();
-              if (showQuizLeaderboard) {
-                setLeaderboardSlideId(null);
-                return;
-              }
-              moveSlide(presentation.id, "prev");
-            }}
+            onClick={goToPrevSlide}
             disabled={idx === 0 && !showQuizLeaderboard}
             className="btn-ghost disabled:opacity-40"
           >
@@ -871,6 +944,8 @@ function Lobby({
   mode,
   onToggleMode,
   onStart,
+  starting,
+  startError,
 }: {
   presentation: Presentation;
   participants: Participant[];
@@ -879,6 +954,8 @@ function Lobby({
   mode: "light" | "dark";
   onToggleMode: () => void;
   onStart: () => void;
+  starting: boolean;
+  startError: string | null;
 }) {
   const code = presentation.code;
   let joinHost = "klikrapp.com";
@@ -1012,13 +1089,18 @@ function Lobby({
 
       <button
         onClick={onStart}
-        disabled={slidesCount === 0}
+        disabled={slidesCount === 0 || starting}
         className={`btn-primary mt-12 px-10 py-3 text-base ${
-          slidesCount > 0 && participants.length > 0 ? "start-pulse" : ""
+          slidesCount > 0 && participants.length > 0 && !starting ? "start-pulse" : ""
         }`}
       >
-        {slidesCount === 0 ? "Add slides first" : "Start"}
+        {slidesCount === 0 ? "Add slides first" : starting ? "Starting…" : "Start"}
       </button>
+      {startError && (
+        <p className="anim-fade-up relative z-10 mt-3 text-xs" style={{ color: "var(--danger, #fca5a5)" }} role="alert">
+          {startError}
+        </p>
+      )}
     </div>
   );
 }

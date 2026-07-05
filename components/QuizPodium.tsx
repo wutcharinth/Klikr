@@ -44,6 +44,21 @@ export function QuizPodium({ participants, presentationId }: { participants: Par
         />
       </div>
 
+      {/* Plain-text scores, always correct and immediately present — the
+       *  Remotion counter above animates from 0 and @remotion/player throttles
+       *  playback to ~1fps while the tab is backgrounded, so a host who opens
+       *  this in a background tab (or a screen reader, which gets nothing from
+       *  the canvas-like reveal) could otherwise be stuck looking at "0 pts". */}
+      <ul className="mt-5 flex flex-wrap items-center justify-center gap-x-6 gap-y-1.5 text-sm">
+        {top.map((p, i) => (
+          <li key={p.id} className="flex items-center gap-1.5">
+            <span aria-hidden>{["🥇", "🥈", "🥉"][i]}</span>
+            <span className="font-medium">{p.nickname}</span>
+            <span className="mono muted-text">{p.score.toLocaleString()}</span>
+          </li>
+        ))}
+      </ul>
+
       {rest.length > 0 && (
         <div className="mt-8">
           <p className="text-[11px] uppercase tracking-wider muted-text">Also in the running</p>

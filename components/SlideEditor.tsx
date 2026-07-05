@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useId, useState, useTransition } from "react";
 import { Sparkles, Loader2 } from "lucide-react";
 import type { Slide, MCQConfig, QuizConfig, WordCloudConfig, QAConfig, RatingConfig, EmbedConfig, RankingConfig, ImageCredit } from "@/lib/types";
 import { updateSlide, deleteSlide } from "@/app/edit/[id]/actions";
@@ -222,6 +222,7 @@ export function SlideEditor({
               value={config as QuizConfig}
               onChange={(c) => setConfig(c)}
               onCommit={save}
+              kahoot={kahoot}
             />
             <label className="mt-3 flex items-center gap-2 text-sm">
               <input
@@ -429,15 +430,25 @@ function RankingConfigEditor({
   );
 }
 
+// Kahoot mode only ever renders 4 tiles (Triangle/Diamond/Circle/Square) on
+// both the audience and presenter screens — see TILES in KahootAudienceView /
+// KahootPresenterView. Anything past the 4th option is silently invisible in
+// play, so the editor must cap/warn instead of letting a host author a
+// 5-option Kahoot question that quietly can't be fully answered.
+const KAHOOT_MAX_OPTIONS = 4;
+
 function QuizConfigEditor({
   value,
   onChange,
   onCommit,
+  kahoot,
 }: {
   value: QuizConfig;
   onChange: (v: QuizConfig) => void;
   onCommit: () => void;
+  kahoot: boolean;
 }) {
+  const radioGroupName = useId();
   return (
     <div className="space-y-3">
       <div>
@@ -446,7 +457,7 @@ function QuizConfigEditor({
           <div key={i} className="mt-2 flex items-center gap-2">
             <input
               type="radio"
-              name={`correct-${Math.random()}`}
+              name={radioGroupName}
               checked={value.correct_index === i}
               onChange={() => {
                 onChange({ ...value, correct_index: i });
@@ -468,8 +479,19 @@ function QuizConfigEditor({
               disabled={value.options.length <= 2}
               onClick={() => {
                 const nextOpts = value.options.filter((_, j) => j !== i);
-                const nextCorrect = Math.min(value.correct_index, nextOpts.length - 1);
-                onChange({ ...value, options: nextOpts, correct_index: Math.max(0, nextCorrect) });
+                // Deleting an option before the correct one shifts every later
+                // index down by one — the correct answer must shift with it,
+                // not stay pinned to the same numeric index (which would
+                // silently mark a different option "correct"). Deleting the
+                // correct option itself has no right answer to preserve, so
+                // fall back to the first remaining option.
+                const nextCorrect =
+                  i === value.correct_index
+                    ? 0
+                    : i < value.correct_index
+                      ? value.correct_index - 1
+                      : value.correct_index;
+                onChange({ ...value, options: nextOpts, correct_index: Math.min(nextCorrect, nextOpts.length - 1) });
                 onCommit();
               }}
               className="btn-ghost text-sm muted-text disabled:opacity-40 px-3 py-2"
@@ -478,16 +500,27 @@ function QuizConfigEditor({
             </button>
           </div>
         ))}
-        <button
-          type="button"
-          onClick={() => {
-            onChange({ ...value, options: [...value.options, `Option ${value.options.length + 1}`] });
-            onCommit();
-          }}
-          className="btn-ghost mt-2 text-sm muted-text"
-        >
-          + Add option
-        </button>
+        {(!kahoot || value.options.length < KAHOOT_MAX_OPTIONS) && (
+          <button
+            type="button"
+            onClick={() => {
+              onChange({ ...value, options: [...value.options, `Option ${value.options.length + 1}`] });
+              onCommit();
+            }}
+            className="btn-ghost mt-2 text-sm muted-text"
+          >
+            + Add option
+          </button>
+        )}
+        {kahoot && value.options.length === KAHOOT_MAX_OPTIONS && (
+          <p className="mt-2 text-xs muted-text">Kahoot mode shows up to {KAHOOT_MAX_OPTIONS} answer tiles.</p>
+        )}
+        {kahoot && value.options.length > KAHOOT_MAX_OPTIONS && (
+          <p className="mt-2 text-xs" style={{ color: "var(--danger, #fca5a5)" }}>
+            Kahoot mode only shows the first {KAHOOT_MAX_OPTIONS} options — the audience won&apos;t see the other{" "}
+            {value.options.length - KAHOOT_MAX_OPTIONS}.
+          </p>
+        )}
       </div>
       <label className="block">
         <span className="mb-2 block text-xs muted-text">Time limit (seconds)</span>

@@ -361,6 +361,7 @@ function NicknameForm({ onJoin }: { onJoin: (n: string) => Promise<void> }) {
   const [name, setName] = useState("");
   const [busy, setBusy] = useState(false);
   const [audio, setAudio] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   useEffect(() => { setAudio(isAudioOn()); }, []);
   return (
     <Stage>
@@ -381,8 +382,15 @@ function NicknameForm({ onJoin }: { onJoin: (n: string) => Promise<void> }) {
           e.preventDefault();
           if (!name.trim() || busy) return;
           setBusy(true);
+          setError(null);
           try {
             await onJoin(name);
+          } catch (err) {
+            // Without this, a failed join (closed session, dropped network,
+            // transient server error) just reset the button back to "Join"
+            // with zero explanation — indistinguishable from the app being
+            // broken. Keep the typed name so the player doesn't retype it.
+            setError(err instanceof Error ? err.message : "Couldn't join. Check your connection and try again.");
           } finally {
             setBusy(false);
           }
@@ -398,6 +406,11 @@ function NicknameForm({ onJoin }: { onJoin: (n: string) => Promise<void> }) {
           placeholder="Your nickname"
           required
         />
+        {error && (
+          <p className="text-xs" style={{ color: "var(--danger, #fca5a5)" }} role="alert">
+            {error}
+          </p>
+        )}
         <button disabled={busy} className="btn-primary press w-full" style={{ height: 48 }}>
           {busy ? "Joining…" : "Join"}
         </button>
