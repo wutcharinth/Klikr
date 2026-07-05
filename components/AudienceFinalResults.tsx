@@ -145,6 +145,17 @@ function FinalResultsBody({
               height={400}
             />
           </div>
+          {/* Plain-text scores alongside the animated reveal — see QuizPodium
+           *  for why the Remotion counter alone isn't reliable here. */}
+          <ul className="mt-3 flex flex-col items-center gap-1 text-sm">
+            {top3.map((p, i) => (
+              <li key={p.id} className="flex items-center gap-1.5">
+                <span aria-hidden>{["🥇", "🥈", "🥉"][i]}</span>
+                <span className="font-medium">{p.nickname}</span>
+                <span className="mono muted-text">{p.score.toLocaleString()}</span>
+              </li>
+            ))}
+          </ul>
         </div>
       ) : null}
 
