@@ -2,7 +2,7 @@
 
 Realtime audience-interaction platform — polls, quizzes, Q&A, word clouds, ratings, ranking, and Kahoot-style trivia. Hosts run a live deck on a big screen, the audience joins from any phone via a 6-character code or QR scan, and answers stream back live over Supabase Realtime.
 
-> Status: private repo · Next.js 15 · Supabase · TypeScript.
+> Status: private repo · Next.js 16 · Supabase · TypeScript.
 
 ---
 
