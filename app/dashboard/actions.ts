@@ -3,19 +3,19 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { getCurrentUser } from "@/lib/supabase/user";
 import { generateRoomCode } from "@/lib/code";
 
 export async function createPresentation(formData: FormData) {
-  const supabase = await createClient();
-  const { data: userData } = await supabase.auth.getUser();
-  if (!userData.user) redirect("/login");
+  const { supabase, user } = await getCurrentUser();
+  if (!user) redirect("/login");
   const title = String(formData.get("title") ?? "Untitled").trim() || "Untitled";
 
   for (let attempt = 0; attempt < 5; attempt++) {
     const code = generateRoomCode();
     const { data, error } = await supabase
       .from("presentations")
-      .insert({ owner_id: userData.user.id, title, code })
+      .insert({ owner_id: user.id, title, code })
       .select("id")
       .single();
     if (!error && data) {
@@ -44,27 +44,29 @@ export async function setPinned(id: string, pinned: boolean) {
 }
 
 export async function duplicatePresentation(sourceId: string) {
-  const supabase = await createClient();
-  const { data: userData } = await supabase.auth.getUser();
-  if (!userData.user) redirect("/login");
+  const { supabase, user } = await getCurrentUser();
+  if (!user) redirect("/login");
 
-  const { data: source, error: srcErr } = await supabase
-    .from("presentations")
-    .select("title, theme, is_template, source_template_id")
-    .eq("id", sourceId)
-    .single<{
-      title: string;
-      theme: unknown;
-      is_template: boolean | null;
-      source_template_id: string | null;
-    }>();
+  const [sourceResult, slidesResult] = await Promise.all([
+    supabase
+      .from("presentations")
+      .select("title, theme, is_template, source_template_id")
+      .eq("id", sourceId)
+      .single<{
+        title: string;
+        theme: unknown;
+        is_template: boolean | null;
+        source_template_id: string | null;
+      }>(),
+    supabase
+      .from("slides")
+      .select("position, type, question, config, image_url, image_credit, kahoot_mode")
+      .eq("presentation_id", sourceId)
+      .order("position", { ascending: true }),
+  ]);
+  const { data: source, error: srcErr } = sourceResult;
   if (srcErr || !source) throw srcErr ?? new Error("Source not found");
-
-  const { data: slides, error: slidesErr } = await supabase
-    .from("slides")
-    .select("position, type, question, config, image_url, image_credit, kahoot_mode")
-    .eq("presentation_id", sourceId)
-    .order("position", { ascending: true });
+  const { data: slides, error: slidesErr } = slidesResult;
   if (slidesErr) throw slidesErr;
 
   const newTitle = `${source.title} (copy)`;
@@ -74,7 +76,7 @@ export async function duplicatePresentation(sourceId: string) {
     const { data, error } = await supabase
       .from("presentations")
       .insert({
-        owner_id: userData.user.id,
+        owner_id: user.id,
         title: newTitle,
         code,
         theme: source.theme ?? null,

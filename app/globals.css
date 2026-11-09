@@ -1112,13 +1112,6 @@
   70%  { transform: translateY(6px) rotate(6deg) scale(1.05); opacity: 1; }
   100% { transform: translateY(0) rotate(0) scale(1); opacity: 1; }
 }
-.podium-skeleton {
-  aspect-ratio: 340 / 400;
-  border-radius: 18px;
-  background: linear-gradient(90deg, var(--bg-soft), var(--line), var(--bg-soft));
-  background-size: 200% 100%;
-  animation: chipShimmer 1.4s linear infinite;
-}
 
 /* --- Phone: reactions + lobby mark --- */
 .rx-float { animation: rxFloat 0.8s ease-out forwards; transform: translate(-50%, -50%); }
@@ -1312,3 +1305,102 @@
   /* Timers keep running (they convey information) but without colour flashing. */
   .time-bar, .gs-timer-arc, .intro-bar { animation-timing-function: linear; }
 }
+
+/* === Final podium (components/Podium.tsx) — DOM + CSS, no animation runtime === */
+.podium {
+  --podium-max: 210px;   /* height of the 1st-place block */
+  --podium-col: clamp(104px, 24%, 200px);
+  --podium-avatar: 64px;
+  position: relative;
+  padding-top: 28px;
+}
+.podium--compact {
+  --podium-max: 120px;
+  --podium-col: 31%;
+  --podium-avatar: 44px;
+  padding-top: 20px;
+}
+.podium-stage {
+  display: flex; align-items: flex-end; justify-content: center;
+  gap: clamp(8px, 2vw, 18px);
+  list-style: none; margin: 0; padding: 0;
+}
+.podium-col {
+  width: var(--podium-col); min-width: 0;
+  display: flex; flex-direction: column; align-items: center;
+}
+.podium-player {
+  display: flex; flex-direction: column; align-items: center;
+  width: 100%; min-width: 0; padding-bottom: 10px; text-align: center;
+  animation: podiumPlayerIn 0.5s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  animation-delay: calc(var(--podium-delay) + 0.35s);
+}
+.podium-crown { width: calc(var(--podium-avatar) * 0.55); height: auto; margin-bottom: 2px; }
+.podium-avatar {
+  width: var(--podium-avatar); height: var(--podium-avatar); border-radius: 999px;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--podium-fill); color: var(--podium-ink);
+  box-shadow: 0 0 0 3px var(--white), 0 0 0 5px var(--podium-edge);
+  font-weight: 800; font-size: calc(var(--podium-avatar) * 0.44); line-height: 1;
+}
+.podium-name {
+  margin-top: 10px; max-width: 100%;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-weight: 650; font-size: 1.05rem;
+}
+.podium--compact .podium-name { margin-top: 8px; font-size: 0.85rem; }
+.podium-you {
+  margin-left: 4px; padding: 1px 6px; border-radius: 999px; vertical-align: 2px;
+  background: var(--blue); color: #fff;
+  font-size: 0.6rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase;
+}
+.podium-score {
+  margin-top: 2px; font-weight: 800; font-size: 1.35rem; line-height: 1.2;
+  color: var(--blue); font-variant-numeric: tabular-nums;
+}
+.podium--compact .podium-score { font-size: 1rem; }
+.podium-pts { font-size: 0.7em; font-weight: 600; opacity: 0.7; }
+.podium-block {
+  width: 100%;
+  height: calc(var(--podium-max) * var(--podium-h));
+  border-radius: 14px 14px 4px 4px;
+  background: linear-gradient(180deg, var(--podium-fill), var(--podium-edge));
+  color: var(--podium-ink);
+  display: flex; justify-content: center; padding-top: 10px;
+  transform-origin: bottom;
+  animation: podiumRise 0.6s cubic-bezier(0.2, 0.9, 0.25, 1.05) both;
+  animation-delay: var(--podium-delay);
+}
+.podium-rank { font-weight: 800; font-size: calc(var(--podium-max) * 0.2); line-height: 1; opacity: 0.85; }
+.podium--compact .podium-rank { font-size: 1.4rem; }
+.podium-col--first .podium-block { box-shadow: 0 18px 40px -18px rgba(217, 162, 27, 0.75); }
+.podium-col--me .podium-avatar { box-shadow: 0 0 0 3px var(--white), 0 0 0 6px var(--blue); }
+@keyframes podiumRise { from { transform: scaleY(0); } to { transform: scaleY(1); } }
+@keyframes podiumPlayerIn {
+  from { opacity: 0; transform: translateY(14px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.podium-confetti { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+.podium-confetti span {
+  position: absolute; top: -12px; left: calc(30% + (var(--i) * 3%));
+  width: 7px; height: 11px; border-radius: 2px; opacity: 0;
+  background: hsl(calc(var(--i) * 47), 85%, 60%);
+  animation: podiumConfetti 1.8s cubic-bezier(0.3, 0.6, 0.5, 1) both;
+  animation-delay: calc(1.5s + var(--i) * 0.04s);
+}
+@keyframes podiumConfetti {
+  0%   { opacity: 1; transform: translate(0, 0) rotate(0); }
+  100% { opacity: 0; transform: translate(calc((var(--i) - 7) * 6px), 260px) rotate(540deg); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .podium-block, .podium-player { animation: none; }
+  .podium-confetti { display: none; }
+}
+
+/* Route loading skeletons (components/PageSkeleton.tsx). */
+.skeleton {
+  background: linear-gradient(90deg, var(--bg-soft), var(--line), var(--bg-soft));
+  background-size: 200% 100%;
+  animation: chipShimmer 1.4s linear infinite;
+}
+@media (prefers-reduced-motion: reduce) { .skeleton { animation: none; } }

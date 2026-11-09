@@ -1,10 +1,9 @@
 import Link from "next/link";
 import { getTranslations } from "next-intl/server";
-import { getCurrentUser } from "@/lib/supabase/user";
+import { getCurrentUser, getIsAdmin } from "@/lib/supabase/user";
 import LocaleSwitcher from "./LocaleSwitcher";
 import ThemeToggle from "./ThemeToggle";
 import { AI_ENABLED } from "@/lib/featureFlags";
-import { isAdminEmail } from "@/lib/admin";
 
 export default async function NavBar({
   active,
@@ -12,23 +11,11 @@ export default async function NavBar({
   active?: "features" | "templates" | "plans" | "credits" | "dashboard" | "admin" | "demo" | "about";
 }) {
   const t = await getTranslations("nav");
-  const { supabase, user } = await getCurrentUser();
+  const { user } = await getCurrentUser();
   const signedIn = Boolean(user);
   const homeHref = signedIn ? "/dashboard" : "/";
 
-  let isAdmin = false;
-  if (signedIn && user) {
-    if (isAdminEmail(user.email)) {
-      isAdmin = true;
-    } else {
-      const { data: prof } = await supabase
-        .from("profiles")
-        .select("is_admin")
-        .eq("id", user.id)
-        .maybeSingle();
-      isAdmin = Boolean(prof?.is_admin);
-    }
-  }
+  const isAdmin = signedIn ? await getIsAdmin() : false;
 
   const link = (href: string, label: string, key: typeof active) => (
     <Link

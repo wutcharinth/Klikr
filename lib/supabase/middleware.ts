@@ -23,6 +23,10 @@ export async function updateSession(request: NextRequest) {
     },
   );
 
-  await supabase.auth.getUser();
+  // Refreshes an expired session (writing the new cookies above) and verifies
+  // the JWT. getClaims() verifies locally with asymmetric signing keys, so
+  // unlike getUser() it doesn't add an Auth-server round trip to every
+  // navigation and server-action POST.
+  await supabase.auth.getClaims();
   return supabaseResponse;
 }

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect, notFound } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
+import { getCurrentUser } from "@/lib/supabase/user";
 import type { Presentation, Slide, SlideType } from "@/lib/types";
 import { addSlide } from "./actions";
 import { SlideEditor } from "@/components/SlideEditor";
@@ -11,39 +11,30 @@ import { Sparkles } from "lucide-react";
 
 export default async function EditPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const supabase = await createClient();
-  const { data: userData } = await supabase.auth.getUser();
-  if (!userData.user) redirect("/login");
+  const { supabase, user } = await getCurrentUser();
+  if (!user) redirect("/login");
 
-  const { data: presentation } = await supabase
-    .from("presentations")
-    .select("*")
-    .eq("id", id)
-    .single<Presentation>();
+  // All three reads are independent (RLS scopes them to what this user may
+  // see), so fetch them in one parallel round trip instead of four in a row.
+  const [{ data: presentation }, { data: slides }, { data: editorRows }] = await Promise.all([
+    supabase.from("presentations").select("*").eq("id", id).single<Presentation>(),
+    supabase
+      .from("slides")
+      .select("*")
+      .eq("presentation_id", id)
+      .order("position", { ascending: true })
+      .returns<Slide[]>(),
+    supabase
+      .from("presentation_editors")
+      .select("user_id, profiles:profiles!presentation_editors_user_id_fkey(display_name)")
+      .eq("presentation_id", id),
+  ]);
   if (!presentation) notFound();
 
-  const isOwner = presentation.owner_id === userData.user.id;
-  if (!isOwner) {
-    const { data: editorRow } = await supabase
-      .from("presentation_editors")
-      .select("user_id")
-      .eq("presentation_id", id)
-      .eq("user_id", userData.user.id)
-      .maybeSingle();
-    if (!editorRow) notFound();
+  const isOwner = presentation.owner_id === user.id;
+  if (!isOwner && !(editorRows ?? []).some((r) => (r as { user_id: string }).user_id === user.id)) {
+    notFound();
   }
-
-  const { data: slides } = await supabase
-    .from("slides")
-    .select("*")
-    .eq("presentation_id", id)
-    .order("position", { ascending: true })
-    .returns<Slide[]>();
-
-  const { data: editorRows } = await supabase
-    .from("presentation_editors")
-    .select("user_id, profiles:profiles!presentation_editors_user_id_fkey(display_name)")
-    .eq("presentation_id", id);
   const editors: Editor[] = (editorRows ?? []).map((r) => {
     type EditorRowProfile = { display_name: string | null } | { display_name: string | null }[] | null;
     const p = (r as unknown as { user_id: string; profiles: EditorRowProfile }).profiles;

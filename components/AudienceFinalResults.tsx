@@ -1,19 +1,12 @@
 "use client";
 
-import dynamic from "next/dynamic";
 import { Trophy } from "lucide-react";
 import type { Standing } from "@/lib/types";
 import { AudienceAppFeedback } from "./AudienceAppFeedback";
 import { encouragementFor } from "./QuizFeedback";
 import { useStandingsOptional } from "./audience/StandingsContext";
 import { useCountUp } from "@/lib/useCountUp";
-
-// The cinematic podium pulls in the Remotion runtime — load it only now, at
-// the very end of the session, instead of on the page every player opens.
-const PodiumPlayer = dynamic(() => import("./remotion/PodiumPlayer").then((m) => m.PodiumPlayer), {
-  ssr: false,
-  loading: () => <div className="podium-skeleton" aria-hidden />,
-});
+import { Podium } from "./Podium";
 
 const MEDAL = ["🥇", "🥈", "🥉"];
 const MEDAL_BG = ["#FFD54F", "#B0BEC5", "#D7864D"];
@@ -95,31 +88,15 @@ function FinalResultsBody({ nickname, standing }: { nickname: string; standing: 
         <p className="mt-5 text-sm font-medium">{headline}</p>
       </div>
 
-      {/* Cinematic top-3 podium reveal (Remotion, plays once). */}
       {top3.length > 0 ? (
         <div className="mt-8">
           <p className="text-[10px] uppercase tracking-[0.2em] muted-text">
             <Trophy className="-mt-0.5 mr-1.5 inline-block h-3 w-3" />
             Final podium
           </p>
-          <div className="mt-3">
-            <PodiumPlayer
-              entries={top3.map((p) => ({ nickname: p.nickname, score: p.score }))}
-              width={340}
-              height={400}
-            />
+          <div className="mt-2">
+            <Podium entries={top3} size="compact" highlightId={me.id} />
           </div>
-          {/* Plain-text scores alongside the animated reveal — see QuizPodium
-           *  for why the Remotion counter alone isn't reliable here. */}
-          <ul className="mt-3 flex flex-col items-center gap-1 text-sm">
-            {top3.map((p, i) => (
-              <li key={p.id} className="flex items-center gap-1.5">
-                <span aria-hidden>{["🥇", "🥈", "🥉"][i]}</span>
-                <span className="font-medium">{p.nickname}</span>
-                <span className="mono muted-text">{p.score.toLocaleString()}</span>
-              </li>
-            ))}
-          </ul>
         </div>
       ) : null}
 

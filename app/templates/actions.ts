@@ -3,30 +3,27 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { getCurrentUser } from "@/lib/supabase/user";
 import { createServiceClient } from "@/lib/supabase/service";
 import { generateRoomCode } from "@/lib/code";
 
 export async function applyTemplate(slug: string, formData: FormData) {
-  const supabase = await createClient();
-  const { data: userData } = await supabase.auth.getUser();
-  if (!userData.user) redirect(`/login?next=/templates/${slug}`);
+  const { supabase, user } = await getCurrentUser();
+  if (!user) redirect(`/login?next=/templates/${slug}`);
 
   const countRaw = formData.get("count");
   const shuffle = formData.get("shuffle") === "true";
   const requestedCount = countRaw ? parseInt(String(countRaw), 10) : null;
 
+  // Template row and its slide-pool size in one request (embedded count).
   const { data: tpl, error: tplErr } = await supabase
     .from("templates")
-    .select("id, title, default_count")
+    .select("id, title, default_count, template_slides(count)")
     .eq("slug", slug)
-    .single();
+    .single<{ id: string; title: string; default_count: number | null; template_slides: { count: number }[] }>();
   if (tplErr || !tpl) throw new Error("Template not found");
 
-  const { count: poolSize, error: poolErr } = await supabase
-    .from("template_slides")
-    .select("id", { count: "exact", head: true })
-    .eq("template_id", tpl.id);
-  if (poolErr) throw poolErr;
+  const poolSize = tpl.template_slides?.[0]?.count ?? 0;
   if (!poolSize) throw new Error("This template is not ready yet.");
 
   const expectedCount = requestedCount ?? tpl.default_count ?? poolSize;
@@ -35,7 +32,7 @@ export async function applyTemplate(slug: string, formData: FormData) {
     const code = generateRoomCode();
     const { data, error } = await supabase.rpc("apply_template", {
       p_template_id: tpl.id,
-      p_owner_id: userData.user.id,
+      p_owner_id: user.id,
       p_title: tpl.title,
       p_code: code,
       p_count: requestedCount,
