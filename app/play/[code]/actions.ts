@@ -5,7 +5,7 @@ import { createServiceClient } from "@/lib/supabase/service";
 import { containsProfanity } from "@/lib/profanity";
 import { isMissingRpc } from "@/lib/supabase/rpc";
 import { QUIZ_EARLY_TAP_GRACE_MS } from "@/lib/liveTiming";
-import type { MCQConfig, Participant, QAConfig, RankingConfig, Standing, StandingRow } from "@/lib/types";
+import type { MCQConfig, Participant, QAConfig, QuizConfig, RankingConfig, Standing, StandingRow } from "@/lib/types";
 
 export async function joinSession(presentationId: string, nickname: string) {
   const supabase = createServiceClient();
@@ -294,6 +294,113 @@ export async function getStanding(input: {
     })),
     scoredRev: (presRes.data?.scored_rev as number | undefined) ?? 0,
   };
+}
+
+export type QuizResult =
+  | {
+      /** The question is still running; ask again after `retryAfterMs`. */
+      status: "open";
+      retryAfterMs: number;
+    }
+  | {
+      status: "closed";
+      /** null only for a malformed slide with no answer key (nobody scores). */
+      correct_index: number | null;
+      /** This participant's recorded answer, or null if they didn't answer. */
+      my_answer: number | null;
+      /** Points this participant earned on the slide, from quiz_slide_scores.
+       *  null when the answer is correct but the host hasn't scored the slide
+       *  yet (scoring lands ~0.5–1s after the window closes). */
+      points: number | null;
+    };
+
+/** The answer key plus this participant's own result for a quiz slide. The
+ *  audience page never receives `correct_index` (see lib/audienceSlides.ts), so
+ *  this is the only way a phone learns the answer — and it refuses while the
+ *  question is still open, so the speed-scored quiz can't be read ahead. */
+export async function getQuizResult(input: {
+  slideId: string;
+  participantId: string;
+  participantToken: string;
+}): Promise<QuizResult> {
+  const { supabase, participant } = await assertParticipant(input);
+
+  // One parallel round trip for everything; nothing answer-related is returned
+  // unless the gate below decides the question has closed.
+  const [slideRes, presRes, respRes, scoreRes] = await Promise.all([
+    supabase
+      .from("slides")
+      .select("id, presentation_id, type, config")
+      .eq("id", input.slideId)
+      .maybeSingle(),
+    supabase
+      .from("presentations")
+      .select("state, current_slide_id, current_slide_started_at")
+      .eq("id", participant.presentation_id)
+      .maybeSingle(),
+    supabase
+      .from("responses")
+      .select("value_index")
+      .eq("slide_id", input.slideId)
+      .eq("participant_id", participant.id)
+      .limit(1)
+      .maybeSingle(),
+    supabase
+      .from("quiz_slide_scores")
+      .select("points")
+      .eq("slide_id", input.slideId)
+      .eq("participant_id", participant.id)
+      .maybeSingle(),
+  ]);
+  for (const r of [slideRes, presRes, respRes, scoreRes]) {
+    if (r.error) throw r.error;
+  }
+  const slide = slideRes.data;
+  const pres = presRes.data;
+  if (!slide || slide.type !== "quiz" || slide.presentation_id !== participant.presentation_id) {
+    throw new Error("Quiz slide not found");
+  }
+  if (!pres) throw new Error("Session not found");
+  const cfg = slide.config as Partial<QuizConfig>;
+
+  // Once the session is closed every question is over. Otherwise:
+  if (pres.state !== "closed") {
+    if (pres.current_slide_id === slide.id) {
+      // The live question closes when its answer window runs out, on the
+      // server's clock. current_slide_started_at is when answers open (it sits
+      // in the future during the "get ready" intro, lib/liveTiming.ts), and
+      // the host's "end question now" rewinds it, so a force-ended question
+      // passes this check straight away.
+      const limitMs = Math.max(1, cfg.time_limit_s ?? 20) * 1000;
+      const startedAt = pres.current_slide_started_at
+        ? new Date(pres.current_slide_started_at).getTime()
+        : NaN;
+      if (!Number.isFinite(startedAt)) return { status: "open", retryAfterMs: 1000 };
+      const remainingMs = startedAt + limitMs - Date.now();
+      if (remainingMs > 0) return { status: "open", retryAfterMs: remainingMs };
+    } else {
+      // Not the live slide: only reveal it if it has already been played, or
+      // a player could pull the answer to an upcoming question by its id.
+      // Responses can only be written by submitResponse, which requires the
+      // slide to be live, so any response row proves the question was asked.
+      const { count, error } = await supabase
+        .from("responses")
+        .select("id", { count: "exact", head: true })
+        .eq("slide_id", slide.id);
+      if (error) throw error;
+      if (!count) throw new Error("This question hasn't been played yet");
+    }
+  }
+
+  const correctIndex = typeof cfg.correct_index === "number" ? cfg.correct_index : null;
+  const myAnswer = typeof respRes.data?.value_index === "number" ? respRes.data.value_index : null;
+  const isCorrect = correctIndex !== null && myAnswer === correctIndex;
+  // score_quiz_slide only writes rows for correct answers, so a missing row
+  // means 0 for a wrong/skipped answer but "not scored yet" for a correct one.
+  const scored = typeof scoreRes.data?.points === "number" ? scoreRes.data.points : null;
+  const points = scored ?? (isCorrect ? null : 0);
+
+  return { status: "closed", correct_index: correctIndex, my_answer: myAnswer, points };
 }
 
 /** Q&A slides allow each participant to submit MULTIPLE questions, so we INSERT

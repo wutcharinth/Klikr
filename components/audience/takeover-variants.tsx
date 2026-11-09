@@ -5,8 +5,17 @@ import { MiniConfettiBurst } from "../QuizFeedback";
 import { useCountUp } from "@/lib/useCountUp";
 import { useStandingsOptional } from "./StandingsContext";
 
-export function QuizCorrectVariant({ points, streak }: { points: number; streak?: number }) {
-  const shown = useCountUp(points, { from: 0, duration: 900, delay: 250 });
+export function QuizCorrectVariant({
+  points,
+  streak,
+}: {
+  slideId?: string;
+  points?: number;
+  streak?: number;
+}) {
+  // Counts up from 0 once the real points arrive (they can land a beat after
+  // the reveal when the host's scoring is still in flight).
+  const shown = useCountUp(points ?? 0, { from: 0, duration: 900, delay: 250 });
   return (
     <div className="takeover-content">
       <div className="takeover-icon">
@@ -16,10 +25,18 @@ export function QuizCorrectVariant({ points, streak }: { points: number; streak?
         <CheckCircle className="relative h-20 w-20" strokeWidth={2.4} />
       </div>
       <div className="takeover-title">Correct!</div>
-      <div className="takeover-points" aria-label={`Plus ${points} points`}>
-        +{shown.toLocaleString()}
-        <span className="ml-1 text-base font-semibold opacity-90">pts</span>
-      </div>
+      {points !== undefined ? (
+        <div className="takeover-points" aria-label={`Plus ${points} points`}>
+          +{shown.toLocaleString()}
+          <span className="ml-1 text-base font-semibold opacity-90">pts</span>
+        </div>
+      ) : (
+        <div className="takeover-points" aria-live="polite">
+          <span className="text-base font-semibold opacity-90">
+            Scoring<span className="loading-dots" aria-hidden />
+          </span>
+        </div>
+      )}
       {streak && streak >= 2 ? (
         <div className="streak-pill" style={{ animationDelay: "0.55s" }}>
           <span className="streak-flame" aria-hidden>🔥</span> {streak} in a row!

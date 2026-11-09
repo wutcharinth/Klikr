@@ -1,24 +1,35 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { Slide, QuizConfig } from "@/lib/types";
-import { submitResponse } from "@/app/play/[code]/actions";
+import type { Slide } from "@/lib/types";
+import type { AudienceQuizConfig } from "@/lib/audienceSlides";
+import { getQuizResult, submitResponse, type QuizResult } from "@/app/play/[code]/actions";
 import { useQuizPhase } from "@/lib/useQuizPhase";
 import { serverNow } from "@/lib/serverClock";
-import { quizPoints } from "@/lib/quizTiles";
 import { playClip, unlock, vibrate } from "@/lib/audio";
 import { bumpStreak, resetStreak } from "@/lib/streak";
 import { useTakeover } from "./TakeoverContext";
 import { useStandingsOptional } from "./StandingsContext";
+
+// Give up asking for the result if the server still says "open" after this —
+// only reachable when the phone's idea of server time is far off.
+const OPEN_RETRY_DEADLINE_MS = 60_000;
+
+const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
 /**
  * Everything a phone needs to play one timed quiz question, shared by the
  * classic list view and the game-show tile view:
  *  - phase (intro → open → closed) on the server clock, re-rendering only at
  *    phase boundaries;
- *  - tap → optimistic points (mirrors score_quiz_slide) + submit;
- *  - on close → tell StandingsContext the round ended and fire the
- *    correct / wrong / time's-up takeover.
+ *  - tap → submit;
+ *  - on close → tell StandingsContext the round ended, ask the server for the
+ *    result and fire the correct / wrong / time's-up takeover.
+ *
+ * The phone never holds the answer key: /play strips correct_index from quiz
+ * configs (lib/audienceSlides.ts). getQuizResult hands back the correct
+ * answer, this player's recorded answer and their real points from
+ * quiz_slide_scores — and only once the question has closed.
  */
 export function useQuizRound({
   slide,
@@ -33,16 +44,25 @@ export function useQuizRound({
   presentationId: string;
   startedAt: string | null;
 }) {
-  const cfg = slide.config as QuizConfig;
+  const cfg = slide.config as AudienceQuizConfig;
   const limit = cfg.time_limit_s ?? 20;
   const timing = useQuizPhase(startedAt, limit);
   const [picked, setPicked] = useState<number | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
-  const pointsRef = useRef(0);
+  const [awaitingPoints, setAwaitingPoints] = useState(false);
   const firedRef = useRef(false);
-  const { trigger } = useTakeover();
+  const aliveRef = useRef(true);
+  const pendingSubmitRef = useRef<Promise<unknown> | null>(null);
+  const { trigger, update } = useTakeover();
   const standings = useStandingsOptional();
   const markRoundClosed = standings?.markRoundClosed;
+
+  useEffect(() => {
+    aliveRef.current = true;
+    return () => {
+      aliveRef.current = false;
+    };
+  }, []);
 
   // Answers unlocked after the intro: a little "go" cue.
   const prevPhaseRef = useRef(timing.phase);
@@ -54,36 +74,85 @@ export function useQuizRound({
     prevPhaseRef.current = timing.phase;
   }, [timing.phase]);
 
-  // Reveal the instant the window closes, with points captured at tap time —
-  // no waiting on the host's scoring write for the correct/wrong beat. Rank
-  // arrives a moment later via StandingsContext.
+  // Reveal as soon as the server confirms the window closed. Rank arrives via
+  // StandingsContext; points come with the result, or a beat later (below)
+  // when the host's scoring write hasn't landed yet.
   useEffect(() => {
     if (timing.phase !== "closed" || firedRef.current) return;
     firedRef.current = true;
     markRoundClosed?.();
-    const correctText = cfg.options[cfg.correct_index];
-    if (picked === null) {
-      resetStreak(presentationId);
-      trigger({ kind: "quiz-skipped", correctText });
-    } else if (picked === cfg.correct_index) {
-      const streak = bumpStreak(presentationId);
-      trigger({ kind: "quiz-correct", points: pointsRef.current, streak });
-    } else {
-      resetStreak(presentationId);
-      trigger({ kind: "quiz-wrong", correctText });
-    }
-  }, [timing.phase, picked, cfg.correct_index, cfg.options, presentationId, trigger, markRoundClosed]);
+    void (async () => {
+      // Let a last-instant tap reach the server so it counts as this
+      // player's answer rather than a skip.
+      await pendingSubmitRef.current;
+      const deadline = Date.now() + OPEN_RETRY_DEADLINE_MS;
+      let res: Extract<QuizResult, { status: "closed" }>;
+      for (;;) {
+        let reply: QuizResult;
+        try {
+          reply = await getQuizResult({ slideId: slide.id, participantId, participantToken });
+        } catch {
+          return; // e.g. host already moved on — nothing to reveal
+        }
+        if (!aliveRef.current) return;
+        if (reply.status === "closed") {
+          res = reply;
+          break;
+        }
+        // This phone's clock estimate ran ahead of the server: wait it out.
+        if (Date.now() > deadline) return;
+        await sleep(Math.min(Math.max(reply.retryAfterMs, 250), 5000));
+        if (!aliveRef.current) return;
+      }
+
+      const correctText = res.correct_index !== null ? cfg.options[res.correct_index] : undefined;
+      if (res.my_answer === null) {
+        resetStreak(presentationId);
+        trigger({ kind: "quiz-skipped", correctText });
+      } else if (res.correct_index !== null && res.my_answer === res.correct_index) {
+        const streak = bumpStreak(presentationId);
+        trigger({ kind: "quiz-correct", slideId: slide.id, points: res.points ?? undefined, streak });
+        if (res.points === null) setAwaitingPoints(true);
+      } else {
+        resetStreak(presentationId);
+        trigger({ kind: "quiz-wrong", correctText });
+      }
+    })();
+  }, [timing.phase, cfg.options, slide.id, participantId, participantToken, presentationId, trigger, markRoundClosed]);
+
+  // Correct, but scoring hadn't landed when the reveal fired. StandingsContext
+  // marks the round settled once the scored_rev signal (or its fallback poll)
+  // shows the scores moved — re-read the real points then and fill them in on
+  // the takeover that's already up.
+  const settled = standings ? standings.settled : true;
+  const standingRev = standings?.standing?.scoredRev;
+  useEffect(() => {
+    if (!awaitingPoints || !settled) return;
+    let cancelled = false;
+    void getQuizResult({ slideId: slide.id, participantId, participantToken })
+      .then((res) => {
+        if (cancelled || res.status !== "closed" || res.points === null) return;
+        const points = res.points;
+        update((cur) => (cur.kind === "quiz-correct" && cur.slideId === slide.id ? { ...cur, points } : cur));
+        setAwaitingPoints(false);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [awaitingPoints, settled, standingRev, slide.id, participantId, participantToken, update]);
 
   const choose = useCallback(
     async (i: number) => {
       if (picked !== null || timing.phase !== "open") return;
-      pointsRef.current = quizPoints(i === cfg.correct_index, serverNow() - timing.openAt, limit);
       setPicked(i);
       setSubmitError(null);
       void unlock();
       vibrate(25);
+      const submission = submitResponse({ slideId: slide.id, participantId, participantToken, valueIndex: i });
+      pendingSubmitRef.current = submission.catch(() => undefined);
       try {
-        await submitResponse({ slideId: slide.id, participantId, participantToken, valueIndex: i });
+        await submission;
       } catch (err) {
         const msg = err instanceof Error ? err.message : "Couldn't send your answer.";
         setSubmitError(msg);
@@ -92,7 +161,7 @@ export function useQuizRound({
         if (serverNow() < timing.closeAt) setPicked(null);
       }
     },
-    [picked, timing.phase, timing.openAt, timing.closeAt, cfg.correct_index, limit, slide.id, participantId, participantToken],
+    [picked, timing.phase, timing.closeAt, slide.id, participantId, participantToken],
   );
 
   return { cfg, limit, timing, picked, choose, submitError };
