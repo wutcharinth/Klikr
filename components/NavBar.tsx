@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { getTranslations } from "next-intl/server";
-import { createClient } from "@/lib/supabase/server";
+import { getCurrentUser } from "@/lib/supabase/user";
 import LocaleSwitcher from "./LocaleSwitcher";
 import ThemeToggle from "./ThemeToggle";
 import { AI_ENABLED } from "@/lib/featureFlags";
@@ -12,20 +12,19 @@ export default async function NavBar({
   active?: "features" | "templates" | "plans" | "credits" | "dashboard" | "admin" | "demo" | "about";
 }) {
   const t = await getTranslations("nav");
-  const supabase = await createClient();
-  const { data } = await supabase.auth.getUser();
-  const signedIn = Boolean(data.user);
+  const { supabase, user } = await getCurrentUser();
+  const signedIn = Boolean(user);
   const homeHref = signedIn ? "/dashboard" : "/";
 
   let isAdmin = false;
-  if (signedIn && data.user) {
-    if (isAdminEmail(data.user.email)) {
+  if (signedIn && user) {
+    if (isAdminEmail(user.email)) {
       isAdmin = true;
     } else {
       const { data: prof } = await supabase
         .from("profiles")
         .select("is_admin")
-        .eq("id", data.user.id)
+        .eq("id", user.id)
         .maybeSingle();
       isAdmin = Boolean(prof?.is_admin);
     }
@@ -48,9 +47,12 @@ export default async function NavBar({
       <div className="flex shrink-0 items-center gap-3 sm:gap-6">
         <Link href={homeHref} className="group inline-flex shrink-0 items-center gap-2.5">
           <img
-            src="/brand/klikr-logo.png"
+            src="/brand/klikr-logo-96.png"
             alt=""
             aria-hidden
+            width={32}
+            height={32}
+            decoding="async"
             className="h-8 w-8 rounded-[10px] transition-transform duration-300 group-hover:scale-105 group-hover:rotate-[-4deg]"
             style={{ boxShadow: "0 6px 18px -8px rgba(99, 102, 241, 0.6)" }}
           />

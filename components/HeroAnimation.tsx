@@ -147,7 +147,7 @@ export function HeroAnimationCSS({ className = "" }: { className?: string }) {
       aria-label="A live Klikr session — host creates a deck, audience joins, votes flow in, and live results appear."
     >
       {/* Background ambient glow */}
-      <div className="absolute top-0 right-0 w-2/3 h-2/3 bg-blue-500/10 blur-[80px] rounded-full pointer-events-none" />
+      <div className="absolute top-0 right-0 w-2/3 h-2/3 bg-blue-500/10 blur-[80px] rounded-full pointer-events-none max-sm:hidden" />
 
       {/* Nav strip — always visible */}
       <div className="absolute top-0 left-0 right-0 p-5 sm:p-6 flex items-center justify-between z-10">

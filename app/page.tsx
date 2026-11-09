@@ -4,7 +4,7 @@ import { getTranslations } from "next-intl/server";
 import { JoinForm } from "@/components/JoinForm";
 import { ArrowRight } from "lucide-react";
 import NavBar from "@/components/NavBar";
-import { createClient } from "@/lib/supabase/server";
+import { getCurrentUser } from "@/lib/supabase/user";
 import { HeroAnimationCSS } from "@/components/HeroAnimation";
 import { Reveal } from "@/components/Reveal";
 
@@ -17,9 +17,8 @@ async function joinAction(formData: FormData) {
 
 export default async function Landing() {
   const t = await getTranslations("landing");
-  const supabase = await createClient();
-  const { data } = await supabase.auth.getUser();
-  const signedIn = Boolean(data.user);
+  const { user } = await getCurrentUser();
+  const signedIn = Boolean(user);
 
   const jsonLd = {
     "@context": "https://schema.org",
