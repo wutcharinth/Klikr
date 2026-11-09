@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { createServiceClient } from "@/lib/supabase/service";
 import type { Presentation, Slide } from "@/lib/types";
 import { AudienceView } from "@/components/AudienceView";
 import { toAudienceSlide } from "@/lib/audienceSlides";
@@ -27,7 +28,11 @@ export default async function PlayPage({
     );
   }
 
-  const { data: slides } = await supabase
+  // Slides load with the service role: the public RLS read on `slides` is
+  // gone (migration 0028), because it let anyone holding the anon key read
+  // every quiz answer straight from the REST API. Scoped to the presentation
+  // the code resolved to, and sanitized below before reaching the client.
+  const { data: slides } = await createServiceClient()
     .from("slides")
     .select("*")
     .eq("presentation_id", presentation.id)
