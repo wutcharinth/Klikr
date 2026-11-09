@@ -70,6 +70,9 @@ function PresenterViewInner({
   // of answers re-renders the presenter once per frame, not once per answer.
   const [responses, enqueueResponses, setResponses] = useBufferedState<ResponseRow[]>([]);
   const [participants, enqueueParticipants, setParticipants] = useBufferedState<Participant[]>([]);
+  // Stable id → nickname lookup for the quiz screen (memoised so the memo'd
+  // KahootPresenterView only re-renders when the roster actually changes).
+  const nicknames = useMemo(() => new Map(participants.map((p) => [p.id, p.nickname])), [participants]);
   const [modeOverride, setModeOverride] = useState<"light" | "dark" | null>(null);
   const [scoredSlideIds, setScoredSlideIds] = useState<Set<string>>(() => new Set());
   const [expiredQuizSlideIds, setExpiredQuizSlideIds] = useState<Set<string>>(() => new Set());
@@ -722,6 +725,7 @@ function PresenterViewInner({
                 questionNumber={quizNumber}
                 questionCount={quizSlides.length}
                 playerCount={participants.length}
+                nicknames={nicknames}
               />
             ) : (
               <>

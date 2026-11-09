@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Check } from "lucide-react";
+import { Check, Zap } from "lucide-react";
 import type { Slide } from "@/lib/types";
 import { QUIZ_TILES, tileFor, tileGradient } from "@/lib/quizTiles";
 import { TimeBar, TimeLeftPill, useElapsed } from "./QuizTimers";
@@ -25,7 +25,7 @@ export function KahootAudienceView({
   startedAt: string | null;
   scoredRev?: number;
 }) {
-  const { cfg, limit, timing, picked, choose, submitError } = useQuizRound({
+  const { cfg, limit, timing, picked, answeredMs, choose, submitError } = useQuizRound({
     slide,
     participantId,
     participantToken,
@@ -46,6 +46,7 @@ export function KahootAudienceView({
         text={cfg.options[picked]}
         closeAt={timing.closeAt}
         limit={limit}
+        answeredMs={answeredMs}
       />
     );
   }
@@ -133,12 +134,15 @@ export function LockedIn({
   text,
   closeAt,
   limit,
+  answeredMs = null,
   showTile = true,
 }: {
   tileIndex: number;
   text: string;
   closeAt: number;
   limit: number;
+  /** Time from the question opening to this player's tap. */
+  answeredMs?: number | null;
   showTile?: boolean;
 }) {
   const tile = tileFor(tileIndex);
@@ -159,6 +163,12 @@ export function LockedIn({
       ) : null}
       <p className="mt-5 text-[10px] font-semibold uppercase tracking-[0.2em] muted-text">Locked in</p>
       <p className="mt-1 px-4 text-xl font-semibold leading-snug">{text}</p>
+      {answeredMs != null && (
+        <p className="answered-in mt-3 inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-sm font-semibold">
+          <Zap className="h-3.5 w-3.5" style={{ color: "#facc15", fill: "#facc15" }} aria-hidden />
+          Answered in <span className="mono">{(answeredMs / 1000).toFixed(1)}s</span>
+        </p>
+      )}
       <p key={line} className="wait-line mt-3 text-sm muted-text">
         {WAIT_LINES[line]}
       </p>

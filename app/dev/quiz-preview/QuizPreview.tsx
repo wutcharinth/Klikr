@@ -154,6 +154,7 @@ function PresenterPreview({ view }: { view: string }) {
             questionNumber={3}
             questionCount={10}
             playerCount={12}
+            nicknames={new Map(participants.map((p) => [p.id, p.nickname]))}
           />
         )}
       </div>
@@ -195,7 +196,7 @@ function PhonePreview({ view }: { view: string }) {
             <h2 className="mt-1 text-2xl font-semibold tracking-tight">{SLIDE.question}</h2>
             <div className="mt-6">
               {view === "phone-locked" ? (
-                <LockedIn tileIndex={0} text="Mercury" closeAt={Date.now() + 14_000} limit={20} />
+                <LockedIn tileIndex={0} text="Mercury" closeAt={Date.now() + 14_000} limit={20} answeredMs={2340} />
               ) : view === "phone-leaderboard" || view.startsWith("phone-c") || view.startsWith("phone-w") || view.startsWith("phone-s") ? (
                 <StagedLeaderboard />
               ) : (
