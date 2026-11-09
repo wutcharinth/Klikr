@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { BarChart3, Download, FilePlus2, FileText, LayoutTemplate, Pin, PinOff, Copy, Trash2 } from "lucide-react";
-import { getCurrentUser } from "@/lib/supabase/user";
+import { BarChart3, Download, FilePlus2, FileText, LayoutTemplate, Loader2, Pin, PinOff, Copy, Trash2 } from "lucide-react";
+import { SubmitButton } from "@/components/SubmitButton";
+import { getCurrentUser, getIsAdmin } from "@/lib/supabase/user";
 import {
   createPresentation,
   deletePresentation,
@@ -35,6 +36,8 @@ export default async function Dashboard({ searchParams }: { searchParams?: Searc
   const sp = (await searchParams) ?? {};
 
   // One parallel round trip: onboarding gate + both presentation lists.
+  // getIsAdmin() is memoised per request; starting it here lets the NavBar's
+  // admin lookup overlap these queries instead of running after them.
   const [profileResult, ownedResult, editorResult] = await Promise.all([
     supabase.from("profiles").select("onboarded_at").eq("id", user.id).maybeSingle(),
     supabase
@@ -45,6 +48,7 @@ export default async function Dashboard({ searchParams }: { searchParams?: Searc
       .from("presentation_editors")
       .select("presentations(id, title, code, state, created_at, last_started_at, pinned)")
       .eq("user_id", user.id),
+    getIsAdmin(),
   ]);
 
   // Onboarding gate: only redirect to /welcome if the row exists and the user
@@ -96,13 +100,24 @@ export default async function Dashboard({ searchParams }: { searchParams?: Searc
         <div className={`mt-6 grid gap-3 ${AI_ENABLED ? "sm:grid-cols-3" : "sm:grid-cols-2"}`}>
           <form action={createPresentation}>
             <input type="hidden" name="title" value="Untitled" />
-            <button className="panel flex w-full items-center gap-3 p-4 text-left transition hover:border-[var(--ink)]">
+            <SubmitButton
+              className="panel flex w-full items-center gap-3 p-4 text-left transition hover:border-[var(--ink)] disabled:opacity-70"
+              pendingLabel={
+                <>
+                  <Loader2 className="h-5 w-5 shrink-0 animate-spin" style={{ color: "var(--blue)" }} />
+                  <span className="min-w-0">
+                    <span className="block font-medium">Creating…</span>
+                    <span className="block text-xs muted-text">Opening the editor</span>
+                  </span>
+                </>
+              }
+            >
               <FilePlus2 className="h-5 w-5 shrink-0" style={{ color: "var(--blue)" }} />
               <span className="min-w-0">
                 <span className="block font-medium">Start from blank</span>
                 <span className="block text-xs muted-text">Empty deck, name it later</span>
               </span>
-            </button>
+            </SubmitButton>
           </form>
           <Link
             href="/templates"
@@ -204,13 +219,13 @@ export default async function Dashboard({ searchParams }: { searchParams?: Searc
                       await duplicatePresentation(p.id);
                     }}
                   >
-                    <button
+                    <SubmitButton
                       className="btn-ghost inline-flex h-10 w-10 items-center justify-center p-0 text-xs muted-text sm:h-9 sm:w-9"
                       title="Duplicate"
                       aria-label="Duplicate"
                     >
                       <Copy className="h-3.5 w-3.5" />
-                    </button>
+                    </SubmitButton>
                   </form>
                   <a
                     href={`/api/export/${p.id}`}

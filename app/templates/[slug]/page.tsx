@@ -22,18 +22,15 @@ export default async function TemplateDetail({ params }: { params: Params }) {
     .maybeSingle();
   if (!tpl) notFound();
 
-  const { data: slides } = await supabase
-    .from("template_slides")
-    .select("*")
-    .eq("template_id", tpl.id)
-    .order("position");
-
-  const { data: related } = await supabase
-    .from("templates")
-    .select("slug, title, category, description, usage_count")
-    .eq("category", tpl.category)
-    .neq("id", tpl.id)
-    .limit(3);
+  const [{ data: slides }, { data: related }] = await Promise.all([
+    supabase.from("template_slides").select("*").eq("template_id", tpl.id).order("position"),
+    supabase
+      .from("templates")
+      .select("slug, title, category, description, usage_count")
+      .eq("category", tpl.category)
+      .neq("id", tpl.id)
+      .limit(3),
+  ]);
 
   const apply = applyTemplate.bind(null, slug);
   const poolSize = (slides ?? []).length;

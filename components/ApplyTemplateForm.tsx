@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { Shuffle, Sparkles } from "lucide-react";
+import { Loader2, Shuffle, Sparkles } from "lucide-react";
+import { SubmitButton } from "./SubmitButton";
 
 interface Props {
   action: (formData: FormData) => Promise<void>;
@@ -78,11 +79,19 @@ export default function ApplyTemplateForm({ action, poolSize, defaultCount }: Pr
         </div>
       )}
 
-      <button type="submit" className="btn-primary w-full justify-center">
+      <SubmitButton
+        className="btn-primary w-full justify-center disabled:opacity-80"
+        pendingLabel={
+          <>
+            <Loader2 className="h-4 w-4 animate-spin" />
+            Creating your deck…
+          </>
+        }
+      >
         <Sparkles className="h-4 w-4" />
         Use template
         {hasPool && <span className="ml-1 opacity-70">· {count} slides</span>}
-      </button>
+      </SubmitButton>
     </form>
   );
 }

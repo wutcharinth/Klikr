@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect, notFound } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
+import { getCurrentUser } from "@/lib/supabase/user";
 import type { Presentation, Slide } from "@/lib/types";
 import { PresenterView } from "@/components/PresenterView";
 import { headers } from "next/headers";
@@ -11,32 +11,26 @@ export default async function PresentPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const supabase = await createClient();
-  const { data: userData } = await supabase.auth.getUser();
-  if (!userData.user) redirect("/login");
+  const { supabase, user } = await getCurrentUser();
+  if (!user) redirect("/login");
 
-  const { data: presentation } = await supabase
-    .from("presentations")
-    .select("*")
-    .eq("id", id)
-    .single<Presentation>();
-  if (!presentation) notFound();
-  if (presentation.owner_id !== userData.user.id) {
-    const { data: editorRow } = await supabase
+  const [{ data: presentation }, { data: slides }, { data: editorRow }] = await Promise.all([
+    supabase.from("presentations").select("*").eq("id", id).single<Presentation>(),
+    supabase
+      .from("slides")
+      .select("*")
+      .eq("presentation_id", id)
+      .order("position", { ascending: true })
+      .returns<Slide[]>(),
+    supabase
       .from("presentation_editors")
       .select("user_id")
       .eq("presentation_id", id)
-      .eq("user_id", userData.user.id)
-      .maybeSingle();
-    if (!editorRow) notFound();
-  }
-
-  const { data: slides } = await supabase
-    .from("slides")
-    .select("*")
-    .eq("presentation_id", id)
-    .order("position", { ascending: true })
-    .returns<Slide[]>();
+      .eq("user_id", user.id)
+      .maybeSingle(),
+  ]);
+  if (!presentation) notFound();
+  if (presentation.owner_id !== user.id && !editorRow) notFound();
 
   const h = await headers();
   const rawHost = h.get("x-forwarded-host") ?? h.get("host") ?? "klikr.app";
