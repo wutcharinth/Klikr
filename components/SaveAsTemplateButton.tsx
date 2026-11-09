@@ -13,7 +13,7 @@ export default function SaveAsTemplateButton({ presentationId, presentationTitle
     return (
       <button
         onClick={() => setOpen(true)}
-        className="btn-ghost inline-flex h-9 w-9 items-center justify-center p-0 text-xs muted-text"
+        className="btn-ghost inline-flex h-10 w-10 items-center justify-center p-0 text-xs muted-text sm:h-9 sm:w-9"
         title="Save as template"
         aria-label="Save as template"
       >

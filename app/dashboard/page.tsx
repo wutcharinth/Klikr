@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { BarChart3, Download, FilePlus2, FileText, LayoutTemplate, Pin, PinOff, Copy, Trash2 } from "lucide-react";
-import { createClient } from "@/lib/supabase/server";
+import { getCurrentUser } from "@/lib/supabase/user";
 import {
   createPresentation,
   deletePresentation,
@@ -29,33 +29,30 @@ type DashboardPresentation = {
 };
 
 export default async function Dashboard({ searchParams }: { searchParams?: SearchParams }) {
-  const supabase = await createClient();
-  const { data: userData } = await supabase.auth.getUser();
-  if (!userData.user) redirect("/login");
+  const { supabase, user } = await getCurrentUser();
+  if (!user) redirect("/login");
+
+  const sp = (await searchParams) ?? {};
+
+  // One parallel round trip: onboarding gate + both presentation lists.
+  const [profileResult, ownedResult, editorResult] = await Promise.all([
+    supabase.from("profiles").select("onboarded_at").eq("id", user.id).maybeSingle(),
+    supabase
+      .from("presentations")
+      .select("id, title, code, state, created_at, last_started_at, pinned")
+      .eq("owner_id", user.id),
+    supabase
+      .from("presentation_editors")
+      .select("presentations(id, title, code, state, created_at, last_started_at, pinned)")
+      .eq("user_id", user.id),
+  ]);
 
   // Onboarding gate: only redirect to /welcome if the row exists and the user
   // really hasn't finished onboarding. If the lookup errors (e.g. profiles
   // table missing because migrations haven't run), let them into the dashboard
   // — never trap them in a /welcome ↔ /dashboard loop.
-  const { data: profile, error: profileErr } = await supabase
-    .from("profiles")
-    .select("onboarded_at")
-    .eq("id", userData.user.id)
-    .maybeSingle();
+  const { data: profile, error: profileErr } = profileResult;
   if (!profileErr && profile && !profile.onboarded_at) redirect("/welcome");
-
-  const sp = (await searchParams) ?? {};
-
-  const [ownedResult, editorResult] = await Promise.all([
-    supabase
-      .from("presentations")
-      .select("id, title, code, state, created_at, last_started_at, pinned")
-      .eq("owner_id", userData.user.id),
-    supabase
-      .from("presentation_editors")
-      .select("presentations(id, title, code, state, created_at, last_started_at, pinned)")
-      .eq("user_id", userData.user.id),
-  ]);
 
   const presentationsErr = ownedResult.error ?? editorResult.error;
   if (presentationsErr) {
@@ -82,10 +79,10 @@ export default async function Dashboard({ searchParams }: { searchParams?: Searc
     });
 
   return (
-    <main className="mx-auto max-w-4xl px-6 py-12">
+    <main className="mx-auto max-w-4xl px-4 py-8 sm:px-6 sm:py-12">
       <NavBar active="dashboard" />
-      <div className="mt-1 flex items-center gap-2 text-xs muted-text">
-        <span>{userData.user.email}</span>
+      <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs muted-text">
+        <span className="min-w-0 max-w-full truncate">{user.email}</span>
         <span>·</span>
         <Link href="/dashboard/api-keys" className="hover:text-[var(--ink)]">API keys</Link>
         <span>·</span>
@@ -94,7 +91,7 @@ export default async function Dashboard({ searchParams }: { searchParams?: Searc
         </form>
       </div>
 
-      <section className="mt-10">
+      <section className="mt-8 sm:mt-10">
         <h1 className="text-2xl font-semibold tracking-tight">Your presentations</h1>
         <div className={`mt-6 grid gap-3 ${AI_ENABLED ? "sm:grid-cols-3" : "sm:grid-cols-2"}`}>
           <form action={createPresentation}>
@@ -142,7 +139,7 @@ export default async function Dashboard({ searchParams }: { searchParams?: Searc
         {rows.map((p) => (
           <li
             key={p.id}
-            className="panel flex items-center justify-between gap-5 p-5"
+            className="panel flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between sm:gap-5 sm:p-5"
           >
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2 min-w-0">
@@ -175,16 +172,16 @@ export default async function Dashboard({ searchParams }: { searchParams?: Searc
                 )}
               </div>
             </div>
-            <div className="flex shrink-0 flex-wrap items-center justify-end gap-1.5">
+            <div className="flex flex-wrap items-center gap-1.5 sm:shrink-0 sm:justify-end">
               <Link
                 href={`/dashboard/analytics/${p.id}`}
-                className="btn-ghost inline-flex h-9 w-9 items-center justify-center p-0 text-xs muted-text"
+                className="btn-ghost inline-flex h-10 w-10 items-center justify-center p-0 text-xs muted-text sm:h-9 sm:w-9"
                 title="Analytics"
                 aria-label="Analytics"
               >
                 <BarChart3 className="h-3.5 w-3.5" />
               </Link>
-              <Link href={`/present/${p.id}`} className="btn-primary h-9 px-4 text-sm">Present</Link>
+              <Link href={`/present/${p.id}`} className="btn-primary h-10 px-4 text-sm sm:h-9">Present</Link>
               {p.is_owner ? (
                 <>
                   <form
@@ -194,7 +191,7 @@ export default async function Dashboard({ searchParams }: { searchParams?: Searc
                     }}
                   >
                     <button
-                      className="btn-ghost inline-flex h-9 w-9 items-center justify-center p-0 text-xs muted-text"
+                      className="btn-ghost inline-flex h-10 w-10 items-center justify-center p-0 text-xs muted-text sm:h-9 sm:w-9"
                       title={p.pinned ? "Unpin" : "Pin to top"}
                       aria-label={p.pinned ? "Unpin" : "Pin"}
                     >
@@ -208,7 +205,7 @@ export default async function Dashboard({ searchParams }: { searchParams?: Searc
                     }}
                   >
                     <button
-                      className="btn-ghost inline-flex h-9 w-9 items-center justify-center p-0 text-xs muted-text"
+                      className="btn-ghost inline-flex h-10 w-10 items-center justify-center p-0 text-xs muted-text sm:h-9 sm:w-9"
                       title="Duplicate"
                       aria-label="Duplicate"
                     >
@@ -218,7 +215,7 @@ export default async function Dashboard({ searchParams }: { searchParams?: Searc
                   <a
                     href={`/api/export/${p.id}`}
                     download
-                    className="btn-ghost inline-flex h-9 w-9 items-center justify-center p-0 text-xs muted-text"
+                    className="btn-ghost inline-flex h-10 w-10 items-center justify-center p-0 text-xs muted-text sm:h-9 sm:w-9"
                     title="Export CSV"
                     aria-label="Export CSV"
                   >
@@ -227,21 +224,21 @@ export default async function Dashboard({ searchParams }: { searchParams?: Searc
                   <a
                     href={`/api/export/${p.id}?format=scores`}
                     download
-                    className="btn-ghost h-9 px-3 text-xs muted-text"
+                    className="btn-ghost h-10 px-3 text-xs muted-text sm:h-9"
                     title="Score sheet — each participant's score per question (opens in Excel)"
                   >
                     Scores
                   </a>
                   <a
                     href={`/api/export/${p.id}?format=xlsx`}
-                    className="btn-ghost h-9 px-3 text-xs muted-text"
+                    className="btn-ghost h-10 px-3 text-xs muted-text sm:h-9"
                     title="Export Excel"
                   >
                     XLS
                   </a>
                   <a
                     href={`/api/export/${p.id}?format=pdf`}
-                    className="btn-ghost inline-flex h-9 w-9 items-center justify-center p-0 text-xs muted-text"
+                    className="btn-ghost inline-flex h-10 w-10 items-center justify-center p-0 text-xs muted-text sm:h-9 sm:w-9"
                     title="Export PDF"
                     aria-label="Export PDF"
                   >
@@ -255,7 +252,7 @@ export default async function Dashboard({ searchParams }: { searchParams?: Searc
                     }}
                   >
                     <button
-                      className="btn-ghost inline-flex h-9 w-9 items-center justify-center p-0 text-xs muted-text"
+                      className="btn-ghost inline-flex h-10 w-10 items-center justify-center p-0 text-xs muted-text sm:h-9 sm:w-9"
                       title="Delete"
                       aria-label="Delete"
                     >

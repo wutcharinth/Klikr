@@ -300,9 +300,16 @@
 /* Gradient orbs for hero */
 .orb {
   position: absolute; pointer-events: none; border-radius: 999px;
-  filter: blur(60px); opacity: 0.6;
+  opacity: 0.6;
   animation: drift 18s ease-in-out infinite alternate;
   will-change: transform;
+}
+/* The radial gradients already fade to transparent, so no filter: blur() is
+   needed. Phones also skip the drift animation (a full-viewport layer
+   re-composited every frame) and the headline sheen (repaints text). */
+@media (max-width: 639px) {
+  .orb { animation: none; will-change: auto; }
+  .headline-shine { animation: none; background-position: 100% 0; }
 }
 .orb-1 { width: 50vw; height: 50vw; max-width: 700px; max-height: 700px; background: radial-gradient(closest-side, rgba(41,151,255,0.55), transparent 65%); top: -10%; right: -10%; }
 .orb-2 { width: 60vw; height: 60vw; max-width: 800px; max-height: 800px; background: radial-gradient(closest-side, rgba(124,138,255,0.40), transparent 65%); bottom: -20%; left: -15%; animation-delay: -6s; animation-duration: 24s; }
@@ -420,7 +427,6 @@
 .tilt {
   transition: transform 0.4s cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 0.4s ease;
   transform-style: preserve-3d;
-  will-change: transform;
 }
 .tilt:hover {
   transform: perspective(900px) rotateX(2deg) rotateY(-3deg) translateY(-4px);
