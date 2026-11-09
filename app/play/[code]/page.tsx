@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import type { Presentation, Slide } from "@/lib/types";
 import { AudienceView } from "@/components/AudienceView";
+import { toAudienceSlide } from "@/lib/audienceSlides";
 
 export default async function PlayPage({
   params,
@@ -33,5 +34,8 @@ export default async function PlayPage({
     .order("position", { ascending: true })
     .returns<Slide[]>();
 
-  return <AudienceView presentation={presentation} slides={slides ?? []} />;
+  // Never ship the quiz answer key to the phone: props are serialized into the
+  // HTML/RSC payload, where any player can read them. The reveal fetches the
+  // correct answer from getQuizResult once the question has closed.
+  return <AudienceView presentation={presentation} slides={(slides ?? []).map(toAudienceSlide)} />;
 }

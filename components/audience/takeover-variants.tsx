@@ -5,7 +5,7 @@ import { MiniConfettiBurst } from "../QuizFeedback";
 
 export function QuizCorrectVariant({
   points, rankNow, rankBefore, total, streak,
-}: { points: number; rankNow: number; rankBefore: number; total: number; streak?: number }) {
+}: { slideId?: string; points?: number; rankNow: number; rankBefore: number; total: number; streak?: number }) {
   const delta = rankBefore - rankNow; // positive = climbed
   return (
     <div className="takeover-content">
@@ -13,7 +13,9 @@ export function QuizCorrectVariant({
         <MiniConfettiBurst />
         <CheckCircle className="h-20 w-20" strokeWidth={2.4} />
       </div>
-      <div className="text-xs uppercase tracking-widest opacity-90">+{points} pts</div>
+      <div className="text-xs uppercase tracking-widest opacity-90">
+        {points !== undefined ? `+${points} pts` : "Scoring…"}
+      </div>
       <div className="big-num-pop text-7xl font-extrabold leading-none">#{rankNow}</div>
       <div className="text-xs uppercase tracking-widest opacity-90">
         {delta > 0 ? `↑ from #${rankBefore}` : delta < 0 ? `↓ from #${rankBefore}` : `held #${rankNow}`} · of {total}

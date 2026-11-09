@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { useTakeover, type TakeoverPayload } from "./TakeoverContext";
 import { playClip, vibrate } from "@/lib/audio";
 import {
@@ -11,11 +11,14 @@ import {
 } from "./takeover-variants";
 
 export function TakeoverLayer() {
-  const { payload, dismiss } = useTakeover();
+  const { payload, seq, dismiss } = useTakeover();
 
-  // Audio + haptics — fire once per payload.
+  // Audio + haptics — fire once per takeover, not again when `update` patches
+  // the one already showing (e.g. quiz points arriving after the reveal).
+  const playedSeqRef = useRef(0);
   useEffect(() => {
-    if (!payload) return;
+    if (!payload || playedSeqRef.current === seq) return;
+    playedSeqRef.current = seq;
     if (payload.kind === "quiz-correct") {
       playClip("correct");
       vibrate(80);
@@ -25,7 +28,7 @@ export function TakeoverLayer() {
       playClip("submit");
       vibrate(40);
     }
-  }, [payload]);
+  }, [payload, seq]);
 
   if (!payload) return null;
   if (payload.kind === "toast") {

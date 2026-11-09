@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import type { Presentation, Slide, MCQConfig, QuizConfig, WordCloudConfig, QAConfig, RatingConfig, RankingConfig, ResponseRow, Participant } from "@/lib/types";
+import type { Presentation, Slide, MCQConfig, WordCloudConfig, QAConfig, RatingConfig, RankingConfig, ResponseRow, Participant } from "@/lib/types";
 import { joinSession, submitResponse, sendReaction, toggleQuestionVote, submitQuestion, getParticipantScores } from "@/app/play/[code]/actions";
 import { KahootAudienceView, WaitCountdown } from "./KahootAudienceView";
 import { AudienceFinalResults } from "./AudienceFinalResults";
@@ -10,8 +10,9 @@ import { LogoMarkPlayer } from "./remotion/LogoMarkPlayer";
 import { TakeoverProvider, TakeoverSlideWatcher, useTakeover } from "./audience/TakeoverContext";
 import { TakeoverLayer } from "./audience/TakeoverLayer";
 import { StagedLeaderboard } from "./audience/AudienceLeaderboard";
+import { useQuizReveal } from "./audience/useQuizReveal";
+import type { AudienceQuizConfig } from "@/lib/audienceSlides";
 import { isAudioOn, setAudioOn } from "@/lib/audio";
-import { bumpStreak, resetStreak } from "@/lib/streak";
 import { Volume2, VolumeX } from "lucide-react";
 
 type LocalParticipant = {
@@ -142,7 +143,7 @@ export function AudienceView({
   // instead of polling the whole game.
   const quizExpiresAt =
     currentSlide.type === "quiz" && slideStartedAt != null
-      ? slideStartedAt + ((currentSlide.config as QuizConfig).time_limit_s ?? 20) * 1000
+      ? slideStartedAt + ((currentSlide.config as AudienceQuizConfig).time_limit_s ?? 20) * 1000
       : null;
 
   return (
@@ -654,7 +655,8 @@ function Quiz({
   startedAt: number | null;
   scoredRev: number;
 }) {
-  const cfg = slide.config as QuizConfig;
+  // Audience slides carry no answer key — see lib/audienceSlides.ts.
+  const cfg = slide.config as AudienceQuizConfig;
   const [picked, setPicked] = useState<number | null>(null);
   const [now, setNow] = useState(Date.now());
   useEffect(() => {
@@ -671,40 +673,17 @@ function Quiz({
     setPicked(null);
   }, [slide.id]);
 
-  const { trigger } = useTakeover();
-  const prevRankRef = useRef<number | null>(null);
-  // Optimistic points captured at tap-time. Mirrors the server's scoring
-  // formula in supabase/migrations/0024_quiz_scoring_fix.sql so we can show
-  // the player their points the instant the reveal starts — no waiting for
-  // the host to advance, no waiting for realtime to deliver the score.
-  const earnedPointsRef = useRef<number>(0);
-  useEffect(() => {
-    if (!expired) return;
-    let cancelled = false;
-    (async () => {
-      const list = await getParticipantScores({ presentationId, participantId, participantToken });
-      if (cancelled) return;
-      const total = list.length;
-      const rankNow = Math.max(1, list.findIndex((p) => p.id === participantId) + 1);
-      const rankBefore = prevRankRef.current ?? total;
-      prevRankRef.current = rankNow;
-
-      const isCorrect = picked !== null && picked === cfg.correct_index;
-      const didNotAnswer = picked === null;
-      const correctText = cfg.options[cfg.correct_index];
-      if (didNotAnswer) {
-        resetStreak(presentationId);
-        trigger({ kind: "quiz-skipped", rankNow, total, correctText });
-      } else if (isCorrect) {
-        const streak = bumpStreak(presentationId);
-        trigger({ kind: "quiz-correct", points: earnedPointsRef.current, rankNow, rankBefore, total, streak });
-      } else {
-        resetStreak(presentationId);
-        trigger({ kind: "quiz-wrong", rankNow, total, correctText });
-      }
-    })();
-    return () => { cancelled = true; };
-  }, [expired, cfg.correct_index, cfg.options, participantId, participantToken, presentationId, picked, trigger]);
+  // Once the timer runs out, ask the server for the result (correct answer +
+  // this player's real points) and fire the correct/wrong/skipped takeover.
+  const { trackSubmit } = useQuizReveal({
+    slideId: slide.id,
+    options: cfg.options,
+    expired,
+    presentationId,
+    participantId,
+    participantToken,
+    scoredRev,
+  });
 
   // Pre-reveal: locked-in confirmation while waiting for the timer to expire.
   if (picked !== null && !expired) {
@@ -756,22 +735,15 @@ function Quiz({
           key={i}
           disabled={picked !== null || expired}
           onClick={async () => {
-            // Capture optimistic points at tap-time, mirroring score_quiz_slide:
-            //   correct → 500 + max(0, round(500 * (1 - response_ms/limit_ms)))
-            //   wrong / skipped → 0
-            const limitMs = Math.max(1, cfg.time_limit_s) * 1000;
-            const tapElapsed = Math.max(0, Math.min(limitMs, Date.now() - (startedAt ?? Date.now())));
-            const isCorrect = i === cfg.correct_index;
-            earnedPointsRef.current = isCorrect
-              ? 500 + Math.max(0, Math.round(500 * (1 - tapElapsed / limitMs)))
-              : 0;
             setPicked(i);
-            await submitResponse({
-              slideId: slide.id,
-              participantId,
-              participantToken,
-              valueIndex: i,
-            });
+            await trackSubmit(
+              submitResponse({
+                slideId: slide.id,
+                participantId,
+                participantToken,
+                valueIndex: i,
+              }),
+            );
           }}
           className="press anim-fade-up w-full rounded-xl px-4 py-4 text-left text-base transition-all duration-200"
           style={{

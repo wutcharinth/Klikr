@@ -124,6 +124,13 @@ test("Quiz reveal fires the correct takeover when the timer expires", async ({ p
     await expect(page.getByText(/locked in/i)).toBeVisible();
     // Timer expires after 2s — full takeover with the "correct" gradient.
     await expect(page.locator(".takeover-bg-correct")).toBeVisible({ timeout: 6_000 });
+    // The answer key must never reach the phone — neither in the HTML nor in
+    // the RSC payload; the reveal above got it from getQuizResult. Checked
+    // after the reveal so the extra requests can't eat into the 4s timer.
+    for (const headers of [{}, { RSC: "1" }] as Record<string, string>[]) {
+      const body = await (await page.request.get(`/play/${code}`, { headers })).text();
+      expect(body).not.toContain("correct_index");
+    }
   } finally {
     await teardown(seed.presentationId, seed.ownerEmail);
   }

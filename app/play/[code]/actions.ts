@@ -3,7 +3,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { containsProfanity } from "@/lib/profanity";
-import type { MCQConfig, Participant, QAConfig, RankingConfig } from "@/lib/types";
+import type { MCQConfig, Participant, QAConfig, QuizConfig, RankingConfig } from "@/lib/types";
 
 export async function joinSession(presentationId: string, nickname: string) {
   const supabase = createServiceClient();
@@ -200,6 +200,133 @@ export async function getParticipantScores(input: {
     .returns<Participant[]>();
   if (error) throw error;
   return data ?? [];
+}
+
+export type QuizResult =
+  | {
+      /** The question is still running; ask again after `retryAfterMs`. */
+      status: "open";
+      retryAfterMs: number;
+    }
+  | {
+      status: "closed";
+      /** null only for a malformed slide with no answer key (nobody scores). */
+      correct_index: number | null;
+      /** This participant's recorded answer, or null if they didn't answer. */
+      my_answer: number | null;
+      /** Points this participant earned on the slide, from quiz_slide_scores.
+       *  null when the answer is correct but the host hasn't scored the slide
+       *  yet (scoring lands ~0–1s after the timer runs out). */
+      points: number | null;
+      /** This participant's leaderboard position (1-based) and the number of
+       *  players, ordered like getParticipantScores. Bundled in so the reveal
+       *  costs one server action — Next runs a page's actions one at a time. */
+      rank: number;
+      total: number;
+    };
+
+/** The answer key plus this participant's own result for a quiz slide. The
+ *  audience page never receives `correct_index` (see lib/audienceSlides.ts), so
+ *  this is the only way a phone learns the answer — and it refuses while the
+ *  question is still open, so the speed-scored quiz can't be read ahead. */
+export async function getQuizResult(input: {
+  slideId: string;
+  participantId: string;
+  participantToken: string;
+}): Promise<QuizResult> {
+  const { supabase, participant } = await assertParticipant(input);
+
+  // One parallel round trip for everything; nothing answer-related is returned
+  // unless the gate below decides the question has closed.
+  const [slideRes, presRes, respRes, scoreRes, standingsRes] = await Promise.all([
+    supabase
+      .from("slides")
+      .select("id, presentation_id, type, config")
+      .eq("id", input.slideId)
+      .maybeSingle(),
+    supabase
+      .from("presentations")
+      .select("state, current_slide_id, current_slide_started_at")
+      .eq("id", participant.presentation_id)
+      .maybeSingle(),
+    supabase
+      .from("responses")
+      .select("value_index")
+      .eq("slide_id", input.slideId)
+      .eq("participant_id", participant.id)
+      .limit(1)
+      .maybeSingle(),
+    supabase
+      .from("quiz_slide_scores")
+      .select("points")
+      .eq("slide_id", input.slideId)
+      .eq("participant_id", participant.id)
+      .maybeSingle(),
+    supabase
+      .from("participants")
+      .select("id")
+      .eq("presentation_id", participant.presentation_id)
+      .order("score", { ascending: false })
+      .order("created_at", { ascending: true }),
+  ]);
+  for (const r of [slideRes, presRes, respRes, scoreRes, standingsRes]) {
+    if (r.error) throw r.error;
+  }
+  const slide = slideRes.data;
+  const pres = presRes.data;
+  if (!slide || slide.type !== "quiz" || slide.presentation_id !== participant.presentation_id) {
+    throw new Error("Quiz slide not found");
+  }
+  if (!pres) throw new Error("Session not found");
+  const cfg = slide.config as Partial<QuizConfig>;
+
+  // Once the session is closed every question is over. Otherwise:
+  if (pres.state !== "closed") {
+    if (pres.current_slide_id === slide.id) {
+      // The live question closes when its timer runs out, measured on the
+      // server's clock (same rule as submitResponse's response_ms). The host's
+      // "end question now" rewinds current_slide_started_at, so a force-ended
+      // question passes this check straight away.
+      const limitMs = Math.max(1, cfg.time_limit_s ?? 20) * 1000;
+      const startedAt = pres.current_slide_started_at
+        ? new Date(pres.current_slide_started_at).getTime()
+        : NaN;
+      if (!Number.isFinite(startedAt)) return { status: "open", retryAfterMs: 1000 };
+      const remainingMs = startedAt + limitMs - Date.now();
+      if (remainingMs > 0) return { status: "open", retryAfterMs: remainingMs };
+    } else {
+      // Not the live slide: only reveal it if it has already been played, or
+      // a player could pull the answer to an upcoming question by its id.
+      // Responses can only be written by submitResponse, which requires the
+      // slide to be live, so any response row proves the question was asked.
+      const { count, error } = await supabase
+        .from("responses")
+        .select("id", { count: "exact", head: true })
+        .eq("slide_id", slide.id);
+      if (error) throw error;
+      if (!count) throw new Error("This question hasn't been played yet");
+    }
+  }
+
+  const correctIndex = typeof cfg.correct_index === "number" ? cfg.correct_index : null;
+  const myAnswer = typeof respRes.data?.value_index === "number" ? respRes.data.value_index : null;
+  const isCorrect = correctIndex !== null && myAnswer === correctIndex;
+  // score_quiz_slide only writes rows for correct answers, so a missing row
+  // means 0 for a wrong/skipped answer but "not scored yet" for a correct one.
+  const scored = typeof scoreRes.data?.points === "number" ? scoreRes.data.points : null;
+  const points = scored ?? (isCorrect ? null : 0);
+
+  const standings = standingsRes.data ?? [];
+  const rank = Math.max(1, standings.findIndex((p) => p.id === participant.id) + 1);
+
+  return {
+    status: "closed",
+    correct_index: correctIndex,
+    my_answer: myAnswer,
+    points,
+    rank,
+    total: standings.length,
+  };
 }
 
 /** Q&A slides allow each participant to submit MULTIPLE questions, so we INSERT

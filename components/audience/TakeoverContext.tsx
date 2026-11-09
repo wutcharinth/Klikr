@@ -3,7 +3,10 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 
 export type TakeoverPayload =
-  | { kind: "quiz-correct"; points: number; rankNow: number; rankBefore: number; total: number; streak?: number }
+  // `points` comes from quiz_slide_scores via getQuizResult. It is undefined
+  // ("Scoring…") while the host's scoring hasn't landed yet; useQuizReveal then
+  // fills it in place with `update`, matching on `slideId`.
+  | { kind: "quiz-correct"; slideId?: string; points?: number; rankNow: number; rankBefore: number; total: number; streak?: number }
   | { kind: "quiz-wrong"; rankNow: number; total: number; correctText?: string }
   | { kind: "quiz-skipped"; rankNow: number; total: number; correctText?: string }
   | { kind: "submitted"; ordinal: number; total: number }
@@ -11,7 +14,13 @@ export type TakeoverPayload =
 
 type TakeoverState = {
   payload: TakeoverPayload | null;
+  /** Increments on every `trigger` (not on `update`), so effects can tell a
+   *  new takeover from an in-place refresh of the current one. */
+  seq: number;
   trigger: (p: TakeoverPayload) => void;
+  /** Patch the takeover that is currently showing, without restarting its
+   *  timer or its sound. No-op once it has been dismissed. */
+  update: (fn: (current: TakeoverPayload) => TakeoverPayload) => void;
   dismiss: () => void;
 };
 
@@ -22,6 +31,7 @@ const TOAST_DURATION_MS = 1000;
 
 export function TakeoverProvider({ children }: { children: React.ReactNode }) {
   const [payload, setPayload] = useState<TakeoverPayload | null>(null);
+  const [seq, setSeq] = useState(0);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const dismiss = useCallback(() => {
@@ -35,11 +45,16 @@ export function TakeoverProvider({ children }: { children: React.ReactNode }) {
   const trigger = useCallback((next: TakeoverPayload) => {
     if (timerRef.current) clearTimeout(timerRef.current);
     setPayload(next);
+    setSeq((n) => n + 1);
     const duration = next.kind === "toast" ? TOAST_DURATION_MS : FULL_DURATION_MS;
     timerRef.current = setTimeout(() => {
       setPayload(null);
       timerRef.current = null;
     }, duration);
+  }, []);
+
+  const update = useCallback((fn: (current: TakeoverPayload) => TakeoverPayload) => {
+    setPayload((prev) => (prev ? fn(prev) : prev));
   }, []);
 
   // Esc dismisses early.
@@ -52,7 +67,10 @@ export function TakeoverProvider({ children }: { children: React.ReactNode }) {
     return () => window.removeEventListener("keydown", onKey);
   }, [payload, dismiss]);
 
-  const value = useMemo(() => ({ payload, trigger, dismiss }), [payload, trigger, dismiss]);
+  const value = useMemo(
+    () => ({ payload, seq, trigger, update, dismiss }),
+    [payload, seq, trigger, update, dismiss],
+  );
   return <TakeoverContext.Provider value={value}>{children}</TakeoverContext.Provider>;
 }
 

@@ -1,12 +1,12 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { Triangle, Diamond, Circle, Square, CheckCircle } from "lucide-react";
-import type { Slide, QuizConfig } from "@/lib/types";
-import { submitResponse, getParticipantScores } from "@/app/play/[code]/actions";
-import { useTakeover } from "./audience/TakeoverContext";
+import type { Slide } from "@/lib/types";
+import type { AudienceQuizConfig } from "@/lib/audienceSlides";
+import { submitResponse } from "@/app/play/[code]/actions";
 import { StagedLeaderboard } from "./audience/AudienceLeaderboard";
-import { bumpStreak, resetStreak } from "@/lib/streak";
+import { useQuizReveal } from "./audience/useQuizReveal";
 
 const TILES = [
   { color: "#E21B3C", Icon: Triangle },
@@ -30,7 +30,8 @@ export function KahootAudienceView({
   startedAt: number | null;
   scoredRev: number;
 }) {
-  const cfg = slide.config as QuizConfig;
+  // Audience slides carry no answer key — see lib/audienceSlides.ts.
+  const cfg = slide.config as AudienceQuizConfig;
   const [picked, setPicked] = useState<number | null>(null);
   const [now, setNow] = useState(Date.now());
 
@@ -51,41 +52,17 @@ export function KahootAudienceView({
     setPicked(null);
   }, [slide.id]);
 
-  // Reveal: fire takeover the instant `expired` flips, with optimistic points
-  // captured at tap-time (mirrors the score_quiz_slide formula). Avoids the
-  // race where the host force-ends a question — by the time `expired` flips
-  // server scoring has already run and any "wait for score change" approach
-  // sees no delta.
-  const { trigger } = useTakeover();
-  const prevRankRef = useRef<number | null>(null);
-  const earnedPointsRef = useRef<number>(0);
-  useEffect(() => {
-    if (!expired) return;
-    let cancelled = false;
-    (async () => {
-      const list = await getParticipantScores({ presentationId, participantId, participantToken });
-      if (cancelled) return;
-      const total = list.length;
-      const rankNow = Math.max(1, list.findIndex((p) => p.id === participantId) + 1);
-      const rankBefore = prevRankRef.current ?? total;
-      prevRankRef.current = rankNow;
-
-      const isCorrect = picked !== null && picked === cfg.correct_index;
-      const didNotAnswer = picked === null;
-      const correctText = cfg.options[cfg.correct_index];
-      if (didNotAnswer) {
-        resetStreak(presentationId);
-        trigger({ kind: "quiz-skipped", rankNow, total, correctText });
-      } else if (isCorrect) {
-        const streak = bumpStreak(presentationId);
-        trigger({ kind: "quiz-correct", points: earnedPointsRef.current, rankNow, rankBefore, total, streak });
-      } else {
-        resetStreak(presentationId);
-        trigger({ kind: "quiz-wrong", rankNow, total, correctText });
-      }
-    })();
-    return () => { cancelled = true; };
-  }, [expired, cfg.correct_index, cfg.options, participantId, participantToken, presentationId, picked, trigger]);
+  // Reveal: once the timer runs out, ask the server for the result (correct
+  // answer + this player's real points) and fire the takeover with it.
+  const { trackSubmit } = useQuizReveal({
+    slideId: slide.id,
+    options: cfg.options,
+    expired,
+    presentationId,
+    participantId,
+    participantToken,
+    scoredRev,
+  });
 
   if (expired) {
     return (
@@ -117,20 +94,15 @@ export function KahootAudienceView({
             <button
               key={i}
               onClick={async () => {
-                // Optimistic points captured at tap, mirroring server formula.
-                const limitMs = Math.max(1, cfg.time_limit_s ?? 20) * 1000;
-                const tapElapsed = Math.max(0, Math.min(limitMs, Date.now() - (startedAt ?? Date.now())));
-                const isCorrect = i === cfg.correct_index;
-                earnedPointsRef.current = isCorrect
-                  ? 500 + Math.max(0, Math.round(500 * (1 - tapElapsed / limitMs)))
-                  : 0;
                 setPicked(i);
-                await submitResponse({
-                  slideId: slide.id,
-                  participantId,
-                  participantToken,
-                  valueIndex: i,
-                });
+                await trackSubmit(
+                  submitResponse({
+                    slideId: slide.id,
+                    participantId,
+                    participantToken,
+                    valueIndex: i,
+                  }),
+                );
               }}
               className="relative flex min-h-[88px] items-center gap-3 rounded-2xl p-4 text-left text-white transition-transform active:scale-95"
               style={{ background: tile.color }}
@@ -164,7 +136,7 @@ function PreReveal({
   remainingS,
   limit,
 }: {
-  cfg: QuizConfig;
+  cfg: AudienceQuizConfig;
   picked: number | null;
   expired: boolean;
   remainingS?: number;
