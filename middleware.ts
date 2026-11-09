@@ -25,6 +25,7 @@ function isPublicPath(path: string): boolean {
     path.startsWith("/docs")
   ) return true;
   if (
+    path === "/api/time" ||
     path.startsWith("/api/track-view") ||
     path.startsWith("/api/openapi.json") ||
     path.startsWith("/api/mcp") ||

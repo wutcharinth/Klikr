@@ -1,9 +1,11 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { memo, useEffect, useRef } from "react";
 import QRCode from "qrcode";
 
-export function QrCode({
+// Memoized: the QR never changes during a session, so parent re-renders
+// (answers streaming in) skip it entirely.
+export const QrCode = memo(function QrCode({
   value,
   size = 180,
   className,
@@ -46,4 +48,4 @@ export function QrCode({
       <canvas ref={canvasRef} style={{ width: "100%", height: "100%", display: "block" }} />
     </div>
   );
-}
+});

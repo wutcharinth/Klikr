@@ -1,11 +1,11 @@
 "use client";
 
+import { memo, useMemo } from "react";
 import type { Participant } from "@/lib/types";
+import { sortByScore } from "./LeaderboardRows";
 
-export function Leaderboard({ participants }: { participants: Participant[] }) {
-  const sorted = [...participants]
-    .sort((a, b) => b.score - a.score || new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
-    .slice(0, 10);
+export const Leaderboard = memo(function Leaderboard({ participants }: { participants: Participant[] }) {
+  const sorted = useMemo(() => sortByScore(participants).slice(0, 10), [participants]);
   return (
     <div className="panel p-6">
       <div className="flex items-center justify-between">
@@ -53,4 +53,4 @@ export function Leaderboard({ participants }: { participants: Participant[] }) {
       )}
     </div>
   );
-}
+});

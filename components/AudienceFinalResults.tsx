@@ -1,111 +1,74 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import dynamic from "next/dynamic";
 import { Trophy } from "lucide-react";
-import type { Participant } from "@/lib/types";
+import type { Standing } from "@/lib/types";
 import { AudienceAppFeedback } from "./AudienceAppFeedback";
 import { encouragementFor } from "./QuizFeedback";
-import { getParticipantScores } from "@/app/play/[code]/actions";
-import { LogoMarkPlayer } from "./remotion/LogoMarkPlayer";
-import { PodiumPlayer } from "./remotion/PodiumPlayer";
+import { useStandingsOptional } from "./audience/StandingsContext";
+import { useCountUp } from "@/lib/useCountUp";
+
+// The cinematic podium pulls in the Remotion runtime — load it only now, at
+// the very end of the session, instead of on the page every player opens.
+const PodiumPlayer = dynamic(() => import("./remotion/PodiumPlayer").then((m) => m.PodiumPlayer), {
+  ssr: false,
+  loading: () => <div className="podium-skeleton" aria-hidden />,
+});
 
 const MEDAL = ["🥇", "🥈", "🥉"];
 const MEDAL_BG = ["#FFD54F", "#B0BEC5", "#D7864D"];
 
 export function AudienceFinalResults({
-  presentationId,
-  participantId,
-  participantToken,
   nickname,
   hasAnyQuiz,
 }: {
-  presentationId: string;
-  participantId: string;
-  participantToken: string;
   nickname: string;
   hasAnyQuiz: boolean;
 }) {
-  const [participants, setParticipants] = useState<Participant[] | null>(null);
-
-  useEffect(() => {
-    if (!hasAnyQuiz) return;
-    let cancelled = false;
-    getParticipantScores({ presentationId, participantId, participantToken })
-      .then((data) => {
-        if (!cancelled) setParticipants(data);
-      })
-      .catch(() => {
-        if (!cancelled) setParticipants([]);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [presentationId, participantId, participantToken, hasAnyQuiz]);
+  const standings = useStandingsOptional();
+  const standing = standings?.standing ?? null;
 
   if (!hasAnyQuiz) {
     return <PlainEnd nickname={nickname} />;
   }
 
-  if (participants === null) {
+  if (!standing) {
     return (
       <Stage>
-        <p className="muted-text text-sm">Tallying scores…</p>
+        <p className="muted-text text-sm">
+          Tallying scores<span className="loading-dots" aria-hidden />
+        </p>
       </Stage>
     );
   }
 
-  if (participants.length === 0) {
-    return <PlainEnd nickname={nickname} />;
-  }
-
-  return (
-    <FinalResultsBody
-      presentationId={presentationId}
-      participantId={participantId}
-      nickname={nickname}
-      participants={participants}
-    />
-  );
+  return <FinalResultsBody nickname={nickname} standing={standing} />;
 }
 
-function FinalResultsBody({
-  participantId,
-  nickname,
-  participants,
-}: {
-  presentationId: string;
-  participantId: string;
-  nickname: string;
-  participants: Participant[];
-}) {
-  const sorted = [...participants].sort(
-    (a, b) => b.score - a.score || new Date(a.created_at).getTime() - new Date(b.created_at).getTime(),
-  );
-  const myIdx = sorted.findIndex((p) => p.id === participantId);
-  const me = myIdx >= 0 ? sorted[myIdx] : null;
-  const top3 = sorted.slice(0, 3);
-  const total = sorted.length;
-  const rank = myIdx >= 0 ? myIdx + 1 : null;
-
-  const isTop3 = rank !== null && rank <= 3;
-  const pct = total > 0 ? (rank ?? total) / total : 1;
-  const headline = me ? encouragementFor(pct, rank ?? total) : "Thanks for playing.";
+function FinalResultsBody({ nickname, standing }: { nickname: string; standing: Standing }) {
+  const { me, total } = standing;
+  const top3 = standing.top.slice(0, 3);
+  const rank = me.rank;
+  const isTop3 = rank <= 3;
+  const pct = total > 0 ? rank / total : 1;
+  const headline = encouragementFor(pct, rank);
+  const shownScore = useCountUp(me.score, { from: 0, duration: 1400, delay: 400 });
 
   return (
     <Stage>
       <div className="flex flex-col items-center text-center">
         <p className="text-[10px] uppercase tracking-[0.2em] muted-text">Session complete</p>
-        <h2 className="mt-2 text-xl font-semibold tracking-tight">Nice run, {nickname}.</h2>
+        <h2 className="anim-fade-up mt-2 text-xl font-semibold tracking-tight">Nice run, {nickname}.</h2>
 
         {/* Personal tile */}
         <div className="anim-pop mt-6 flex flex-col items-center">
           {isTop3 ? (
             <div
-              className="flex h-24 w-24 items-center justify-center rounded-full text-5xl"
-              style={{ background: MEDAL_BG[(rank ?? 1) - 1] }}
+              className="medal-drop flex h-24 w-24 items-center justify-center rounded-full text-5xl"
+              style={{ background: MEDAL_BG[rank - 1] }}
               aria-label={`Rank ${rank}`}
             >
-              {MEDAL[(rank ?? 1) - 1]}
+              {MEDAL[rank - 1]}
             </div>
           ) : (
             <div
@@ -115,17 +78,18 @@ function FinalResultsBody({
             >
               <span className="text-[10px] uppercase tracking-[0.18em] muted-text">Rank</span>
               <span className="text-3xl font-bold leading-none" style={{ color: "var(--blue)" }}>
-                #{rank ?? "—"}
+                #{rank}
               </span>
               <span className="mt-0.5 text-[10px] muted-text">of {total}</span>
             </div>
           )}
-          {me ? (
-            <p className="mt-4 text-4xl font-bold tracking-tight" style={{ color: "var(--blue)" }}>
-              <span className="count-bump inline-block">{me.score.toLocaleString()}</span>
-            </p>
-          ) : null}
-          {me ? <p className="mt-1 text-xs muted-text uppercase tracking-[0.18em]">Final score</p> : null}
+          <p
+            className="mt-4 text-4xl font-bold tracking-tight"
+            style={{ color: "var(--blue)", fontVariantNumeric: "tabular-nums" }}
+          >
+            {shownScore.toLocaleString()}
+          </p>
+          <p className="mt-1 text-xs muted-text uppercase tracking-[0.18em]">Final score</p>
         </div>
 
         <p className="mt-5 text-sm font-medium">{headline}</p>
@@ -163,9 +127,12 @@ function FinalResultsBody({
         <AudienceAppFeedback />
       </div>
 
-      {/* Logo outro — branded close to the personal card. */}
+      {/* Branded close (CSS — no animation runtime needed). */}
       <div className="mt-6 flex justify-center" aria-hidden>
-        <LogoMarkPlayer variant="outro" width={480} height={140} loop={false} />
+        <div className="lobby-mark lobby-mark--outro">
+          <span className="lobby-mark-word">Klikr</span>
+          <span className="lobby-mark-dot" />
+        </div>
       </div>
     </Stage>
   );
