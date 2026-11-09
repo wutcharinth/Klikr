@@ -2,16 +2,20 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import type { Presentation, Slide, MCQConfig, QuizConfig, WordCloudConfig, QAConfig, RatingConfig, RankingConfig, ResponseRow, Participant } from "@/lib/types";
-import { joinSession, submitResponse, sendReaction, toggleQuestionVote, submitQuestion, getParticipantScores } from "@/app/play/[code]/actions";
-import { KahootAudienceView, WaitCountdown } from "./KahootAudienceView";
+import type { Presentation, Slide, MCQConfig, WordCloudConfig, QAConfig, RatingConfig, RankingConfig, ResponseRow } from "@/lib/types";
+import { joinSession, submitResponse, toggleQuestionVote, submitQuestion } from "@/app/play/[code]/actions";
+import { KahootAudienceView, LockedIn, PhoneIntro } from "./KahootAudienceView";
+import { TimeBar, TimeLeftPill } from "./QuizTimers";
 import { AudienceFinalResults } from "./AudienceFinalResults";
-import { LogoMarkPlayer } from "./remotion/LogoMarkPlayer";
 import { TakeoverProvider, TakeoverSlideWatcher, useTakeover } from "./audience/TakeoverContext";
 import { TakeoverLayer } from "./audience/TakeoverLayer";
 import { StagedLeaderboard } from "./audience/AudienceLeaderboard";
+import { StandingsProvider, useStandingsOptional } from "./audience/StandingsContext";
+import { useQuizRound } from "./audience/useQuizRound";
+import { reactionChannelName, REACTION_EVENT, REACTION_EMOJI } from "@/lib/realtime";
+import { isMissingRpc } from "@/lib/supabase/rpc";
 import { isAudioOn, setAudioOn } from "@/lib/audio";
-import { bumpStreak, resetStreak } from "@/lib/streak";
+import { useCountUp } from "@/lib/useCountUp";
 import { Volume2, VolumeX } from "lucide-react";
 
 type LocalParticipant = {
@@ -90,15 +94,35 @@ export function AudienceView({
     );
   }
 
+  const hasQuiz = slides.some((s) => s.type === "quiz");
+  const scoredRev = presentation.scored_rev ?? 0;
+  // One shared standings fetcher for the whole session (score pill, quiz
+  // reveal, leaderboard, final screen) — see StandingsContext.
+  const withStandings = (children: React.ReactNode, top = 5) => (
+    <StandingsProvider
+      presentationId={presentation.id}
+      participantId={participant.id}
+      participantToken={participant.participantToken}
+      scoredRev={scoredRev}
+      slideId={presentation.current_slide_id}
+      top={top}
+      enabled={hasQuiz}
+    >
+      {children}
+    </StandingsProvider>
+  );
+
   if (presentation.state === "lobby") {
     return (
       <TakeoverProvider>
         <Stage>
           <div className="flex justify-center" aria-hidden>
-            <LogoMarkPlayer variant="idle" width={260} height={80} />
+            <LobbyMark />
           </div>
-          <h2 className="mt-4 text-2xl font-semibold">Hi {participant.nickname}!</h2>
-          <p className="mt-2 text-slate-500">Waiting for the presenter to start…</p>
+          <h2 className="anim-fade-up mt-4 text-2xl font-semibold">Hi {participant.nickname}!</h2>
+          <p className="anim-fade-up delay-200 mt-2 text-slate-500">
+            Waiting for the presenter to start<span className="loading-dots" aria-hidden />
+          </p>
           <p className="mt-4 text-xs muted-text">Keep this tab open — answers will appear as the host moves on.</p>
         </Stage>
         <TakeoverLayer />
@@ -107,17 +131,12 @@ export function AudienceView({
   }
 
   if (presentation.state === "closed") {
-    return (
+    return withStandings(
       <TakeoverProvider>
-        <AudienceFinalResults
-          presentationId={presentation.id}
-          participantId={participant.id}
-          participantToken={participant.participantToken}
-          nickname={participant.nickname}
-          hasAnyQuiz={slides.some((s) => s.type === "quiz")}
-        />
+        <AudienceFinalResults nickname={participant.nickname} hasAnyQuiz={hasQuiz} />
         <TakeoverLayer />
-      </TakeoverProvider>
+      </TakeoverProvider>,
+      10,
     );
   }
 
@@ -133,32 +152,14 @@ export function AudienceView({
     );
   }
 
-  const slideStartedAt = presentation.current_slide_started_at
-    ? new Date(presentation.current_slide_started_at).getTime()
-    : null;
-  const hasQuiz = slides.some((s) => s.type === "quiz");
-  // The only moment a score changes is when the current quiz slide is scored —
-  // at its timer expiry. Hand the pill that timestamp so it can refetch then
-  // instead of polling the whole game.
-  const quizExpiresAt =
-    currentSlide.type === "quiz" && slideStartedAt != null
-      ? slideStartedAt + ((currentSlide.config as QuizConfig).time_limit_s ?? 20) * 1000
-      : null;
+  const quizIndex = currentSlide.type === "quiz" ? slides.filter((s) => s.type === "quiz").findIndex((s) => s.id === currentSlide.id) : -1;
+  const quizCount = hasQuiz ? slides.filter((s) => s.type === "quiz").length : 0;
 
-  return (
+  return withStandings(
     <TakeoverProvider>
       <TakeoverSlideWatcher slideId={presentation.current_slide_id} />
       <Stage>
-        {hasQuiz ? (
-          <MyScorePill
-            presentationId={presentation.id}
-            participantId={participant.id}
-            participantToken={participant.participantToken}
-            scoredRev={presentation.scored_rev ?? 0}
-            slideId={presentation.current_slide_id}
-            quizExpiresAt={quizExpiresAt}
-          />
-        ) : null}
+        {hasQuiz ? <MyScorePill /> : null}
         {!connected ? (
           <div
             className="anim-fade-up mb-4 flex items-center gap-2 rounded-full px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.16em]"
@@ -175,7 +176,11 @@ export function AudienceView({
           </div>
         ) : null}
         <div key={currentSlide.id} className="slide-enter">
-          <p className="text-[10px] uppercase tracking-[0.18em] muted-text">{currentSlide.type}</p>
+          <p className="text-[10px] uppercase tracking-[0.18em] muted-text">
+            {currentSlide.type === "quiz" && quizIndex >= 0
+              ? `Question ${quizIndex + 1} of ${quizCount}`
+              : currentSlide.type}
+          </p>
           <h2 className="mt-1 text-2xl font-semibold tracking-tight">{currentSlide.question}</h2>
           {currentSlide.image_url ? (
             <div className="anim-fade-up mt-4">
@@ -210,8 +215,7 @@ export function AudienceView({
                   participantId={participant.id}
                   participantToken={participant.participantToken}
                   presentationId={presentation.id}
-                  startedAt={slideStartedAt}
-                  scoredRev={presentation.scored_rev ?? 0}
+                  startedAt={presentation.current_slide_started_at}
                 />
               ) : (
                 <Quiz
@@ -219,8 +223,7 @@ export function AudienceView({
                   participantId={participant.id}
                   participantToken={participant.participantToken}
                   presentationId={presentation.id}
-                  startedAt={slideStartedAt}
-                  scoredRev={presentation.scored_rev ?? 0}
+                  startedAt={presentation.current_slide_started_at}
                 />
               )
             ) : null}
@@ -261,14 +264,10 @@ export function AudienceView({
             ) : null}
           </div>
         </div>
-        <ReactionsBar
-          presentationId={presentation.id}
-          participantId={participant.id}
-          participantToken={participant.participantToken}
-        />
+        <ReactionsBar presentationId={presentation.id} supabase={supabase} />
       </Stage>
       <TakeoverLayer />
-    </TakeoverProvider>
+    </TakeoverProvider>,
   );
 }
 
@@ -281,77 +280,42 @@ function Stage({ children }: { children: React.ReactNode }) {
   );
 }
 
-// Always-on personal score for the player's phone — visible across every slide
-// of a quiz deck, so each player sees their own running total at a glance
-// instead of only glimpsing it on the post-reveal leaderboard. A score only
-// changes when a quiz slide is scored, so this refetches on the scored_rev
-// signal (instant; migration 0026), on every slide change, and in a short
-// burst around the current quiz's expiry — never on a constant poll.
-function MyScorePill({
-  presentationId,
-  participantId,
-  participantToken,
-  scoredRev,
-  slideId,
-  quizExpiresAt,
-}: {
-  presentationId: string;
-  participantId: string;
-  participantToken: string;
-  scoredRev: number;
-  slideId: string | null;
-  quizExpiresAt: number | null;
-}) {
-  const [me, setMe] = useState<{ score: number; rank: number; total: number } | null>(null);
-  useEffect(() => {
-    let cancelled = false;
-    const fetchMine = async () => {
-      let list: Participant[];
-      try {
-        list = await getParticipantScores({ presentationId, participantId, participantToken });
-      } catch {
-        return; // keep last known score rather than blanking
-      }
-      if (cancelled) return;
-      const idx = list.findIndex((p) => p.id === participantId);
-      if (idx === -1) return;
-      setMe({ score: list[idx].score, rank: idx + 1, total: list.length });
-    };
-    // Refresh once on mount / slide change / scored_rev signal. (Slide change
-    // also catches a score applied when the host advanced off the prior quiz.)
-    fetchMine();
-    // The host scores ~0–1s after the quiz timer expires. Without the realtime
-    // scored_rev signal we fire a short burst around that moment to catch the
-    // new total — then stop. No constant polling: the score can't change again
-    // until the next quiz is scored (which re-runs this effect via the deps).
-    let burst: ReturnType<typeof setTimeout>[] = [];
-    if (quizExpiresAt != null) {
-      const base = Math.max(0, quizExpiresAt - Date.now());
-      burst = [0, 500, 1200, 2200, 3500].map((off) => setTimeout(fetchMine, base + off));
-    }
-    return () => {
-      cancelled = true;
-      burst.forEach(clearTimeout);
-    };
-  }, [presentationId, participantId, participantToken, scoredRev, slideId, quizExpiresAt]);
+// Lightweight CSS stand-in for the Remotion logo animation in the lobby — the
+// Remotion runtime was ~100 KB of JS on the page every player loads first.
+function LobbyMark() {
+  return (
+    <div className="lobby-mark" role="img" aria-label="Klikr">
+      <span className="lobby-mark-word">Klikr</span>
+      <span className="lobby-mark-dot" />
+    </div>
+  );
+}
 
+// Always-on personal score for the player's phone — visible across every slide
+// of a quiz deck. Reads the shared standings (one fetch per scored_rev change,
+// see StandingsContext) instead of polling on its own.
+function MyScorePill() {
+  const standings = useStandingsOptional();
+  const me = standings?.standing?.me ?? null;
+  const total = standings?.standing?.total ?? 0;
+  const shown = useCountUp(me?.score ?? 0, { duration: 900 });
   if (!me) return null;
   return (
     <div
       className="anim-fade-up sticky top-2 z-10 mb-4 flex items-center justify-between gap-3 rounded-full px-4 py-2 text-white shadow-sm"
-      style={{ background: "linear-gradient(135deg, var(--blue), #00C2FF)" }}
+      style={{ background: "linear-gradient(135deg, var(--blue), #7C5CFF)" }}
       aria-live="polite"
     >
       <span className="text-[10px] font-semibold uppercase tracking-[0.16em] opacity-90">Your score</span>
       <span className="flex items-baseline gap-2">
-        <span
-          key={me.score}
-          className="count-bump text-lg font-bold"
-          style={{ fontVariantNumeric: "tabular-nums" }}
-        >
-          {me.score.toLocaleString()}
+        <span className="text-lg font-bold" style={{ fontVariantNumeric: "tabular-nums" }}>
+          {shown.toLocaleString()}
         </span>
-        {me.total > 1 ? <span className="text-[11px] font-medium opacity-90">#{me.rank}</span> : null}
+        {total > 1 ? (
+          <span key={me.rank} className="anim-pop text-[11px] font-medium opacity-90">
+            #{me.rank}
+          </span>
+        ) : null}
       </span>
     </div>
   );
@@ -639,148 +603,55 @@ function CheckBadge() {
   );
 }
 
+// Classic (list-style) timed quiz on the phone. Same round mechanics as the
+// game-show tiles (useQuizRound): get-ready intro, tap, locked in, reveal.
 function Quiz({
   slide,
   participantId,
   participantToken,
   presentationId,
   startedAt,
-  scoredRev,
 }: {
   slide: Slide;
   participantId: string;
   participantToken: string;
   presentationId: string;
-  startedAt: number | null;
-  scoredRev: number;
+  startedAt: string | null;
 }) {
-  const cfg = slide.config as QuizConfig;
-  const [picked, setPicked] = useState<number | null>(null);
-  const [now, setNow] = useState(Date.now());
-  useEffect(() => {
-    const t = setInterval(() => setNow(Date.now()), 250);
-    return () => clearInterval(t);
-  }, []);
-  const elapsedMs = startedAt ? now - startedAt : 0;
-  const remainingMs = Math.max(0, cfg.time_limit_s * 1000 - elapsedMs);
-  const expired = remainingMs <= 0;
+  const { cfg, limit, timing, picked, choose, submitError } = useQuizRound({
+    slide,
+    participantId,
+    participantToken,
+    presentationId,
+    startedAt,
+  });
 
-  // Reset local state when host moves to a new slide (component instance may
-  // be reused if other quiz slides follow).
-  useEffect(() => {
-    setPicked(null);
-  }, [slide.id]);
-
-  const { trigger } = useTakeover();
-  const prevRankRef = useRef<number | null>(null);
-  // Optimistic points captured at tap-time. Mirrors the server's scoring
-  // formula in supabase/migrations/0024_quiz_scoring_fix.sql so we can show
-  // the player their points the instant the reveal starts — no waiting for
-  // the host to advance, no waiting for realtime to deliver the score.
-  const earnedPointsRef = useRef<number>(0);
-  useEffect(() => {
-    if (!expired) return;
-    let cancelled = false;
-    (async () => {
-      const list = await getParticipantScores({ presentationId, participantId, participantToken });
-      if (cancelled) return;
-      const total = list.length;
-      const rankNow = Math.max(1, list.findIndex((p) => p.id === participantId) + 1);
-      const rankBefore = prevRankRef.current ?? total;
-      prevRankRef.current = rankNow;
-
-      const isCorrect = picked !== null && picked === cfg.correct_index;
-      const didNotAnswer = picked === null;
-      const correctText = cfg.options[cfg.correct_index];
-      if (didNotAnswer) {
-        resetStreak(presentationId);
-        trigger({ kind: "quiz-skipped", rankNow, total, correctText });
-      } else if (isCorrect) {
-        const streak = bumpStreak(presentationId);
-        trigger({ kind: "quiz-correct", points: earnedPointsRef.current, rankNow, rankBefore, total, streak });
-      } else {
-        resetStreak(presentationId);
-        trigger({ kind: "quiz-wrong", rankNow, total, correctText });
-      }
-    })();
-    return () => { cancelled = true; };
-  }, [expired, cfg.correct_index, cfg.options, participantId, participantToken, presentationId, picked, trigger]);
-
-  // Pre-reveal: locked-in confirmation while waiting for the timer to expire.
-  if (picked !== null && !expired) {
+  if (timing.phase === "closed") return <StagedLeaderboard />;
+  if (timing.phase === "intro") return <PhoneIntro openAt={timing.openAt} introMs={timing.introMs} />;
+  if (picked !== null) {
     return (
-      <div className="flex flex-col items-center justify-center py-12">
-        <div className="anim-pop flex items-center gap-2 text-base font-medium" style={{ color: "var(--blue)" }}>
-          <CheckBadge /> Locked in — submitted in {(elapsedMs / 1000).toFixed(1)}s
-        </div>
-        <p className="mt-3 text-sm muted-text">Hold tight for the result.</p>
-        <WaitCountdown remainingS={Math.ceil(remainingMs / 1000)} limit={cfg.time_limit_s} />
-      </div>
+      <LockedIn tileIndex={picked} text={cfg.options[picked]} closeAt={timing.closeAt} limit={limit} showTile={false} />
     );
   }
 
-  // Post-reveal: TakeoverLayer covers the screen for ~1.8s with the
-  // correct/wrong reveal, then the leaderboard sits underneath until the
-  // host advances. Polls so rank changes animate as other players finish.
-  if (expired) {
-    return (
-      <StagedLeaderboard
-        presentationId={presentationId}
-        participantId={participantId}
-        participantToken={participantToken}
-        scoredRev={scoredRev}
-      />
-    );
-  }
-
-  const pct = (remainingMs / (cfg.time_limit_s * 1000)) * 100;
   return (
     <div className="space-y-2">
-      <div className="mb-3 flex items-center justify-end gap-2">
-        <div className="relative h-1.5 flex-1 overflow-hidden rounded-full" style={{ background: "rgba(0,0,0,0.06)" }}>
-          <div
-            className="absolute inset-y-0 left-0 transition-all"
-            style={{
-              width: `${pct}%`,
-              background: pct < 30 ? "var(--danger, #fca5a5)" : "var(--blue)",
-              transition: "width 250ms linear, background 300ms ease",
-            }}
-          />
+      <div className="mb-3 flex items-center gap-3">
+        <div className="flex-1">
+          <TimeBar closeAt={timing.closeAt} limit={limit} />
         </div>
-        <span className="mono text-sm muted-text" style={{ fontVariantNumeric: "tabular-nums", minWidth: 36, textAlign: "right" }}>
-          {Math.ceil(remainingMs / 1000)}s
-        </span>
+        <TimeLeftPill closeAt={timing.closeAt} />
       </div>
       {cfg.options.map((opt, i) => (
         <button
           key={i}
-          disabled={picked !== null || expired}
-          onClick={async () => {
-            // Capture optimistic points at tap-time, mirroring score_quiz_slide:
-            //   correct → 500 + max(0, round(500 * (1 - response_ms/limit_ms)))
-            //   wrong / skipped → 0
-            const limitMs = Math.max(1, cfg.time_limit_s) * 1000;
-            const tapElapsed = Math.max(0, Math.min(limitMs, Date.now() - (startedAt ?? Date.now())));
-            const isCorrect = i === cfg.correct_index;
-            earnedPointsRef.current = isCorrect
-              ? 500 + Math.max(0, Math.round(500 * (1 - tapElapsed / limitMs)))
-              : 0;
-            setPicked(i);
-            await submitResponse({
-              slideId: slide.id,
-              participantId,
-              participantToken,
-              valueIndex: i,
-            });
-          }}
+          onClick={() => choose(i)}
           className="press anim-fade-up w-full rounded-xl px-4 py-4 text-left text-base transition-all duration-200"
           style={{
             animationDelay: `${i * 60}ms`,
             border: "1px solid var(--line)",
-            background: picked === i ? "rgba(0, 113, 227, 0.10)" : "rgba(255, 255, 255, 0.02)",
-            borderColor: picked === i ? "var(--blue)" : "var(--line)",
-            color: picked === i ? "var(--blue)" : "var(--fg)",
-            opacity: (picked !== null && picked !== i) || expired ? 0.45 : 1,
+            background: "rgba(255, 255, 255, 0.02)",
+            color: "var(--fg)",
           }}
         >
           <span className="mono mr-3 muted-text" style={{ fontSize: 12 }}>
@@ -789,6 +660,11 @@ function Quiz({
           {opt}
         </button>
       ))}
+      {submitError ? (
+        <p className="text-center text-xs" style={{ color: "var(--danger, #ef4444)" }} role="alert">
+          {submitError}
+        </p>
+      ) : null}
     </div>
   );
 }
@@ -942,38 +818,123 @@ function QAInput({
   const [error, setError] = useState<string | null>(null);
   const { trigger } = useTakeover();
 
+  // Questions stream in via a slide-filtered channel. Vote totals come from
+  // the get_qa_votes RPC (aggregated in SQL), refreshed at most every 750ms —
+  // previously any vote anywhere on the platform made every phone re-download
+  // every vote row.
+  const questionIdsRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    questionIdsRef.current = new Set(questions.map((q) => q.id));
+  }, [questions]);
+
   useEffect(() => {
     let cancelled = false;
-    const load = async () => {
-      const { data: q } = await supabase
-        .from("responses").select("*").eq("slide_id", slide.id)
-        .order("created_at", { ascending: true });
-      if (!cancelled && q) setQuestions(q as ResponseRow[]);
-      const { data: votes } = await supabase
-        .from("question_votes").select("response_id, participant_id")
-        .in("response_id", (q ?? []).map((x) => x.id));
-      if (!cancelled && votes) {
-        const counts = new Map<string, number>();
-        const mine = new Set<string>();
-        for (const v of votes) {
-          counts.set(v.response_id, (counts.get(v.response_id) ?? 0) + 1);
-          if (v.participant_id === participantId) mine.add(v.response_id);
-        }
-        setVoteCounts(counts);
-        setMyVotes(mine);
+    let voteTimer: ReturnType<typeof setTimeout> | null = null;
+    let votePending = false;
+
+    const applyVotes = (rows: { response_id: string; votes: number; mine: boolean }[]) => {
+      const counts = new Map<string, number>();
+      const mine = new Set<string>();
+      for (const r of rows) {
+        counts.set(r.response_id, r.votes);
+        if (r.mine) mine.add(r.response_id);
       }
+      setVoteCounts(counts);
+      setMyVotes(mine);
     };
-    load();
+
+    const loadVotes = async () => {
+      const { data, error } = await supabase.rpc("get_qa_votes", {
+        p_slide_id: slide.id,
+        p_participant_id: participantId,
+      });
+      if (cancelled) return;
+      if (!error && data) {
+        applyVotes(data as { response_id: string; votes: number; mine: boolean }[]);
+        return;
+      }
+      if (!isMissingRpc(error)) return;
+      // Fallback until migration 0027 is applied.
+      const ids = [...questionIdsRef.current];
+      if (ids.length === 0) return applyVotes([]);
+      const { data: votes } = await supabase
+        .from("question_votes")
+        .select("response_id, participant_id")
+        .in("response_id", ids);
+      if (cancelled || !votes) return;
+      const agg = new Map<string, { response_id: string; votes: number; mine: boolean }>();
+      for (const v of votes) {
+        const row = agg.get(v.response_id) ?? { response_id: v.response_id, votes: 0, mine: false };
+        row.votes += 1;
+        if (v.participant_id === participantId) row.mine = true;
+        agg.set(v.response_id, row);
+      }
+      applyVotes([...agg.values()]);
+    };
+
+    const scheduleVotes = () => {
+      if (voteTimer) {
+        votePending = true;
+        return;
+      }
+      void loadVotes();
+      voteTimer = setTimeout(() => {
+        voteTimer = null;
+        if (votePending) {
+          votePending = false;
+          scheduleVotes();
+        }
+      }, 750);
+    };
+
+    (async () => {
+      const { data: q } = await supabase
+        .from("responses")
+        .select("id, slide_id, participant_id, value_text, value_index, response_ms, created_at, status, pinned, flagged")
+        .eq("slide_id", slide.id)
+        .order("created_at", { ascending: true });
+      if (cancelled) return;
+      if (q) {
+        questionIdsRef.current = new Set(q.map((x) => x.id as string));
+        setQuestions(q as ResponseRow[]);
+      }
+      scheduleVotes();
+    })();
+
     const channel = supabase
       .channel(`qa-${slide.id}`)
       .on("postgres_changes",
         { event: "INSERT", schema: "public", table: "responses", filter: `slide_id=eq.${slide.id}` },
-        (p) => setQuestions((prev) => [...prev, p.new as ResponseRow]))
+        (p) => {
+          const row = p.new as ResponseRow;
+          setQuestions((prev) => (prev.some((x) => x.id === row.id) ? prev : [...prev, row]));
+        })
+      .on("postgres_changes",
+        // Moderation approvals / pins land as UPDATEs — previously ignored, so
+        // a pre-moderated question never appeared on phones until reload.
+        { event: "UPDATE", schema: "public", table: "responses", filter: `slide_id=eq.${slide.id}` },
+        (p) => {
+          const row = p.new as ResponseRow;
+          setQuestions((prev) => prev.map((x) => (x.id === row.id ? { ...x, ...row } : x)));
+        })
       .on("postgres_changes",
         { event: "*", schema: "public", table: "question_votes" },
-        () => load())
+        (p) => {
+          // question_votes can't be filtered by slide server-side; skip events
+          // for questions that aren't on this slide (DELETE payloads may only
+          // carry the primary key, so those always refresh — throttled).
+          const rid =
+            (p.new as { response_id?: string } | null)?.response_id ??
+            (p.old as { response_id?: string } | null)?.response_id;
+          if (rid && !questionIdsRef.current.has(rid)) return;
+          scheduleVotes();
+        })
       .subscribe();
-    return () => { cancelled = true; supabase.removeChannel(channel); };
+    return () => {
+      cancelled = true;
+      if (voteTimer) clearTimeout(voteTimer);
+      supabase.removeChannel(channel);
+    };
   }, [supabase, slide.id, participantId]);
 
   // Audience only ever sees approved questions; pending/rejected/flagged stay in the presenter tray.
@@ -1128,23 +1089,41 @@ function RatingInput({
 }
 
 // ----------------- Reactions bar -----------------
-const REACTION_EMOJI = ["👏", "❤️", "🎉", "😂", "🔥", "💡"];
+const REACTION_THROTTLE_MS = 250;
 
+// Taps fly over Realtime Broadcast (no DB write). Each phone sends at most one
+// reaction per 250ms; extra taps still pulse locally so it feels responsive.
 function ReactionsBar({
   presentationId,
-  participantId,
-  participantToken,
+  supabase,
 }: {
   presentationId: string;
-  participantId: string;
-  participantToken: string;
+  supabase: ReturnType<typeof createClient>;
 }) {
   const [pulses, setPulses] = useState<{ id: number; emoji: string }[]>([]);
+  const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
+  const lastSentRef = useRef(0);
+
+  useEffect(() => {
+    const ch = supabase.channel(reactionChannelName(presentationId), {
+      config: { broadcast: { self: false, ack: false } },
+    });
+    ch.subscribe();
+    channelRef.current = ch;
+    return () => {
+      channelRef.current = null;
+      supabase.removeChannel(ch);
+    };
+  }, [supabase, presentationId]);
+
   const send = (e: string) => {
     const id = Date.now() + Math.random();
-    setPulses((p) => [...p, { id, emoji: e }]);
+    setPulses((p) => [...p.slice(-6), { id, emoji: e }]);
     setTimeout(() => setPulses((p) => p.filter((x) => x.id !== id)), 800);
-    void sendReaction({ presentationId, participantId, participantToken, emoji: e });
+    const now = Date.now();
+    if (now - lastSentRef.current < REACTION_THROTTLE_MS) return;
+    lastSentRef.current = now;
+    void channelRef.current?.send({ type: "broadcast", event: REACTION_EVENT, payload: { e } });
   };
   return (
     <div className="relative mt-6">
@@ -1163,13 +1142,11 @@ function ReactionsBar({
       </div>
       <div className="pointer-events-none absolute inset-0 -z-10">
         {pulses.map((p) => (
-          <span key={p.id} className="absolute left-1/2 top-1/2 text-3xl"
-            style={{ animation: "rxFloat 0.8s ease-out forwards", transform: `translate(-50%, -50%)` }}>
+          <span key={p.id} className="rx-float absolute left-1/2 top-1/2 text-3xl">
             {p.emoji}
           </span>
         ))}
       </div>
-      <style>{`@keyframes rxFloat { 0% { transform: translate(-50%, -50%) scale(0.6); opacity: 1; } 100% { transform: translate(-50%, -160%) scale(1.6); opacity: 0; } }`}</style>
     </div>
   );
 }

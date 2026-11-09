@@ -18,9 +18,12 @@ export function TakeoverLayer() {
     if (!payload) return;
     if (payload.kind === "quiz-correct") {
       playClip("correct");
-      vibrate(80);
+      vibrate([40, 30, 80]);
     } else if (payload.kind === "quiz-wrong") {
+      playClip("wrong");
       vibrate(120);
+    } else if (payload.kind === "quiz-skipped") {
+      playClip("wrong");
     } else if (payload.kind === "submitted" || payload.kind === "toast") {
       playClip("submit");
       vibrate(40);

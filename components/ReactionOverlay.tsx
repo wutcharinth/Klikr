@@ -1,78 +1,103 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { memo, useEffect, useMemo, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { pinRealtimeAuth, reactionChannelName, REACTION_EVENT } from "@/lib/realtime";
 
-type Burst = { id: string; emoji: string; x: number; delay: number };
+type Burst = { id: number; emoji: string; x: number; delay: number; size: number };
 
-export function ReactionOverlay({ presentationId }: { presentationId: string }) {
+// At most this many emoji float at once; extra arrivals during a flood are
+// dropped (the screen is already full of them — nobody can tell).
+const MAX_ON_SCREEN = 40;
+const LIFETIME_MS = 3500;
+
+export const ReactionOverlay = memo(function ReactionOverlay({ presentationId }: { presentationId: string }) {
   const supabase = useMemo(() => createClient(), []);
   const [bursts, setBursts] = useState<Burst[]>([]);
+  const queueRef = useRef<string[]>([]);
+  const frameRef = useRef<number | null>(null);
+  const liveRef = useRef(0);
+  const seqRef = useRef(0);
+  const timersRef = useRef<Set<ReturnType<typeof setTimeout>>>(new Set());
 
   useEffect(() => {
-    let channel: ReturnType<typeof supabase.channel> | null = null;
     let cancelled = false;
+    const timers = timersRef.current;
 
+    // Arrivals are queued and added once per frame, so a flood of taps costs
+    // one render per frame instead of one per reaction.
+    const flush = () => {
+      frameRef.current = null;
+      const room = Math.max(0, MAX_ON_SCREEN - liveRef.current);
+      const take = queueRef.current.splice(0, room);
+      queueRef.current = [];
+      if (take.length === 0) return;
+      const fresh = take.map((emoji) => ({
+        id: ++seqRef.current,
+        emoji,
+        x: Math.random() * 80 + 10,
+        delay: Math.random() * 0.2,
+        size: 30 + Math.random() * 14,
+      }));
+      liveRef.current += fresh.length;
+      setBursts((prev) => [...prev, ...fresh]);
+      const ids = new Set(fresh.map((b) => b.id));
+      const t = setTimeout(() => {
+        timers.delete(t);
+        liveRef.current -= ids.size;
+        setBursts((prev) => prev.filter((b) => !ids.has(b.id)));
+      }, LIFETIME_MS);
+      timers.add(t);
+    };
+    const push = (emoji: string) => {
+      if (cancelled || typeof emoji !== "string") return;
+      queueRef.current.push(emoji.slice(0, 8));
+      if (frameRef.current == null) frameRef.current = requestAnimationFrame(flush);
+    };
+
+    // Broadcast: the live path (phones send here, no DB write).
+    const live = supabase
+      .channel(reactionChannelName(presentationId))
+      .on("broadcast", { event: REACTION_EVENT }, ({ payload }) => push((payload as { e?: string })?.e ?? ""))
+      .subscribe();
+
+    // Legacy path: phones still running the previous build insert rows into
+    // `reactions`. Keep listening so a deploy mid-session loses nothing.
+    let legacy: ReturnType<typeof supabase.channel> | null = null;
     (async () => {
-      // Pin the JWT on the realtime socket before subscribing — without
-      // this, the channel can subscribe with the anon role, and the
-      // reactions SELECT policy ("owners and editors") then filters out
-      // every event so the overlay never fires.
-      const { data } = await supabase.auth.getSession();
-      const token = data.session?.access_token;
-      if (token) supabase.realtime.setAuth(token);
-
+      await pinRealtimeAuth(supabase);
       if (cancelled) return;
-      channel = supabase
+      legacy = supabase
         .channel(`reactions-${presentationId}`)
         .on(
           "postgres_changes",
           { event: "INSERT", schema: "public", table: "reactions", filter: `presentation_id=eq.${presentationId}` },
-          (payload) => {
-            const r = payload.new as { id: string; emoji: string };
-            const b: Burst = {
-              id: r.id,
-              emoji: r.emoji,
-              x: Math.random() * 80 + 10,
-              delay: Math.random() * 0.2,
-            };
-            setBursts((prev) => [...prev, b]);
-            setTimeout(() => setBursts((prev) => prev.filter((x) => x.id !== b.id)), 3500);
-          },
+          (payload) => push((payload.new as { emoji: string }).emoji),
         )
         .subscribe();
     })();
 
     return () => {
       cancelled = true;
-      if (channel) supabase.removeChannel(channel);
+      if (frameRef.current != null) cancelAnimationFrame(frameRef.current);
+      timers.forEach(clearTimeout);
+      timers.clear();
+      supabase.removeChannel(live);
+      if (legacy) supabase.removeChannel(legacy);
     };
   }, [supabase, presentationId]);
 
   return (
-    <div className="pointer-events-none fixed inset-0 z-50 overflow-hidden">
+    <div className="pointer-events-none fixed inset-0 z-50 overflow-hidden" style={{ contain: "strict" }}>
       {bursts.map((b) => (
         <span
           key={b.id}
-          className="absolute select-none"
-          style={{
-            left: `${b.x}%`,
-            bottom: 0,
-            fontSize: 36,
-            animation: `floatUp 3.4s cubic-bezier(0.2, 0.8, 0.2, 1) ${b.delay}s forwards`,
-          }}
+          className="reaction-float absolute select-none"
+          style={{ left: `${b.x}%`, bottom: 0, fontSize: b.size, animationDelay: `${b.delay}s` }}
         >
           {b.emoji}
         </span>
       ))}
-      <style>{`
-        @keyframes floatUp {
-          0%   { transform: translateY(0) scale(0.6) rotate(0deg); opacity: 0; }
-          10%  { transform: translateY(-40px) scale(1) rotate(-6deg); opacity: 1; }
-          80%  { transform: translateY(-70vh) scale(1.2) rotate(8deg); opacity: 0.95; }
-          100% { transform: translateY(-90vh) scale(1.4) rotate(-10deg); opacity: 0; }
-        }
-      `}</style>
     </div>
   );
-}
+});

@@ -4,6 +4,7 @@ import { generateRoomCode } from "@/lib/code";
 import type { SlideType, SlideConfig } from "@/lib/types";
 import { authenticateRequest } from "@/lib/apiAuth";
 import { createServiceClient } from "@/lib/supabase/service";
+import { startedAtFor } from "@/lib/liveTiming";
 
 /**
  * Klikr Model Context Protocol server.
@@ -286,7 +287,7 @@ export async function POST(req: NextRequest) {
 
         const { data: slides } = await supabase
           .from("slides")
-          .select("id, position")
+          .select("id, position, type")
           .eq("presentation_id", presentationId)
           .order("position", { ascending: true });
         if (!slides || slides.length === 0) {
@@ -299,23 +300,24 @@ export async function POST(req: NextRequest) {
           .single();
         if (!pres) throw new Error("Presentation not found");
 
-        let nextId: string | null = null;
+        let next: { id: string; type: string } | null = null;
         if (pres.state === "lobby") {
-          nextId = slides[0].id;
+          next = slides[0];
         } else {
           const idx = slides.findIndex((s) => s.id === pres.current_slide_id);
           const nextIdx = direction === "next" ? idx + 1 : idx - 1;
           if (nextIdx < 0 || nextIdx >= slides.length) {
             throw new Error(`No ${direction} slide available`);
           }
-          nextId = slides[nextIdx].id;
+          next = slides[nextIdx];
         }
+        const nextId = next.id;
         const { error } = await supabase
           .from("presentations")
           .update({
             state: "active",
             current_slide_id: nextId,
-            current_slide_started_at: new Date().toISOString(),
+            current_slide_started_at: startedAtFor(next.type),
           })
           .eq("id", presentationId);
         if (error) throw error;

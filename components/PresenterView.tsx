@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Moon, Sun } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import type { Presentation, Slide, ResponseRow, Participant } from "@/lib/types";
@@ -17,15 +17,43 @@ import { ReactionOverlay } from "./ReactionOverlay";
 import { EmbedSlide } from "./EmbedSlide";
 import { KahootPresenterView } from "./KahootPresenterView";
 import { QuizPodium } from "./QuizPodium";
-import { LeaderboardRows, annotateRanks, type LbRow } from "./LeaderboardRows";
+import { LeaderboardRows, sortByScore, useStagedRows } from "./LeaderboardRows";
 import { QrCode } from "./QrCode";
-import { PresenterMusicToggle } from "./PresenterMusicToggle";
+import { PresenterMusicProvider, PresenterMusicToggle } from "./PresenterMusicToggle";
 import { SessionStatusPill } from "./SessionStatusPill";
 import { PresenterShortcutsHelp } from "./PresenterShortcutsHelp";
-import { Keyboard, Maximize2, Minimize2, FastForward } from "lucide-react";
+import { Keyboard, Maximize2, Minimize2, FastForward, Flame, TrendingUp } from "lucide-react";
 import type { EmbedConfig, QAConfig } from "@/lib/types";
+import { useBufferedState } from "@/lib/useBufferedState";
+import { pinRealtimeAuth } from "@/lib/realtime";
+import { startedAtFor } from "@/lib/liveTiming";
+import { serverNow } from "@/lib/serverClock";
+import { playPresenterClip } from "@/lib/audio";
+import { MiniConfettiBurst } from "./QuizFeedback";
 
-export function PresenterView({
+// Only the columns the presenter screens read — `select("*")` shipped every
+// column of every response on each refetch.
+const RESPONSE_COLS = "id, slide_id, participant_id, value_text, value_index, response_ms, created_at, status, pinned, flagged";
+const PARTICIPANT_COLS = "id, presentation_id, nickname, score, created_at";
+
+type RoundBaseline = Map<string, { id: string; nickname: string; score: number; rank: number }>;
+
+export function PresenterView(props: {
+  presentation: Presentation;
+  slides: Slide[];
+  joinUrl: string;
+  displayJoinUrl: string;
+}) {
+  // Music lives above the lobby/live/closed switch so it keeps playing (and
+  // isn't re-downloaded) when the host presses Start.
+  return (
+    <PresenterMusicProvider>
+      <PresenterViewInner {...props} />
+    </PresenterMusicProvider>
+  );
+}
+
+function PresenterViewInner({
   presentation: initialPresentation,
   slides,
   joinUrl,
@@ -38,8 +66,10 @@ export function PresenterView({
 }) {
   const supabase = useMemo(() => createClient(), []);
   const [presentation, setPresentation] = useState(initialPresentation);
-  const [responses, setResponses] = useState<ResponseRow[]>([]);
-  const [participants, setParticipants] = useState<Participant[]>([]);
+  // Realtime-fed lists apply in per-frame batches (useBufferedState): a burst
+  // of answers re-renders the presenter once per frame, not once per answer.
+  const [responses, enqueueResponses, setResponses] = useBufferedState<ResponseRow[]>([]);
+  const [participants, enqueueParticipants, setParticipants] = useBufferedState<Participant[]>([]);
   const [modeOverride, setModeOverride] = useState<"light" | "dark" | null>(null);
   const [scoredSlideIds, setScoredSlideIds] = useState<Set<string>>(() => new Set());
   const [expiredQuizSlideIds, setExpiredQuizSlideIds] = useState<Set<string>>(() => new Set());
@@ -49,6 +79,7 @@ export function PresenterView({
   const [starting, setStarting] = useState(false);
   const [startError, setStartError] = useState<string | null>(null);
   const [navError, setNavError] = useState<string | null>(null);
+  const navBusyRef = useRef(false);
 
   // Optional auto-advance: after a quiz is scored, automatically show the
   // leaderboard then move to the next question on a timer. Off by default; the
@@ -56,12 +87,11 @@ export function PresenterView({
   const [autoAdvance, setAutoAdvance] = useState(false);
   const [autoCountdown, setAutoCountdown] = useState<number | null>(null);
   const autoTimersRef = useRef<Array<ReturnType<typeof setTimeout>>>([]);
-  // Persistent previous-rank snapshot for the between-question leaderboard, so
-  // delta arrows reflect movement since the last round (survives remounts).
-  const leaderboardPrevRankRef = useRef<Record<string, number>>({});
   useEffect(() => {
     if (typeof window === "undefined") return;
-    setAutoAdvance(localStorage.getItem("klikr:autoadvance") === "on");
+    try {
+      setAutoAdvance(localStorage.getItem("klikr:autoadvance") === "on");
+    } catch {}
   }, []);
   const clearAutoTimers = useCallback(() => {
     autoTimersRef.current.forEach((t) => {
@@ -74,7 +104,9 @@ export function PresenterView({
   const toggleAutoAdvance = useCallback(() => {
     setAutoAdvance((v) => {
       const next = !v;
-      if (typeof window !== "undefined") localStorage.setItem("klikr:autoadvance", next ? "on" : "off");
+      try {
+        localStorage.setItem("klikr:autoadvance", next ? "on" : "off");
+      } catch {}
       if (!next) clearAutoTimers();
       return next;
     });
@@ -102,45 +134,6 @@ export function PresenterView({
     }
   }, []);
 
-  // Keyboard shortcuts — host-only, scoped to presentation states.
-  // Right / Space → next, Left → prev, F → fullscreen.
-  // Ignore when focus is in an input / textarea / contenteditable so editing
-  // isn't disrupted.
-  useEffect(() => {
-    if (presentation.state !== "active" && presentation.state !== "lobby") return;
-    const handler = (e: KeyboardEvent) => {
-      const target = e.target as HTMLElement | null;
-      if (
-        target &&
-        (target.tagName === "INPUT" ||
-          target.tagName === "TEXTAREA" ||
-          target.isContentEditable)
-      ) {
-        return;
-      }
-      if (e.metaKey || e.ctrlKey || e.altKey) return;
-      if (e.key === "ArrowRight" || e.key === " ") {
-        if (presentation.state === "active") {
-          e.preventDefault();
-          moveSlide(presentation.id, "next").catch(() => {});
-        }
-      } else if (e.key === "ArrowLeft") {
-        if (presentation.state === "active") {
-          e.preventDefault();
-          moveSlide(presentation.id, "prev").catch(() => {});
-        }
-      } else if (e.key === "f" || e.key === "F") {
-        e.preventDefault();
-        toggleFullscreen();
-      } else if (e.key === "?" || (e.shiftKey && e.key === "/")) {
-        e.preventDefault();
-        setShortcutsOpen((v) => !v);
-      }
-    };
-    window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
-  }, [presentation.state, presentation.id, toggleFullscreen]);
-
   useEffect(() => {
     try {
       const stored = localStorage.getItem(`klikr-present-mode-${initialPresentation.id}`);
@@ -167,12 +160,22 @@ export function PresenterView({
     } catch {}
   }
 
-  const currentSlide = slides.find((s) => s.id === presentation.current_slide_id) ?? null;
+  const currentSlideId = presentation.current_slide_id;
+  const currentSlide = useMemo(
+    () => slides.find((s) => s.id === currentSlideId) ?? null,
+    [slides, currentSlideId],
+  );
+  const quizSlides = useMemo(() => slides.filter((s) => s.type === "quiz"), [slides]);
+
+  const stateRef = useRef(presentation.state);
+  useEffect(() => {
+    stateRef.current = presentation.state;
+  }, [presentation.state]);
 
   const loadParticipants = useCallback(() => {
     return supabase
       .from("participants")
-      .select("id, presentation_id, nickname, score, created_at")
+      .select(PARTICIPANT_COLS)
       .eq("presentation_id", presentation.id)
       .order("score", { ascending: false })
       .order("created_at", { ascending: true })
@@ -180,63 +183,74 @@ export function PresenterView({
       .then(({ data }) => {
         if (data) setParticipants(data);
       });
-  }, [supabase, presentation.id]);
+  }, [supabase, presentation.id, setParticipants]);
 
   useEffect(() => {
     let realtimeOk = false;
-    const channel = supabase
-      .channel(`pres-${presentation.id}`)
-      .on(
-        "postgres_changes",
-        { event: "UPDATE", schema: "public", table: "presentations", filter: `id=eq.${presentation.id}` },
-        (payload) => setPresentation((prev) => ({ ...prev, ...(payload.new as Presentation) })),
-      )
-      .on(
-        "postgres_changes",
-        { event: "INSERT", schema: "public", table: "participants" },
-        (payload) => {
-          setParticipants((prev) => {
+    let cancelled = false;
+    let channel: ReturnType<typeof supabase.channel> | null = null;
+    // Filtered to THIS presentation. (The filter was once dropped, so every
+    // join/score on the platform reached every live presenter; the real cause
+    // of the missing events was the socket joining as `anon` — fixed by
+    // pinning the session JWT first.)
+    (async () => {
+      await pinRealtimeAuth(supabase);
+      if (cancelled) return;
+      channel = supabase
+        .channel(`pres-${presentation.id}`)
+        .on(
+          "postgres_changes",
+          { event: "UPDATE", schema: "public", table: "presentations", filter: `id=eq.${presentation.id}` },
+          (payload) => setPresentation((prev) => ({ ...prev, ...(payload.new as Presentation) })),
+        )
+        .on(
+          "postgres_changes",
+          { event: "INSERT", schema: "public", table: "participants", filter: `presentation_id=eq.${presentation.id}` },
+          (payload) => {
             const fresh = payload.new as Participant;
-            if (fresh.presentation_id !== presentation.id) return prev;
-            if (prev.some(p => p.id === fresh.id)) return prev;
-            return [...prev, fresh];
-          });
-        },
-      )
-      .on(
-        "postgres_changes",
-        { event: "UPDATE", schema: "public", table: "participants" },
-        (payload) => {
-          const fresh = payload.new as Participant;
-          if (fresh.presentation_id !== presentation.id) return;
-          setParticipants((prev) => prev.map(p => p.id === fresh.id ? fresh : p));
-        },
-      )
-      .subscribe((status) => {
-        realtimeOk = status === "SUBSCRIBED";
-      });
-    
+            enqueueParticipants((prev) => (prev.some((p) => p.id === fresh.id) ? prev : [...prev, fresh]));
+          },
+        )
+        .on(
+          "postgres_changes",
+          { event: "UPDATE", schema: "public", table: "participants", filter: `presentation_id=eq.${presentation.id}` },
+          (payload) => {
+            const fresh = payload.new as Participant;
+            enqueueParticipants((prev) => prev.map((p) => (p.id === fresh.id ? { ...p, ...fresh } : p)));
+          },
+        )
+        .subscribe((status) => {
+          realtimeOk = status === "SUBSCRIBED";
+        });
+    })();
+
     // Initial load for instant first paint. After that realtime keeps the
     // roster fresh; the fast interval only fetches while the websocket is down
-    // (Railway can drop it), so a healthy session has no 2s re-render churn.
+    // (Railway can drop it), so a healthy session has no re-render churn.
     // The slow interval is a belt-and-suspenders safety net: a channel can
-    // report "SUBSCRIBED" while still silently dropping specific row events
-    // (e.g. an RLS/auth edge case), and a host staring at a lobby that never
-    // updates has no other way to notice — so we never go fully quiet.
+    // report "SUBSCRIBED" while still silently dropping specific row events,
+    // and a host staring at a lobby that never updates has no other way to
+    // notice — so we never go fully quiet.
     loadParticipants();
     const fastPoll = setInterval(() => {
       if (!realtimeOk) loadParticipants();
     }, 5000);
+    // In the lobby the roster IS the screen, so the safety net runs every 5s
+    // there (one tiny query for one host); during the game, every 20s.
+    let ticks = 0;
     const safetyPoll = setInterval(() => {
-      if (realtimeOk) loadParticipants();
-    }, 20000);
+      ticks += 1;
+      if (!realtimeOk || document.visibilityState !== "visible") return;
+      if (stateRef.current === "lobby" || ticks % 4 === 0) loadParticipants();
+    }, 5000);
 
     return () => {
+      cancelled = true;
       clearInterval(fastPoll);
       clearInterval(safetyPoll);
-      supabase.removeChannel(channel);
+      if (channel) supabase.removeChannel(channel);
     };
-  }, [supabase, presentation.id, loadParticipants]);
+  }, [supabase, presentation.id, loadParticipants, enqueueParticipants]);
 
   // Refetch the roster the instant any quiz slide is scored. The host already
   // reloads on its own timer-expiry and gets participant realtime, but this
@@ -248,64 +262,77 @@ export function PresenterView({
 
   useEffect(() => {
     setLeaderboardSlideId(null);
-  }, [currentSlide?.id]);
+  }, [currentSlideId]);
+
+  // Standings as each quiz question starts — the between-question
+  // leaderboard animates from here to the new totals.
+  const participantsRef = useRef(participants);
+  useEffect(() => {
+    participantsRef.current = participants;
+  }, [participants]);
+  const [roundBaseline, setRoundBaseline] = useState<RoundBaseline | null>(null);
+  const baselineSlideRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!currentSlide || currentSlide.type !== "quiz") return;
+    if (baselineSlideRef.current === currentSlide.id) return;
+    baselineSlideRef.current = currentSlide.id;
+    const ranked = sortByScore(participantsRef.current);
+    setRoundBaseline(
+      new Map(ranked.map((p, i) => [p.id, { id: p.id, nickname: p.nickname, score: p.score, rank: i + 1 }])),
+    );
+  }, [currentSlide]);
 
   useEffect(() => {
-    if (!currentSlide) {
+    if (!currentSlideId) {
       setResponses([]);
       return;
     }
     let cancelled = false;
     let realtimeOk = false;
-    supabase
-      .from("responses")
-      .select("*")
-      .eq("slide_id", currentSlide.id)
-      .then(({ data }) => {
-        if (!cancelled && data) setResponses(data);
-      });
+    const fetchResponses = () => {
+      supabase
+        .from("responses")
+        .select(RESPONSE_COLS)
+        .eq("slide_id", currentSlideId)
+        .returns<ResponseRow[]>()
+        .then(({ data }) => {
+          if (!cancelled && data) setResponses(data);
+        });
+    };
+    setResponses([]);
+    fetchResponses();
     const channel = supabase
-      .channel(`slide-${currentSlide.id}`)
+      .channel(`slide-${currentSlideId}`)
       .on(
         "postgres_changes",
-        { event: "*", schema: "public", table: "responses", filter: `slide_id=eq.${currentSlide.id}` },
+        { event: "*", schema: "public", table: "responses", filter: `slide_id=eq.${currentSlideId}` },
         (payload) => {
           if (payload.eventType === "INSERT") {
-            setResponses((r) => [...r, payload.new as ResponseRow]);
+            const row = payload.new as ResponseRow;
+            enqueueResponses((r) => (r.some((x) => x.id === row.id) ? r : [...r, row]));
           } else if (payload.eventType === "UPDATE") {
-            setResponses((r) =>
-              r.map((x) => (x.id === (payload.new as ResponseRow).id ? (payload.new as ResponseRow) : x)),
-            );
+            const row = payload.new as ResponseRow;
+            enqueueResponses((r) => r.map((x) => (x.id === row.id ? row : x)));
           } else if (payload.eventType === "DELETE") {
-            setResponses((r) => r.filter((x) => x.id !== (payload.old as ResponseRow).id));
+            const id = (payload.old as ResponseRow).id;
+            enqueueResponses((r) => r.filter((x) => x.id !== id));
           }
         },
       )
       .subscribe((status) => {
         realtimeOk = status === "SUBSCRIBED";
       });
-      
+
     // Fallback polling for responses too (Word Cloud, Polls, etc) — the fast
     // interval only fires while the websocket is down, so a healthy session
-    // re-renders on real changes rather than every 2s. The slow interval is a
-    // safety net for the same silent-drop risk as the participants roster
-    // above (channel says "SUBSCRIBED" but a specific row's events never
-    // arrive) — votes/answers are the whole point of the presenter screen, so
-    // this can't be allowed to go stale indefinitely.
-    const fetchResponses = () => {
-      supabase
-        .from("responses")
-        .select("*")
-        .eq("slide_id", currentSlide.id)
-        .then(({ data }) => {
-          if (!cancelled && data) setResponses(data);
-        });
-    };
+    // re-renders on real changes. The slow interval is a safety net for the
+    // same silent-drop risk as the participants roster above — votes/answers
+    // are the whole point of the presenter screen.
     const fastPoll = setInterval(() => {
       if (!realtimeOk) fetchResponses();
     }, 5000);
     const safetyPoll = setInterval(() => {
-      if (realtimeOk) fetchResponses();
+      if (realtimeOk && document.visibilityState === "visible") fetchResponses();
     }, 20000);
 
     return () => {
@@ -314,31 +341,37 @@ export function PresenterView({
       clearInterval(safetyPoll);
       supabase.removeChannel(channel);
     };
-  }, [supabase, currentSlide]);
+  }, [supabase, currentSlideId, setResponses, enqueueResponses]);
 
   const themeForShell: Presentation["theme"] = {
     ...(presentation.theme ?? {}),
     mode: effectiveMode,
   };
 
-  // Click Start → flip to "active" immediately (mirrors endSessionNow's
-  // optimistic pattern below) rather than waiting on the realtime echo of our
-  // own write, which can lag or — per the participants/responses polling
-  // fallbacks elsewhere in this file — occasionally never arrive. Without this,
-  // a slow/dropped echo left the host stuck looking at the lobby with no
-  // indication anything happened, indistinguishable from the button being
-  // broken. On failure, revert and show why so the host can retry.
+  // Click Start → flip to "active" immediately rather than waiting on the
+  // realtime echo of our own write, which can lag or occasionally never
+  // arrive. On failure, revert and show why so the host can retry.
   async function startNow() {
     if (starting) return;
     setStarting(true);
     setStartError(null);
     const prevSlideId = presentation.current_slide_id;
     const prevStartedAt = presentation.current_slide_started_at;
-    const first = slides[0]?.id ?? null;
-    const now = new Date().toISOString();
-    setPresentation((p) => ({ ...p, state: "active", current_slide_id: first, current_slide_started_at: now }));
+    const first = slides[0] ?? null;
+    setPresentation((p) => ({
+      ...p,
+      state: "active",
+      current_slide_id: first?.id ?? null,
+      current_slide_started_at: startedAtFor(first?.type, serverNow()),
+    }));
+    playPresenterClip("whoosh");
     try {
-      await startPresentation(presentation.id);
+      const res = await startPresentation(presentation.id);
+      if (res?.currentSlideStartedAt) {
+        setPresentation((p) =>
+          p.current_slide_id === res.currentSlideId ? { ...p, current_slide_started_at: res.currentSlideStartedAt } : p,
+        );
+      }
     } catch (err) {
       console.error("startPresentation failed", err);
       setPresentation((p) => ({ ...p, state: "lobby", current_slide_id: prevSlideId, current_slide_started_at: prevStartedAt }));
@@ -347,6 +380,102 @@ export function PresenterView({
       setStarting(false);
     }
   }
+
+  // Optimistic slide navigation: show the target slide immediately, then
+  // reconcile with the server's answer (move_slide RPC, one round trip).
+  const navigate = useCallback(
+    async (direction: "next" | "prev") => {
+      if (navBusyRef.current) return;
+      const idxNow = slides.findIndex((s) => s.id === presentation.current_slide_id);
+      const target = slides[direction === "next" ? idxNow + 1 : idxNow - 1];
+      if (!target) return;
+      navBusyRef.current = true;
+      clearAutoTimers();
+      setLeaderboardSlideId(null);
+      setNavError(null);
+      const prevSlideId = presentation.current_slide_id;
+      const prevStartedAt = presentation.current_slide_started_at;
+      setPresentation((p) => ({
+        ...p,
+        current_slide_id: target.id,
+        current_slide_started_at: startedAtFor(target.type, serverNow()),
+      }));
+      try {
+        const res = await moveSlide(presentation.id, direction);
+        if (res?.moved && res.currentSlideId) {
+          setPresentation((p) =>
+            p.current_slide_id === res.currentSlideId
+              ? { ...p, current_slide_started_at: res.currentSlideStartedAt }
+              : { ...p, current_slide_id: res.currentSlideId, current_slide_started_at: res.currentSlideStartedAt },
+          );
+        } else if (res && !res.moved) {
+          // Server says we were already at the edge (another host moved?) —
+          // follow the server.
+          setPresentation((p) => ({
+            ...p,
+            current_slide_id: res.currentSlideId,
+            current_slide_started_at: res.currentSlideStartedAt,
+          }));
+        }
+      } catch (err) {
+        console.error(`moveSlide ${direction} failed`, err);
+        setPresentation((p) => ({ ...p, current_slide_id: prevSlideId, current_slide_started_at: prevStartedAt }));
+        setNavError(
+          err instanceof Error
+            ? err.message
+            : direction === "next"
+              ? "Couldn't advance to the next slide. Check your connection and try again."
+              : "Couldn't go back to the previous slide. Check your connection and try again.",
+        );
+      } finally {
+        navBusyRef.current = false;
+      }
+    },
+    [slides, presentation.current_slide_id, presentation.current_slide_started_at, presentation.id, clearAutoTimers],
+  );
+
+  // Keyboard shortcuts — host-only, scoped to presentation states.
+  // Right / Space → next, Left → prev, F → fullscreen.
+  // Ignore when focus is in an input / textarea / contenteditable so editing
+  // isn't disrupted.
+  const navigateRef = useRef(navigate);
+  useEffect(() => {
+    navigateRef.current = navigate;
+  }, [navigate]);
+  useEffect(() => {
+    if (presentation.state !== "active" && presentation.state !== "lobby") return;
+    const handler = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (
+        target &&
+        (target.tagName === "INPUT" ||
+          target.tagName === "TEXTAREA" ||
+          target.isContentEditable)
+      ) {
+        return;
+      }
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      if (e.key === "ArrowRight" || e.key === " ") {
+        if (presentation.state === "active") {
+          e.preventDefault();
+          void navigateRef.current("next");
+        }
+      } else if (e.key === "ArrowLeft") {
+        if (presentation.state === "active") {
+          e.preventDefault();
+          void navigateRef.current("prev");
+        }
+      } else if (e.key === "f" || e.key === "F") {
+        e.preventDefault();
+        toggleFullscreen();
+      } else if (e.key === "?" || (e.shiftKey && e.key === "/")) {
+        e.preventDefault();
+        setShortcutsOpen((v) => !v);
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [presentation.state, toggleFullscreen]);
 
   if (presentation.state === "lobby") {
     return (
@@ -366,7 +495,7 @@ export function PresenterView({
     );
   }
 
-  const hasAnyQuiz = slides.some((s) => s.type === "quiz");
+  const hasAnyQuiz = quizSlides.length > 0;
 
   if (presentation.state === "closed") {
     const startedAt = new Date(presentation.created_at).getTime();
@@ -379,7 +508,7 @@ export function PresenterView({
     return (
       <ThemedShell theme={themeForShell}>
         <div className="flex flex-1 flex-col gap-6">
-          <div className="panel p-12 text-center">
+          <div className="panel anim-scale-in p-12 text-center">
             <div className="pill"><span className="live-dot" /> Session complete</div>
             <h2 className="mt-6 text-3xl font-semibold tracking-tight">Thanks for playing.</h2>
             <p
@@ -429,6 +558,7 @@ export function PresenterView({
   const qaCfg = currentSlide.type === "qa" ? (currentSlide.config as QAConfig) : null;
   const quizExpired = isQuiz && expiredQuizSlideIds.has(currentSlide.id);
   const showQuizLeaderboard = isQuiz && leaderboardSlideId === currentSlide.id;
+  const quizNumber = isQuiz ? quizSlides.findIndex((s) => s.id === currentSlide.id) + 1 : 0;
 
   async function scoreQuizOnExpiry(slideId: string, force = false) {
     setExpiredQuizSlideIds((prev) => {
@@ -456,8 +586,8 @@ export function PresenterView({
   // cleared by any manual nav or slide change so it can never fire late.
   function armAutoAdvance(slideId: string) {
     clearAutoTimers();
-    const LEADERBOARD_DELAY_MS = 2500;
-    const NEXT_SECONDS = 5;
+    const LEADERBOARD_DELAY_MS = 3000;
+    const NEXT_SECONDS = 6;
     autoTimersRef.current.push(
       setTimeout(() => {
         setLeaderboardSlideId(slideId);
@@ -468,7 +598,7 @@ export function PresenterView({
           if (n <= 0) {
             clearInterval(iv);
             setAutoCountdown(null);
-            goToNextSlide();
+            void navigateRef.current("next");
           } else {
             setAutoCountdown(n);
           }
@@ -484,9 +614,8 @@ export function PresenterView({
   }
 
   // Confirmation is handled inline by EndSessionButton — NOT window.confirm,
-  // which browsers silently suppress after a few dialogs ("prevent this page
-  // from creating additional dialogs"), which made End session a no-op. Same
-  // reason we don't alert() on failure.
+  // which browsers silently suppress after a few dialogs. Same reason we
+  // don't alert() on failure.
   async function endSessionNow() {
     clearAutoTimers();
     setNavError(null);
@@ -502,52 +631,30 @@ export function PresenterView({
     }
   }
 
-  // Both nav actions surface a visible error on failure instead of silently
-  // doing nothing — clicking Next/Prev with no feedback reads as a broken
-  // button, same class of bug as the Start flow above.
-  async function goToNextSlide() {
-    clearAutoTimers();
-    setLeaderboardSlideId(null);
-    setNavError(null);
-    try {
-      await moveSlide(presentation.id, "next");
-    } catch (err) {
-      console.error("moveSlide next failed", err);
-      setNavError(err instanceof Error ? err.message : "Couldn't advance to the next slide. Check your connection and try again.");
-    }
+  function goToNextSlide() {
+    void navigate("next");
   }
 
-  async function goToPrevSlide() {
+  function goToPrevSlide() {
     clearAutoTimers();
     if (showQuizLeaderboard) {
       setLeaderboardSlideId(null);
       return;
     }
-    setNavError(null);
-    try {
-      await moveSlide(presentation.id, "prev");
-    } catch (err) {
-      console.error("moveSlide prev failed", err);
-      setNavError(err instanceof Error ? err.message : "Couldn't go back to the previous slide. Check your connection and try again.");
-    }
+    void navigate("prev");
   }
+
+  const visibleCount = responses.filter((r) => (r.status ?? "approved") !== "rejected").length;
 
   return (
     <ThemedShell theme={themeForShell}>
       <div className="flex min-h-0 flex-1 flex-col gap-4">
-        <div className="flex items-start justify-end gap-3">
-          <div className="text-right leading-tight">
-            <div className="text-[10px] uppercase tracking-[0.18em] muted-text">Join at</div>
-            <div className="mono text-sm">{displayJoinUrl}</div>
-            <div className="mono text-2xl font-semibold tracking-[0.22em]">{presentation.code}</div>
-          </div>
-          <QrCode value={joinUrl} size={88} />
-        </div>
+        <JoinCorner displayJoinUrl={displayJoinUrl} code={presentation.code} joinUrl={joinUrl} />
         <div className="flex min-h-0 flex-1 flex-col gap-4 rounded-2xl px-2 py-3 sm:px-6 sm:py-5 overflow-y-auto">
           <div className="flex items-center justify-between">
             <div className="mono text-[11px] uppercase tracking-[0.2em] muted-text">
               Slide {String(idx + 1).padStart(2, "0")} of {String(slides.length).padStart(2, "0")} · {currentSlide.type}
-              {isKahoot && <span className="ml-2" style={{ color: "var(--blue)" }}>· Kahoot mode</span>}
+              {isKahoot && <span className="ml-2" style={{ color: "var(--blue)" }}>· Game show</span>}
             </div>
             <div className="flex items-center gap-3 text-[11px] uppercase tracking-[0.2em] muted-text">
               <a
@@ -599,13 +706,22 @@ export function PresenterView({
           </div>
           <div key={`${currentSlide.id}-${showQuizLeaderboard ? "leaderboard" : "slide"}`} className="slide-enter flex min-h-0 flex-1 flex-col">
             {showQuizLeaderboard ? (
-              <QuizLeaderboardScreen participants={participants} prevRankRef={leaderboardPrevRankRef} />
+              <QuizLeaderboardScreen
+                participants={participants}
+                baseline={roundBaseline}
+                quizSlideIds={quizSlides.slice(0, Math.max(0, quizNumber)).map((s) => s.id)}
+                supabase={supabase}
+              />
             ) : isKahoot ? (
               <KahootPresenterView
                 slide={currentSlide}
                 responses={responses}
                 startedAt={presentation.current_slide_started_at}
                 onExpired={() => scoreQuizOnExpiry(currentSlide.id)}
+                forceClosed={quizExpired}
+                questionNumber={quizNumber}
+                questionCount={quizSlides.length}
+                playerCount={participants.length}
               />
             ) : (
               <>
@@ -652,6 +768,7 @@ export function PresenterView({
                       responses={responses}
                       startedAt={presentation.current_slide_started_at}
                       onExpired={() => scoreQuizOnExpiry(currentSlide.id)}
+                      forceClosed={quizExpired}
                     />
                   )}
                   {currentSlide.type === "qa" && (
@@ -669,22 +786,10 @@ export function PresenterView({
                 </div>
 
                 <div className="mt-4 text-xs muted-text">
-                  {(() => {
-                    const visibleCount = responses.filter(
-                      (r) => (r.status ?? "approved") !== "rejected",
-                    ).length;
-                    return (
-                      <>
-                        <span
-                          key={visibleCount}
-                          className="mono count-bump text-[var(--fg)]"
-                        >
-                          {visibleCount}
-                        </span>{" "}
-                        responses
-                      </>
-                    );
-                  })()}
+                  <span key={visibleCount} className="mono count-bump text-[var(--fg)]">
+                    {visibleCount}
+                  </span>{" "}
+                  responses
                 </div>
               </>
             )}
@@ -731,6 +836,7 @@ export function PresenterView({
                   <button
                     onClick={() => {
                       clearAutoTimers();
+                      playPresenterClip("whoosh");
                       setLeaderboardSlideId(currentSlide.id);
                     }}
                     className="btn-ghost"
@@ -775,33 +881,118 @@ export function PresenterView({
   );
 }
 
-function QuizLeaderboardScreen({
+// Join code + QR in the corner. Memoized: it never changes during a session,
+// so answers streaming in don't re-render it.
+const JoinCorner = memo(function JoinCorner({
+  displayJoinUrl,
+  code,
+  joinUrl,
+}: {
+  displayJoinUrl: string;
+  code: string;
+  joinUrl: string;
+}) {
+  return (
+    <div className="flex items-start justify-end gap-3">
+      <div className="text-right leading-tight">
+        <div className="text-[10px] uppercase tracking-[0.18em] muted-text">Join at</div>
+        <div className="mono text-sm">{displayJoinUrl}</div>
+        <div className="mono text-2xl font-semibold tracking-[0.22em]">{code}</div>
+      </div>
+      <QrCode value={joinUrl} size={88} />
+    </div>
+  );
+});
+
+// Between-question scoreboard. Two beats: rows first sit where they were
+// before this question, then spring to the new standings while the scores
+// count up. Callouts: the biggest climber, and the hottest answer streak.
+export function QuizLeaderboardScreen({
   participants,
-  prevRankRef,
+  baseline,
+  quizSlideIds,
+  supabase,
 }: {
   participants: Participant[];
-  prevRankRef: React.MutableRefObject<Record<string, number>>;
+  baseline: RoundBaseline | null;
+  quizSlideIds: string[];
+  supabase: ReturnType<typeof createClient>;
 }) {
-  // Annotate ranks/deltas against the previous standings so rows can animate
-  // their climb/drop with arrows, mirroring the audience board. Computed in an
-  // effect (annotateRanks mutates the snapshot ref — never during render). The
-  // ref lives in the parent so it survives this screen's remounts and the first
-  // paint of each round shows movement since the last leaderboard.
-  const [rows, setRows] = useState<LbRow[]>([]);
+  const ranked = useMemo(
+    () => sortByScore(participants).map((p, i) => ({ id: p.id, nickname: p.nickname, score: p.score, rank: i + 1 })),
+    [participants],
+  );
+  const top = useMemo(() => ranked.slice(0, 8), [ranked]);
+  const prev = useMemo(() => (baseline ? [...baseline.values()] : null), [baseline]);
+  const rows = useStagedRows(top, prev, 800);
+
+  const climber = useMemo(() => {
+    if (!baseline) return null;
+    let best: { nickname: string; delta: number } | null = null;
+    for (const r of ranked) {
+      const b = baseline.get(r.id);
+      if (!b) continue;
+      const delta = b.rank - r.rank;
+      if (delta >= 2 && (!best || delta > best.delta)) best = { nickname: r.nickname, delta };
+    }
+    return best;
+  }, [ranked, baseline]);
+
+  // Answer streaks from quiz_slide_scores (owner-readable): consecutive
+  // correct answers ending with the question just played.
+  const [streak, setStreak] = useState<{ nickname: string; n: number } | null>(null);
+  const idsKey = quizSlideIds.join(",");
   useEffect(() => {
-    const annotated = annotateRanks(participants, prevRankRef.current).slice(0, 8);
-    setRows(annotated.map((r) => ({ ...r, visualIndex: r.rank - 1 })));
-  }, [participants, prevRankRef]);
+    if (quizSlideIds.length < 2) return;
+    let cancelled = false;
+    supabase
+      .from("quiz_slide_scores")
+      .select("participant_id, slide_id")
+      .in("slide_id", quizSlideIds)
+      .then(({ data }) => {
+        if (cancelled || !data) return;
+        const got = new Map<string, Set<string>>();
+        for (const row of data as { participant_id: string; slide_id: string }[]) {
+          if (!got.has(row.participant_id)) got.set(row.participant_id, new Set());
+          got.get(row.participant_id)!.add(row.slide_id);
+        }
+        let best: { id: string; n: number } | null = null;
+        for (const [pid, set] of got) {
+          let n = 0;
+          for (let i = quizSlideIds.length - 1; i >= 0 && set.has(quizSlideIds[i]); i--) n++;
+          if (n >= 2 && (!best || n > best.n)) best = { id: pid, n };
+        }
+        const nick = best ? ranked.find((r) => r.id === best!.id)?.nickname : null;
+        setStreak(best && nick ? { nickname: nick, n: best.n } : null);
+      });
+    return () => {
+      cancelled = true;
+    };
+    // ranked is read for nicknames only; refetch per question, not per score tick.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [supabase, idsKey]);
 
   return (
     <div className="flex min-h-0 flex-1 flex-col justify-center">
       <div className="mx-auto w-full max-w-4xl">
-        <p className="text-center text-[11px] uppercase tracking-[0.24em] muted-text">
-          Leaderboard
-        </p>
-        <h2 className="mt-2 text-center text-4xl font-semibold tracking-tight sm:text-6xl">
+        <p className="text-center text-[11px] uppercase tracking-[0.24em] muted-text">Leaderboard</p>
+        <h2 className="lb-title mt-2 text-center text-4xl font-semibold tracking-tight sm:text-6xl">
           Current standings
         </h2>
+        {(climber || streak) && (
+          <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
+            {streak ? (
+              <span className="callout-pill" style={{ animationDelay: "1.1s" }}>
+                <Flame className="h-4 w-4" style={{ color: "#f97316" }} /> {streak.nickname} — {streak.n} in a row
+              </span>
+            ) : null}
+            {climber ? (
+              <span className="callout-pill" style={{ animationDelay: "1.35s" }}>
+                <TrendingUp className="h-4 w-4" style={{ color: "#16a34a" }} /> {climber.nickname} climbed {climber.delta} places
+              </span>
+            ) : null}
+          </div>
+        )}
         {rows.length === 0 ? (
           <div className="panel-soft mt-10 p-10 text-center">
             <p className="text-lg font-medium">No scores yet.</p>
@@ -936,6 +1127,8 @@ function ThemedShell({ theme, children }: { theme: Presentation["theme"]; childr
   );
 }
 
+const LOBBY_MILESTONES = [10, 25, 50, 100, 200] as const;
+
 function Lobby({
   presentation,
   participants,
@@ -979,6 +1172,9 @@ function Lobby({
     const fresh = participants.filter((p) => !seen.has(p.id));
     if (fresh.length === 0) return;
     fresh.forEach((p) => seen.add(p.id));
+    // A big batch is the initial roster load (people already in the room),
+    // not a wave of live joins — don't toast every one of them.
+    if (fresh.length > 5) return;
     setLatestId(fresh[fresh.length - 1].id);
     setToasts((prev) => [
       ...prev,
@@ -986,15 +1182,34 @@ function Lobby({
     ]);
   }, [participants]);
 
-  // Auto-dismiss each toast after ~3.2s.
+  // Auto-dismiss each toast after ~3.2s. Cap the stack so a rush of joins
+  // doesn't bury the screen.
   useEffect(() => {
     if (toasts.length === 0) return;
     const oldest = toasts[0];
     const t = setTimeout(() => {
       setToasts((prev) => prev.filter((x) => x.key !== oldest.key));
-    }, 3200);
+    }, toasts.length > 4 ? 600 : 3200);
     return () => clearTimeout(t);
   }, [toasts]);
+
+  // Room milestones: a celebratory beat at 10 / 25 / 50 / 100 players. Only
+  // for live joins — not when the roster first loads with people already in.
+  const [milestone, setMilestone] = useState<number | null>(null);
+  const prevCountRef = useRef(0);
+  useEffect(() => {
+    const n = participants.length;
+    const prevN = prevCountRef.current;
+    prevCountRef.current = n;
+    const reached = (count: number) => [...LOBBY_MILESTONES].reverse().find((m) => count >= m) ?? 0;
+    const hit = reached(n);
+    if (hit > reached(prevN) && n - prevN <= 3) {
+      setMilestone(hit);
+      playPresenterClip("correct");
+      const t = setTimeout(() => setMilestone(null), 2600);
+      return () => clearTimeout(t);
+    }
+  }, [participants.length]);
 
   return (
     <div className="relative panel p-6 text-center overflow-hidden sm:p-14">
@@ -1021,6 +1236,16 @@ function Lobby({
           </div>
         ))}
       </div>
+
+      {milestone ? (
+        <div className="pointer-events-none absolute inset-0 z-30 flex items-center justify-center" aria-live="polite">
+          <div key={milestone} className="milestone-burst relative rounded-3xl px-10 py-6 text-center text-white">
+            <MiniConfettiBurst count={30} />
+            <p className="text-6xl font-extrabold tracking-tight" style={{ fontVariantNumeric: "tabular-nums" }}>{milestone}</p>
+            <p className="mt-1 text-sm font-semibold uppercase tracking-[0.24em] opacity-90">players in the room!</p>
+          </div>
+        </div>
+      ) : null}
 
       <div className="absolute right-4 top-4 z-10 flex items-center gap-2">
         <ModeToggleButton mode={mode} onToggle={onToggleMode} />
@@ -1069,7 +1294,7 @@ function Lobby({
             return (
               <li
                 key={p.id}
-                className={`${isLatest ? "anim-pop name-glow" : "row-enter"} rounded-full px-3 py-1.5 text-sm font-medium`}
+                className={`${isLatest ? "chip-bounce name-glow" : "row-enter"} rounded-full px-3 py-1.5 text-sm font-medium`}
                 style={{
                   background: isLatest ? "rgba(0, 113, 227, .22)" : "rgba(0, 113, 227, .14)",
                   border: "1px solid rgba(0, 113, 227, .35)",
