@@ -1,43 +1,91 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { memo, useEffect, useMemo, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import type { Slide, ResponseRow, QAConfig } from "@/lib/types";
+import { isMissingRpc } from "@/lib/supabase/rpc";
 import { EmptyResponseState } from "./EmptyResponseState";
 
-type Vote = { response_id: string; participant_id: string };
+const VOTE_REFRESH_MS = 750;
 
-export function QAStream({ slide, responses }: { slide: Slide; responses: ResponseRow[] }) {
+export const QAStream = memo(function QAStream({ slide, responses }: { slide: Slide; responses: ResponseRow[] }) {
   const cfg = slide.config as QAConfig;
   const supabase = useMemo(() => createClient(), []);
-  const [votes, setVotes] = useState<Vote[]>([]);
+  const [counts, setCounts] = useState<Map<string, number>>(() => new Map());
+
+  // Question ids live in a ref so a new question doesn't tear down and
+  // re-create the realtime channel (it used to, on every single question).
+  const idsRef = useRef<Set<string>>(new Set());
+  const idsKey = responses.map((r) => r.id).join(",");
+  const refreshRef = useRef<() => void>(() => {});
+  useEffect(() => {
+    idsRef.current = new Set(responses.map((r) => r.id));
+    refreshRef.current();
+    // idsKey captures the id set; responses identity changes on every update.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [idsKey]);
 
   useEffect(() => {
     let cancelled = false;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    let pending = false;
+
     const load = async () => {
-      const { data } = await supabase
-        .from("question_votes")
-        .select("response_id, participant_id")
-        .in("response_id", responses.map((r) => r.id));
-      if (!cancelled && data) setVotes(data as Vote[]);
+      const { data, error } = await supabase.rpc("get_qa_votes", { p_slide_id: slide.id });
+      if (cancelled) return;
+      if (!error && data) {
+        setCounts(new Map((data as { response_id: string; votes: number }[]).map((r) => [r.response_id, r.votes])));
+        return;
+      }
+      if (!isMissingRpc(error)) return;
+      // Fallback until migration 0027 is applied.
+      const ids = [...idsRef.current];
+      if (ids.length === 0) return setCounts(new Map());
+      const { data: votes } = await supabase.from("question_votes").select("response_id").in("response_id", ids);
+      if (cancelled || !votes) return;
+      const next = new Map<string, number>();
+      for (const v of votes) next.set(v.response_id, (next.get(v.response_id) ?? 0) + 1);
+      setCounts(next);
     };
-    load();
+    // Throttled: at most one refresh per VOTE_REFRESH_MS, trailing edge kept.
+    const schedule = () => {
+      if (timer) {
+        pending = true;
+        return;
+      }
+      void load();
+      timer = setTimeout(() => {
+        timer = null;
+        if (pending) {
+          pending = false;
+          schedule();
+        }
+      }, VOTE_REFRESH_MS);
+    };
+    refreshRef.current = schedule;
+    schedule();
+
     const channel = supabase
       .channel(`qa-votes-${slide.id}`)
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "question_votes" },
-        () => load(),
+        (p) => {
+          const rid =
+            (p.new as { response_id?: string } | null)?.response_id ??
+            (p.old as { response_id?: string } | null)?.response_id;
+          if (rid && !idsRef.current.has(rid)) return; // a vote on another session
+          schedule();
+        },
       )
       .subscribe();
     return () => {
       cancelled = true;
+      refreshRef.current = () => {};
+      if (timer) clearTimeout(timer);
       supabase.removeChannel(channel);
     };
-  }, [supabase, slide.id, responses]);
-
-  const counts = new Map<string, number>();
-  for (const v of votes) counts.set(v.response_id, (counts.get(v.response_id) ?? 0) + 1);
+  }, [supabase, slide.id]);
 
   // On stage: only show approved questions, with pinned floating to top.
   const visible = responses.filter((q) => (q.status ?? "approved") === "approved");
@@ -97,4 +145,4 @@ export function QAStream({ slide, responses }: { slide: Slide; responses: Respon
       })}
     </ul>
   );
-}
+});

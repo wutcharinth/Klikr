@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { authenticateRequest } from "@/lib/apiAuth";
 import { createServiceClient } from "@/lib/supabase/service";
+import { startedAtFor } from "@/lib/liveTiming";
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -41,7 +42,7 @@ export async function POST(req: Request, { params }: Ctx) {
 
   const { data: slides } = await svc
     .from("slides")
-    .select("id, position")
+    .select("id, position, type")
     .eq("presentation_id", id)
     .order("position", { ascending: true });
   const ordered = slides ?? [];
@@ -51,7 +52,7 @@ export async function POST(req: Request, { params }: Ctx) {
   switch (parsed.data.action) {
     case "start": {
       if (ordered.length === 0) return NextResponse.json({ error: "No slides." }, { status: 400 });
-      updates = { state: "active", current_slide_id: ordered[0].id, current_slide_started_at: new Date().toISOString() };
+      updates = { state: "active", current_slide_id: ordered[0].id, current_slide_started_at: startedAtFor(ordered[0].type) };
       break;
     }
     case "end": {
@@ -65,7 +66,7 @@ export async function POST(req: Request, { params }: Ctx) {
       if (idx < 0 || target < 0 || target >= ordered.length) {
         return NextResponse.json({ error: "Out of range." }, { status: 400 });
       }
-      updates = { current_slide_id: ordered[target].id, current_slide_started_at: new Date().toISOString() };
+      updates = { current_slide_id: ordered[target].id, current_slide_started_at: startedAtFor(ordered[target].type) };
       break;
     }
     case "goto": {
@@ -73,7 +74,7 @@ export async function POST(req: Request, { params }: Ctx) {
       if (!slideId || !ordered.some((s) => s.id === slideId)) {
         return NextResponse.json({ error: "slide_id not in this presentation." }, { status: 400 });
       }
-      updates = { current_slide_id: slideId, current_slide_started_at: new Date().toISOString() };
+      updates = { current_slide_id: slideId, current_slide_started_at: startedAtFor(ordered.find((s) => s.id === slideId)?.type) };
       break;
     }
   }

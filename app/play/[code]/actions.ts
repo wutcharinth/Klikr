@@ -3,7 +3,9 @@
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { containsProfanity } from "@/lib/profanity";
-import type { MCQConfig, Participant, QAConfig, RankingConfig } from "@/lib/types";
+import { isMissingRpc } from "@/lib/supabase/rpc";
+import { QUIZ_EARLY_TAP_GRACE_MS } from "@/lib/liveTiming";
+import type { MCQConfig, Participant, QAConfig, RankingConfig, Standing, StandingRow } from "@/lib/types";
 
 export async function joinSession(presentationId: string, nickname: string) {
   const supabase = createServiceClient();
@@ -61,6 +63,15 @@ async function assertCurrentSlide(
   }
 }
 
+type ParticipantWithPresentation = {
+  id: string;
+  presentation_id: string;
+  presentations:
+    | { state: string; current_slide_id: string | null; current_slide_started_at: string | null }
+    | { state: string; current_slide_id: string | null; current_slide_started_at: string | null }[]
+    | null;
+};
+
 export async function submitResponse(input: {
   slideId: string;
   participantId: string;
@@ -68,27 +79,34 @@ export async function submitResponse(input: {
   valueText?: string | null;
   valueIndex?: number | null;
 }) {
-  const { supabase, participant } = await assertParticipant(input);
+  const supabase = createServiceClient();
 
-  // Single query covers the active-slide gate AND pulls slide config + start
-  // time so we can compute response_ms server-side. Trusting client-supplied
-  // response_ms lets a participant claim 0ms and harvest the full speed bonus.
-  const { data: pres, error: presErr } = await supabase
-    .from("presentations")
-    .select("state, current_slide_id, current_slide_started_at")
-    .eq("id", participant.presentation_id)
-    .maybeSingle();
-  if (presErr) throw presErr;
+  // One round trip covers the token check AND the active-slide gate (single
+  // FK participants.presentation_id → presentations, so the embed is
+  // unambiguous); the slide config loads in parallel. Previously these were
+  // three sequential queries before the write.
+  const [partRes, slideRes] = await Promise.all([
+    supabase
+      .from("participants")
+      .select("id, presentation_id, presentations!inner(state, current_slide_id, current_slide_started_at)")
+      .eq("id", input.participantId)
+      .eq("participant_token", input.participantToken)
+      .maybeSingle<ParticipantWithPresentation>(),
+    supabase
+      .from("slides")
+      .select("id, type, config, presentation_id")
+      .eq("id", input.slideId)
+      .maybeSingle(),
+  ]);
+  if (partRes.error) throw partRes.error;
+  const participant = partRes.data;
+  if (!participant) throw new Error("Invalid participant session");
+  const pres = Array.isArray(participant.presentations) ? participant.presentations[0] : participant.presentations;
   if (!pres || pres.state !== "active" || pres.current_slide_id !== input.slideId) {
     throw new Error("This slide is not accepting responses");
   }
-
-  const { data: slide } = await supabase
-    .from("slides")
-    .select("id, type, config")
-    .eq("id", input.slideId)
-    .maybeSingle();
-  if (!slide) throw new Error("Slide not found");
+  const slide = slideRes.data;
+  if (!slide || slide.presentation_id !== participant.presentation_id) throw new Error("Slide not found");
 
   let valueText = input.valueText?.trim().slice(0, 500) ?? null;
   const valueIndex = input.valueIndex ?? null;
@@ -139,6 +157,9 @@ export async function submitResponse(input: {
   // Quiz scoring is speed-weighted, so we must measure response_ms server-side.
   // Falls back to limit_ms (= zero speed bonus) if the slide somehow has no
   // started_at, since score_quiz_slide treats null as instant (max bonus).
+  // started_at may sit slightly in the future during the "get ready" intro
+  // (lib/liveTiming.ts); answers aren't open until it passes.
+  const now = Date.now();
   let responseMs: number | null = null;
   if (slide.type === "quiz") {
     const cfg = slide.config as { time_limit_s?: number };
@@ -146,7 +167,10 @@ export async function submitResponse(input: {
     const startedAt = pres.current_slide_started_at
       ? new Date(pres.current_slide_started_at).getTime()
       : 0;
-    const elapsed = startedAt > 0 ? Date.now() - startedAt : limitMs;
+    if (startedAt > 0 && now < startedAt - QUIZ_EARLY_TAP_GRACE_MS) {
+      throw new Error("Answers open in a moment");
+    }
+    const elapsed = startedAt > 0 ? now - startedAt : limitMs;
     responseMs = Math.max(0, Math.min(limitMs, elapsed));
   }
 
@@ -166,22 +190,39 @@ export async function submitResponse(input: {
   // a "Nth in" takeover. Quiz slides skip this; the takeover for quiz fires on
   // local timer expiry, not on submit.
   if (slide.type !== "quiz") {
-    const [respRes, partRes] = await Promise.all([
+    const [respRes, partCountRes] = await Promise.all([
       supabase
         .from("responses")
-        .select("*", { count: "exact", head: true })
+        .select("id", { count: "exact", head: true })
         .eq("slide_id", input.slideId),
       supabase
         .from("participants")
-        .select("*", { count: "exact", head: true })
+        .select("id", { count: "exact", head: true })
         .eq("presentation_id", participant.presentation_id),
     ]);
     return {
       ordinal: respRes.count ?? 1,
-      total: Math.max(respRes.count ?? 1, partRes.count ?? 1),
+      total: Math.max(respRes.count ?? 1, partCountRes.count ?? 1),
+      serverNow: Date.now(),
     };
   }
-  return {};
+  return { serverNow: Date.now() };
+}
+
+async function listParticipantScores(
+  supabase: ReturnType<typeof createServiceClient>,
+  presentationId: string,
+): Promise<Participant[]> {
+  const { data, error } = await supabase
+    .from("participants")
+    .select("id, presentation_id, nickname, score, created_at")
+    .eq("presentation_id", presentationId)
+    .order("score", { ascending: false })
+    .order("created_at", { ascending: true })
+    .order("id", { ascending: true })
+    .returns<Participant[]>();
+  if (error) throw error;
+  return data ?? [];
 }
 
 export async function getParticipantScores(input: {
@@ -191,15 +232,68 @@ export async function getParticipantScores(input: {
 }): Promise<Participant[]> {
   const { supabase, participant } = await assertParticipant(input);
   if (participant.presentation_id !== input.presentationId) throw new Error("Invalid presentation");
-  const { data, error } = await supabase
-    .from("participants")
-    .select("id, presentation_id, nickname, score, created_at")
-    .eq("presentation_id", input.presentationId)
-    .order("score", { ascending: false })
-    .order("created_at", { ascending: true })
-    .returns<Participant[]>();
-  if (error) throw error;
-  return data ?? [];
+  return listParticipantScores(supabase, input.presentationId);
+}
+
+type StandingRpc = {
+  presentation_id: string;
+  me: { id: string; nickname: string; score: number; rank: number };
+  total: number;
+  ahead: { nickname: string; score: number } | null;
+  top: StandingRow[];
+  scored_rev: number;
+};
+
+/** One player's score + rank, the player just ahead, and the top-N board, in
+ *  a single small payload (get_standing RPC, migration 0027). The audience
+ *  used to download the whole roster several times per question to work this
+ *  out client-side. Falls back to that roster query if the RPC isn't there. */
+export async function getStanding(input: {
+  presentationId: string;
+  participantId: string;
+  participantToken: string;
+  top?: number;
+}): Promise<Standing> {
+  const supabase = createServiceClient();
+  const top = Math.max(0, Math.min(50, Math.round(input.top ?? 5)));
+  const { data, error } = await supabase.rpc("get_standing", {
+    p_participant_id: input.participantId,
+    p_token: input.participantToken,
+    p_top: top,
+  });
+  if (!error && data) {
+    const s = data as StandingRpc;
+    if (s.presentation_id !== input.presentationId) throw new Error("Invalid presentation");
+    return { me: s.me, total: s.total, ahead: s.ahead, top: s.top ?? [], scoredRev: s.scored_rev ?? 0 };
+  }
+  if (error && !isMissingRpc(error)) {
+    if (error.code === "28000") throw new Error("Invalid participant session");
+    throw error;
+  }
+
+  // Fallback: migration 0027 not applied yet.
+  const { participant } = await assertParticipant(input);
+  if (participant.presentation_id !== input.presentationId) throw new Error("Invalid presentation");
+  const [list, presRes] = await Promise.all([
+    listParticipantScores(supabase, input.presentationId),
+    supabase.from("presentations").select("scored_rev").eq("id", input.presentationId).maybeSingle(),
+  ]);
+  const idx = list.findIndex((p) => p.id === input.participantId);
+  const meRow = list[idx];
+  if (!meRow) throw new Error("Invalid participant session");
+  return {
+    me: { id: meRow.id, nickname: meRow.nickname, score: meRow.score, rank: idx + 1 },
+    total: list.length,
+    ahead: idx > 0 ? { nickname: list[idx - 1].nickname, score: list[idx - 1].score } : null,
+    top: list.slice(0, top).map((p, i) => ({
+      id: p.id,
+      nickname: p.nickname,
+      score: p.score,
+      created_at: p.created_at,
+      rank: i + 1,
+    })),
+    scoredRev: (presRes.data?.scored_rev as number | undefined) ?? 0,
+  };
 }
 
 /** Q&A slides allow each participant to submit MULTIPLE questions, so we INSERT

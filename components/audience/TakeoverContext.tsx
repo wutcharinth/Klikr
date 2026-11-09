@@ -2,10 +2,13 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 
+// Quiz reveals no longer carry rank numbers: rank depends on the server
+// scoring this round, which lands a beat after the reveal starts. The variants
+// read it live from StandingsContext and pop it in when it arrives.
 export type TakeoverPayload =
-  | { kind: "quiz-correct"; points: number; rankNow: number; rankBefore: number; total: number; streak?: number }
-  | { kind: "quiz-wrong"; rankNow: number; total: number; correctText?: string }
-  | { kind: "quiz-skipped"; rankNow: number; total: number; correctText?: string }
+  | { kind: "quiz-correct"; points: number; streak?: number }
+  | { kind: "quiz-wrong"; correctText?: string }
+  | { kind: "quiz-skipped"; correctText?: string }
   | { kind: "submitted"; ordinal: number; total: number }
   | { kind: "toast"; text: string };
 
@@ -18,7 +21,15 @@ type TakeoverState = {
 const TakeoverContext = createContext<TakeoverState | null>(null);
 
 const FULL_DURATION_MS = 1800;
+// Quiz reveals hold longer: points count up, then the rank chip lands.
+const QUIZ_DURATION_MS = 3200;
 const TOAST_DURATION_MS = 1000;
+
+function durationFor(p: TakeoverPayload): number {
+  if (p.kind === "toast") return TOAST_DURATION_MS;
+  if (p.kind === "quiz-correct" || p.kind === "quiz-wrong" || p.kind === "quiz-skipped") return QUIZ_DURATION_MS;
+  return FULL_DURATION_MS;
+}
 
 export function TakeoverProvider({ children }: { children: React.ReactNode }) {
   const [payload, setPayload] = useState<TakeoverPayload | null>(null);
@@ -35,7 +46,7 @@ export function TakeoverProvider({ children }: { children: React.ReactNode }) {
   const trigger = useCallback((next: TakeoverPayload) => {
     if (timerRef.current) clearTimeout(timerRef.current);
     setPayload(next);
-    const duration = next.kind === "toast" ? TOAST_DURATION_MS : FULL_DURATION_MS;
+    const duration = durationFor(next);
     timerRef.current = setTimeout(() => {
       setPayload(null);
       timerRef.current = null;

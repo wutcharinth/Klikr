@@ -1,13 +1,19 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { Trophy } from "lucide-react";
 import type { Participant } from "@/lib/types";
-import { PodiumPlayer } from "./remotion/PodiumPlayer";
+import { sortByScore } from "./LeaderboardRows";
+
+// The Remotion runtime is only needed once the session ends — keep it out of
+// the presenter's initial bundle.
+const PodiumPlayer = dynamic(() => import("./remotion/PodiumPlayer").then((m) => m.PodiumPlayer), {
+  ssr: false,
+  loading: () => <div className="podium-skeleton" style={{ aspectRatio: "960 / 520" }} aria-hidden />,
+});
 
 export function QuizPodium({ participants, presentationId }: { participants: Participant[]; presentationId: string }) {
-  const sorted = [...participants].sort(
-    (a, b) => b.score - a.score || new Date(a.created_at).getTime() - new Date(b.created_at).getTime(),
-  );
+  const sorted = sortByScore(participants);
   const top = sorted.slice(0, 3);
   const rest = sorted.slice(3);
 

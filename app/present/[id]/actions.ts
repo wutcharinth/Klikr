@@ -1,50 +1,78 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
+import { isMissingRpc } from "@/lib/supabase/rpc";
+import { QUIZ_INTRO_MS, startedAtFor } from "@/lib/liveTiming";
 import type { Slide } from "@/lib/types";
 
 export async function startPresentation(presentationId: string) {
   const supabase = await createClient();
   const { data: slides } = await supabase
     .from("slides")
-    .select("id")
+    .select("id, type")
     .eq("presentation_id", presentationId)
     .order("position", { ascending: true })
     .limit(1);
-  const first = slides?.[0]?.id ?? null;
-  const now = new Date().toISOString();
+  const first = slides?.[0] ?? null;
+  const nowMs = Date.now();
+  const startedAt = startedAtFor(first?.type, nowMs);
   const { error } = await supabase
     .from("presentations")
     .update({
       state: "active",
-      current_slide_id: first,
-      current_slide_started_at: now,
-      last_started_at: now,
+      current_slide_id: first?.id ?? null,
+      current_slide_started_at: startedAt,
+      last_started_at: new Date(nowMs).toISOString(),
     })
     .eq("id", presentationId);
   if (error) throw error;
+  return { currentSlideId: first?.id ?? null, currentSlideStartedAt: startedAt };
 }
 
-export async function moveSlide(presentationId: string, direction: "next" | "prev") {
-  const supabase = await createClient();
-  const { data: pres } = await supabase
-    .from("presentations")
-    .select("current_slide_id")
-    .eq("id", presentationId)
-    .single();
-  if (!pres) return;
+export type MoveResult = {
+  moved: boolean;
+  currentSlideId: string | null;
+  currentSlideStartedAt: string | null;
+};
 
-  const { data: slides } = await supabase
-    .from("slides")
-    .select("id, type, config, position")
-    .eq("presentation_id", presentationId)
-    .order("position", { ascending: true })
-    .returns<Pick<Slide, "id" | "type" | "config" | "position">[]>();
-  if (!slides || slides.length === 0) return;
+export async function moveSlide(presentationId: string, direction: "next" | "prev"): Promise<MoveResult> {
+  const supabase = await createClient();
+
+  // Fast path (migration 0027): score the outgoing quiz + move, in one
+  // transaction and one round trip. Quiz targets get the get-ready intro.
+  const { data, error } = await supabase.rpc("move_slide", {
+    p_presentation_id: presentationId,
+    p_direction: direction,
+    p_intro_ms: QUIZ_INTRO_MS,
+  });
+  if (!error && data) {
+    const r = data as { moved: boolean; current_slide_id: string | null; current_slide_started_at: string | null };
+    return { moved: r.moved, currentSlideId: r.current_slide_id, currentSlideStartedAt: r.current_slide_started_at };
+  }
+  if (error && !isMissingRpc(error)) throw error;
+
+  // Fallback: the original multi-query path (lookups in parallel).
+  const [presRes, slidesRes] = await Promise.all([
+    supabase.from("presentations").select("current_slide_id, current_slide_started_at").eq("id", presentationId).single(),
+    supabase
+      .from("slides")
+      .select("id, type, config, position")
+      .eq("presentation_id", presentationId)
+      .order("position", { ascending: true })
+      .returns<Pick<Slide, "id" | "type" | "config" | "position">[]>(),
+  ]);
+  const pres = presRes.data;
+  const slides = slidesRes.data;
+  const unchanged: MoveResult = {
+    moved: false,
+    currentSlideId: pres?.current_slide_id ?? null,
+    currentSlideStartedAt: pres?.current_slide_started_at ?? null,
+  };
+  if (!pres || !slides || slides.length === 0) return unchanged;
 
   const idx = slides.findIndex((s) => s.id === pres.current_slide_id);
   const nextIdx = direction === "next" ? idx + 1 : idx - 1;
-  if (nextIdx < 0 || nextIdx >= slides.length) return;
+  if (nextIdx < 0 || nextIdx >= slides.length) return unchanged;
 
   if (direction === "next" && idx >= 0 && slides[idx].type === "quiz") {
     // Scoring must never block navigation — if it throws (e.g. a malformed
@@ -57,14 +85,17 @@ export async function moveSlide(presentationId: string, direction: "next" | "pre
     }
   }
 
-  const { error } = await supabase
+  const target = slides[nextIdx];
+  const startedAt = startedAtFor(target.type);
+  const { error: updErr } = await supabase
     .from("presentations")
     .update({
-      current_slide_id: slides[nextIdx].id,
-      current_slide_started_at: new Date().toISOString(),
+      current_slide_id: target.id,
+      current_slide_started_at: startedAt,
     })
     .eq("id", presentationId);
-  if (error) throw error;
+  if (updErr) throw updErr;
+  return { moved: true, currentSlideId: target.id, currentSlideStartedAt: startedAt };
 }
 
 export async function endPresentation(presentationId: string) {

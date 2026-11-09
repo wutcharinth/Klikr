@@ -113,6 +113,25 @@ export type Participant = {
   created_at: string;
 };
 
+/** One player's live standing, as returned by the get_standing RPC
+ *  (migration 0027) or its TypeScript fallback. */
+export type StandingRow = {
+  id: string;
+  nickname: string;
+  score: number;
+  rank: number;
+  created_at: string;
+};
+
+export type Standing = {
+  me: { id: string; nickname: string; score: number; rank: number };
+  total: number;
+  /** The player directly above me, for "N pts behind X". Null when I lead. */
+  ahead: { nickname: string; score: number } | null;
+  top: StandingRow[];
+  scoredRev: number;
+};
+
 export type ResponseRow = {
   id: string;
   slide_id: string;

@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { Volume2, VolumeX, SkipForward } from "lucide-react";
+import { unlock } from "@/lib/audio";
 
 const TRACKS = [
   { label: "Pulse", src: "/audio/quiz-pulse.mp3" },
@@ -15,45 +16,70 @@ const TRACKS = [
 ];
 const PREF_KEY = "klikr-presenter-music";
 
-export function PresenterMusicToggle({ active = true }: { active?: boolean }) {
+type MusicState = {
+  enabled: boolean;
+  trackIdx: number;
+  toggle: () => void;
+  setTrackIdx: (i: number) => void;
+};
+
+const MusicContext = createContext<MusicState | null>(null);
+
+// One <audio> element for the whole presenter session, mounted above the
+// lobby / live / closed switch so the track doesn't restart (or download
+// again) when the host presses Start. preload="none": nothing is fetched
+// until music is actually switched on — the tracks are 3–6 MB each.
+export function PresenterMusicProvider({ children }: { children: React.ReactNode }) {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [enabled, setEnabled] = useState(false);
   // Randomize the starting track on every mount so each new present session
-  // begins with different music. The skip button still cycles deterministically
-  // from there.
+  // begins with different music. The skip button still cycles from there.
   const [trackIdx, setTrackIdx] = useState(() => Math.floor(Math.random() * TRACKS.length));
   const [hydrated, setHydrated] = useState(false);
 
   useEffect(() => {
-    if (typeof window === "undefined") return;
-    setEnabled(localStorage.getItem(PREF_KEY) === "on");
+    try {
+      setEnabled(localStorage.getItem(PREF_KEY) === "on");
+    } catch {}
     setHydrated(true);
   }, []);
 
   useEffect(() => {
     const a = audioRef.current;
     if (!a || !hydrated) return;
-    if (enabled && active) {
+    if (enabled) {
       a.volume = 0.3;
       const p = a.play();
       if (p && typeof p.catch === "function") p.catch(() => {});
     } else {
       a.pause();
     }
-  }, [enabled, active, hydrated, trackIdx]);
+  }, [enabled, hydrated, trackIdx]);
 
-  const toggle = () => {
+  const toggle = useCallback(() => {
+    void unlock();
     setEnabled((v) => {
       const next = !v;
-      if (typeof window !== "undefined") localStorage.setItem(PREF_KEY, next ? "on" : "off");
+      try {
+        localStorage.setItem(PREF_KEY, next ? "on" : "off");
+      } catch {}
       return next;
     });
-  };
+  }, []);
 
-  const nextTrack = () => {
-    setTrackIdx((i) => (i + 1) % TRACKS.length);
-  };
+  const value = useMemo(() => ({ enabled, trackIdx, toggle, setTrackIdx }), [enabled, trackIdx, toggle]);
+  return (
+    <MusicContext.Provider value={value}>
+      {children}
+      <audio ref={audioRef} src={TRACKS[trackIdx].src} loop preload="none" />
+    </MusicContext.Provider>
+  );
+}
 
+export function PresenterMusicToggle() {
+  const ctx = useContext(MusicContext);
+  if (!ctx) return null;
+  const { enabled, trackIdx, toggle, setTrackIdx } = ctx;
   const track = TRACKS[trackIdx];
 
   return (
@@ -61,8 +87,9 @@ export function PresenterMusicToggle({ active = true }: { active?: boolean }) {
       <button
         type="button"
         onClick={toggle}
-        title={enabled ? "Mute music" : "Play music"}
+        title={enabled ? "Mute music & sound effects" : "Play music & sound effects"}
         aria-label={enabled ? "Mute music" : "Play music"}
+        aria-pressed={enabled}
         className="flex h-8 w-8 items-center justify-center rounded-full transition-colors"
         style={{
           background: enabled ? "rgba(0,113,227,0.12)" : "transparent",
@@ -74,7 +101,7 @@ export function PresenterMusicToggle({ active = true }: { active?: boolean }) {
       </button>
       <button
         type="button"
-        onClick={nextTrack}
+        onClick={() => setTrackIdx((trackIdx + 1) % TRACKS.length)}
         title={`Skip — now playing ${track.label}`}
         aria-label="Skip to next track"
         className="flex h-8 w-8 items-center justify-center rounded-full transition-colors"
@@ -104,7 +131,6 @@ export function PresenterMusicToggle({ active = true }: { active?: boolean }) {
           </option>
         ))}
       </select>
-      <audio ref={audioRef} src={track.src} loop preload="auto" />
     </>
   );
 }

@@ -46,11 +46,14 @@ Then open:
 | `ranking`     | Drag/arrow re-order a list                | Aggregated ranking display                                                 |
 | `embed`       | (read-only)                               | Iframed external content                                                   |
 
-**Kahoot mode** layers on:
+**Game-show mode** (`slides.kahoot_mode`) layers on:
 
+- A 3-second "get ready" intro per question (question alone on screen, answers unlock after; timing and speed scoring start from the unlock, enforced server-side)
 - Speed-based scoring (sooner = more points, server-side via the `score_quiz_slide` RPC)
-- Live leaderboard with `count-bump` animation
-- Per-question reveal on the audience phone (medal + score + rank + "+N pts" float + rank-change pill + confetti on correct)
+- Shape tiles in Klikr's palette (`lib/quizTiles.ts`), CSS-driven timer ring + urgency bar, live "answers in" counter
+- Reveal: correct tile pops with confetti, the rest dim, vote fills grow and counts tick up
+- Two-beat leaderboard: rows start at last round's standings, then spring to the new ones while scores count up; streak + biggest-climber callouts
+- Per-question reveal on the audience phone (points count-up, streak, rank chip, "N pts behind X") + synthesized sound/haptics
 - End-of-session 3 → 2 → 1 podium reveal on both presenter and phone
 
 Other built-ins:
@@ -74,7 +77,7 @@ Other built-ins:
 - **Recharts** for analytics charts
 - **canvas-confetti** + bespoke CSS keyframes for motion
 - **react-pdf** for PDF export
-- **Playwright** for QA screenshots (no E2E suite yet)
+- **Playwright** for E2E (`e2e/`) and QA screenshots
 
 ---
 
@@ -199,6 +202,11 @@ Core tables:
 Important RPCs / views:
 
 - `score_quiz_slide(p_slide_id)` — security-definer, called by `moveSlide`/`endPresentation`. Scales points by speed (`1 - response_ms/limit`).
+- `move_slide(p_presentation_id, p_direction, p_intro_ms)` — one round trip: scores the quiz being left, moves, and sets the next quiz's answer window `p_intro_ms` in the future (the get-ready intro).
+- `get_standing(p_participant_id, p_token, p_top)` — one player's score, rank, the player just ahead and the top-N board (the phone used to download the whole roster to work this out).
+- `get_qa_votes(p_slide_id, p_participant_id)` — per-question upvote totals for a Q&A slide, aggregated in SQL.
+
+Everything that calls the 0027 functions falls back to the previous query path if the migration hasn't been applied yet (`lib/supabase/rpc.ts`), so code can deploy before `npm run migrate`.
 - `editable_presentations` — view exposing presentations the current `auth.uid()` owns or edits. The dashboard reads from this.
 
 RLS is enabled on every table. The audience uses a server-side service-role client (in [app/play/[code]/actions.ts](app/play/[code]/actions.ts)) for inserts that need to skip RLS, but `select` policies for `participants` / `responses` are intentionally permissive so audience clients can compute their own rank.
@@ -211,13 +219,20 @@ Both the host and the audience subscribe to Supabase Realtime channels and re-fe
 
 | Channel                                   | Subscriber  | Watches                                                       |
 |-------------------------------------------|-------------|---------------------------------------------------------------|
-| `audience-${presentationId}`              | Audience    | `presentations` row updates (slide advance, state change)     |
-| `audience-pts-${presentationId}-${pId}`   | Audience    | `participants` row updates (own score)                        |
-| `pres-${presentationId}`                  | Presenter   | `presentations` + `participants` for this session             |
+| `audience-${presentationId}`              | Audience    | `presentations` row updates (slide advance, state change, `scored_rev`) |
+| `pres-${presentationId}`                  | Presenter   | `presentations` + `participants` filtered to this session (JWT pinned first — see `lib/realtime.ts`) |
 | `slide-${currentSlideId}`                 | Presenter   | `responses` for the current slide                             |
-| `qa-${slideId}`                           | Both        | Q&A inserts + `question_votes` toggles                        |
+| `qa-${slideId}` / `qa-votes-${slideId}`   | Both        | Q&A inserts/moderation updates; vote changes trigger a throttled `get_qa_votes` refresh |
+| `reactions:${presentationId}`             | Both        | **Broadcast** (not postgres_changes): emoji reactions, no DB write per tap |
 
-Server-side scoring fires inside `moveSlide` and `endPresentation` server actions ([app/present/[id]/actions.ts](app/present/[id]/actions.ts)) — never on the client. Audience clients compute rank locally from the `participants` snapshot.
+Server-side scoring fires inside `move_slide` / `endPresentation` and at timer expiry ([app/present/[id]/actions.ts](app/present/[id]/actions.ts)) — never on the client. Each phone keeps one shared standings store ([components/audience/StandingsContext.tsx](components/audience/StandingsContext.tsx)): one `get_standing` call per `scored_rev` change, shared by the score pill, the reveal, the leaderboard and the final screen.
+
+Performance notes:
+
+- Realtime-fed lists on the presenter apply in per-frame batches (`lib/useBufferedState.ts`): a burst of 200 answers/second costs ~60 renders, not 200.
+- Quiz timing runs on the server clock (`lib/serverClock.ts` samples `/api/time`), so phones with skewed clocks still reveal on time. Phase changes are one-shot timers (`lib/useQuizPhase.ts`); progress bars and the timer ring are single CSS animations anchored with a negative `animation-delay` — no per-tick re-renders.
+- Remotion only loads at session end (podium, via `next/dynamic`); the phone lobby uses a CSS logo animation.
+- Phone sound effects are synthesized with WebAudio (`lib/audio.ts`) — zero downloads. Presenter music uses `preload="none"` and a single `<audio>` element for the whole session.
 
 ---
 
@@ -227,7 +242,7 @@ The repo ships with [`railway.toml`](railway.toml) for Railway (Nixpacks builder
 
 After every deploy:
 
-1. Run `npm run migrate` against your prod database to pick up new migrations.
+1. Run `npm run migrate` against your prod database to pick up new migrations. (Code calling newer RPCs falls back gracefully until you do, but the fast paths need them.)
 2. The Supabase Realtime publication must include the live tables. The init migration does this for `presentations`, `slides`, `participants`, `responses`, `question_votes`. New tables that need realtime must `alter publication supabase_realtime add table <name>;` in their migration.
 3. The Google OAuth client's redirect URI must be `<site>/auth/callback`.
 
@@ -272,13 +287,16 @@ There's also an MCP (Model Context Protocol) endpoint at `/api/mcp` for LLM tool
 
 ## Motion design
 
-All animations are CSS keyframes plus `canvas-confetti` for big bursts — no Framer Motion or GSAP. Motion utilities live in [app/globals.css](app/globals.css):
+All animations are CSS keyframes plus `canvas-confetti` for big bursts — no Framer Motion or GSAP. Number tweens use a tiny rAF hook (`lib/useCountUp.ts`). Motion is transform/opacity only (no animated `filter: blur()`). Motion utilities live in [app/globals.css](app/globals.css):
 
 - Entrances: `.anim-fade-up`, `.anim-fade-in`, `.anim-pop`, `.slide-enter`, `.morph-in/out`
 - Reveal accents: `.shake-once`, `.rippleOut`, `.count-bump`, `.burst-particle` (`ConfettiBurst` and `MiniConfettiBurst`)
 - Score/rank micro-motion: `.points-float`, `.rank-delta-pill`
 - Lobby/landing: `.start-pulse`, `.qr-halo`, `.pulse-ring`, `.float-slow`, `.headline-shine`, `.sheen`
-- Join toast: `.join-toast`
+- Join toast: `.join-toast`; lobby milestones: `.milestone-burst`, `.chip-bounce`
+- Game show: `.gs-*` (intro, tiles, timer ring, reveal), `.quiz-tile*`, `.time-bar` / `.intro-bar` (CSS-driven timers), `.rank-chip`, `.streak-pill`, `.lb-row-*`
+
+`/dev/quiz-preview` (dev builds only) renders every quiz phase with mock data, plus a render-count stress test.
 
 Every keyframe respects `prefers-reduced-motion: reduce`.
 
