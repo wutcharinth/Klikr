@@ -1,7 +1,7 @@
 "use client";
 
 import { Fragment, memo, useEffect, useMemo, useRef, useState } from "react";
-import { Check, Users } from "lucide-react";
+import { Check, Users, Zap } from "lucide-react";
 import type { Slide, ResponseRow, QuizConfig } from "@/lib/types";
 import { QUIZ_TILES, tileGradient } from "@/lib/quizTiles";
 import { useQuizPhase, useSecondsLeft } from "@/lib/useQuizPhase";
@@ -26,6 +26,7 @@ export const KahootPresenterView = memo(function KahootPresenterView({
   questionNumber,
   questionCount,
   playerCount = 0,
+  nicknames,
 }: {
   slide: Slide;
   responses: ResponseRow[];
@@ -35,6 +36,8 @@ export const KahootPresenterView = memo(function KahootPresenterView({
   questionNumber?: number;
   questionCount?: number;
   playerCount?: number;
+  /** participant id → nickname, for the "locked in" ticker and fastest shout-out. */
+  nicknames?: ReadonlyMap<string, string>;
 }) {
   const cfg = slide.config as QuizConfig;
   const limit = cfg.time_limit_s ?? 20;
@@ -82,6 +85,7 @@ export const KahootPresenterView = memo(function KahootPresenterView({
 
   const closed = timing.phase === "closed";
   const correctCount = counts[cfg.correct_index] ?? 0;
+  const fastest = closed ? fastestCorrect(responses, cfg.correct_index, nicknames) : null;
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-6 lg:gap-8">
@@ -149,6 +153,7 @@ export const KahootPresenterView = memo(function KahootPresenterView({
               <p className="mt-1 text-sm uppercase tracking-[0.18em] muted-text">got it right</p>
             </div>
           </div>
+          <RevealShoutout fastest={fastest} correctCount={correctCount} total={total} />
           <div className="text-right leading-tight">
             <p className="mono text-3xl font-semibold sm:text-4xl" style={{ fontVariantNumeric: "tabular-nums" }}>
               <CountUpNumber value={total > 0 ? Math.round((correctCount / total) * 100) : 0} delay={500} />%
@@ -168,7 +173,10 @@ export const KahootPresenterView = memo(function KahootPresenterView({
           )}
         </div>
       ) : (
-        <AnswersIn total={total} players={playerCount} />
+        <div className="flex flex-wrap items-center justify-center gap-x-10 gap-y-3">
+          <AnswersIn total={total} players={playerCount} />
+          {nicknames && <LockedInTicker responses={responses} nicknames={nicknames} />}
+        </div>
       )}
     </div>
   );
@@ -309,6 +317,83 @@ function CountUpNumber({
     <span className={className} style={{ fontVariantNumeric: "tabular-nums", ...style }}>
       {shown.toLocaleString()}
     </span>
+  );
+}
+
+// Newest answerers pop in as name chips while the question is open. Shows who
+// has locked in — never what they picked — so the room can see the momentum
+// (and who's still thinking).
+const TICKER_MAX = 6;
+function LockedInTicker({ responses, nicknames }: { responses: ResponseRow[]; nicknames: ReadonlyMap<string, string> }) {
+  const recent = useMemo(
+    () =>
+      [...responses]
+        .sort((a, b) => (a.created_at < b.created_at ? 1 : a.created_at > b.created_at ? -1 : 0))
+        .filter((r) => nicknames.has(r.participant_id)),
+    [responses, nicknames],
+  );
+  if (recent.length === 0) return null;
+  const shown = recent.slice(0, TICKER_MAX);
+  const more = recent.length - shown.length;
+  return (
+    <ul className="gs-ticker flex max-w-2xl flex-wrap items-center gap-2" aria-label="Players who have answered">
+      {shown.map((r) => (
+        <li key={r.id} className="gs-ticker-chip">
+          <Check className="h-3.5 w-3.5" strokeWidth={3} aria-hidden />
+          <span className="truncate">{nicknames.get(r.participant_id)}</span>
+        </li>
+      ))}
+      {more > 0 && <li className="gs-ticker-chip gs-ticker-more">+{more}</li>}
+    </ul>
+  );
+}
+
+type Fastest = { nickname: string; ms: number };
+
+function fastestCorrect(
+  responses: ResponseRow[],
+  correctIndex: number,
+  nicknames: ReadonlyMap<string, string> | undefined,
+): Fastest | null {
+  if (!nicknames) return null;
+  let best: Fastest | null = null;
+  for (const r of responses) {
+    if (r.value_index !== correctIndex || r.response_ms == null || r.response_ms < 0) continue;
+    const nickname = nicknames.get(r.participant_id);
+    if (!nickname) continue;
+    if (!best || r.response_ms < best.ms) best = { nickname, ms: r.response_ms };
+  }
+  return best;
+}
+
+// Middle of the reveal footer: celebrate the quickest correct answer, or call
+// out a clean sweep / a question that stumped the whole room.
+function RevealShoutout({ fastest, correctCount, total }: { fastest: Fastest | null; correctCount: number; total: number }) {
+  if (total === 0) return null;
+  if (correctCount === 0) {
+    return (
+      <p className="gs-shoutout" style={{ animationDelay: "900ms" }}>
+        <span aria-hidden>🤯</span> This one stumped everyone
+      </p>
+    );
+  }
+  return (
+    <div className="flex flex-col items-center gap-1.5">
+      {fastest && (
+        <p className="gs-shoutout" style={{ animationDelay: "900ms" }}>
+          <Zap className="h-5 w-5" style={{ color: "#facc15", fill: "#facc15" }} aria-hidden />
+          <span>
+            Fastest: <strong>{fastest.nickname}</strong>
+          </span>
+          <span className="mono muted-text">{(fastest.ms / 1000).toFixed(1)}s</span>
+        </p>
+      )}
+      {correctCount === total && total > 1 && (
+        <p className="gs-shoutout gs-shoutout--soft" style={{ animationDelay: "1200ms" }}>
+          <span aria-hidden>🎉</span> Everyone got it!
+        </p>
+      )}
+    </div>
   );
 }
 

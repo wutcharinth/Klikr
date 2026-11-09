@@ -48,6 +48,10 @@ export function useQuizRound({
   const limit = cfg.time_limit_s ?? 20;
   const timing = useQuizPhase(startedAt, limit);
   const [picked, setPicked] = useState<number | null>(null);
+  // How long the player took to tap, on the server-synced clock — shown on
+  // the "locked in" screen so speed feels like it matters (it does: scoring
+  // rewards fast answers).
+  const [answeredMs, setAnsweredMs] = useState<number | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [awaitingPoints, setAwaitingPoints] = useState(false);
   const firedRef = useRef(false);
@@ -146,6 +150,7 @@ export function useQuizRound({
     async (i: number) => {
       if (picked !== null || timing.phase !== "open") return;
       setPicked(i);
+      setAnsweredMs(Math.max(0, serverNow() - timing.openAt));
       setSubmitError(null);
       void unlock();
       vibrate(25);
@@ -158,11 +163,14 @@ export function useQuizRound({
         setSubmitError(msg);
         // Still answering? Let them tap again rather than sit "locked in" on
         // an answer the server never got.
-        if (serverNow() < timing.closeAt) setPicked(null);
+        if (serverNow() < timing.closeAt) {
+          setPicked(null);
+          setAnsweredMs(null);
+        }
       }
     },
-    [picked, timing.phase, timing.closeAt, slide.id, participantId, participantToken],
+    [picked, timing.phase, timing.openAt, timing.closeAt, slide.id, participantId, participantToken],
   );
 
-  return { cfg, limit, timing, picked, choose, submitError };
+  return { cfg, limit, timing, picked, answeredMs, choose, submitError };
 }

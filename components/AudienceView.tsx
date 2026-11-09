@@ -618,7 +618,7 @@ function Quiz({
   presentationId: string;
   startedAt: string | null;
 }) {
-  const { cfg, limit, timing, picked, choose, submitError } = useQuizRound({
+  const { cfg, limit, timing, picked, answeredMs, choose, submitError } = useQuizRound({
     slide,
     participantId,
     participantToken,
@@ -630,7 +630,7 @@ function Quiz({
   if (timing.phase === "intro") return <PhoneIntro openAt={timing.openAt} introMs={timing.introMs} />;
   if (picked !== null) {
     return (
-      <LockedIn tileIndex={picked} text={cfg.options[picked]} closeAt={timing.closeAt} limit={limit} showTile={false} />
+      <LockedIn tileIndex={picked} text={cfg.options[picked]} closeAt={timing.closeAt} limit={limit} answeredMs={answeredMs} showTile={false} />
     );
   }
 
