@@ -1,10 +1,10 @@
 "use client";
 
 import { Profiler, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { Participant, ResponseRow, Slide, Standing } from "@/lib/types";
+import type { Participant, QuizConfig, ResponseRow, Slide, Standing } from "@/lib/types";
 import { KahootPresenterView } from "@/components/KahootPresenterView";
 import { QuizLeaderboardScreen } from "@/components/PresenterView";
-import { KahootAudienceView, LockedIn } from "@/components/KahootAudienceView";
+import { KahootAudienceView, LockedIn, RevealHold } from "@/components/KahootAudienceView";
 import { StagedLeaderboard } from "@/components/audience/AudienceLeaderboard";
 import { StandingsStaticProvider } from "@/components/audience/StandingsContext";
 import { TakeoverProvider, useTakeover, type TakeoverPayload } from "@/components/audience/TakeoverContext";
@@ -20,12 +20,15 @@ const VIEWS = [
   "presenter-intro",
   "presenter-open",
   "presenter-reveal",
+  "presenter-reveal-trick",
+  "presenter-reveal-lonewolf",
   "presenter-leaderboard",
   "presenter-podium",
   "presenter-countdown",
   "phone-intro",
   "phone-open",
   "phone-locked",
+  "phone-hold",
   "phone-correct",
   "phone-wrong",
   "phone-skipped",
@@ -157,10 +160,14 @@ function PresenterPreview({ view }: { view: string }) {
           <QuizLeaderboardScreen participants={participants} baseline={baseline} quizSlideIds={[]} supabase={supabase} />
         ) : (
           <KahootPresenterView
-            slide={SLIDE}
+            slide={
+              view === "presenter-reveal-trick" || view === "presenter-reveal-lonewolf"
+                ? { ...SLIDE, config: { ...(SLIDE.config as QuizConfig), correct_index: view === "presenter-reveal-trick" ? 1 : 3 } }
+                : SLIDE
+            }
             responses={responses}
             startedAt={startedAt}
-            forceClosed={view === "presenter-reveal"}
+            forceClosed={view.startsWith("presenter-reveal")}
             questionNumber={3}
             questionCount={10}
             playerCount={12}
@@ -205,7 +212,9 @@ function PhonePreview({ view }: { view: string }) {
             <p className="text-[10px] uppercase tracking-[0.18em] muted-text">Question 3 of 10</p>
             <h2 className="mt-1 text-2xl font-semibold tracking-tight">{SLIDE.question}</h2>
             <div className="mt-6">
-              {view === "phone-locked" ? (
+              {view === "phone-hold" ? (
+                <RevealHold tileIndex={0} text="Mercury" />
+              ) : view === "phone-locked" ? (
                 <LockedIn tileIndex={0} text="Mercury" closeAt={Date.now() + 14_000} limit={20} answeredMs={2340} />
               ) : view === "phone-leaderboard" || view.startsWith("phone-c") || view.startsWith("phone-w") || view.startsWith("phone-s") ? (
                 <StagedLeaderboard />

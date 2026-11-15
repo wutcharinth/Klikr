@@ -3,7 +3,8 @@
 import { useEffect, useState } from "react";
 import { Check, Zap } from "lucide-react";
 import type { Slide } from "@/lib/types";
-import { QUIZ_TILES, tileFor, tileGradient } from "@/lib/quizTiles";
+import { QUIZ_TILES, quizPoints, tileFor, tileGradient } from "@/lib/quizTiles";
+import { serverNow } from "@/lib/serverClock";
 import { TimeBar, TimeLeftPill, useElapsed } from "./QuizTimers";
 import { useSecondsLeft } from "@/lib/useQuizPhase";
 import { StagedLeaderboard } from "./audience/AudienceLeaderboard";
@@ -25,7 +26,7 @@ export function KahootAudienceView({
   startedAt: string | null;
   scoredRev?: number;
 }) {
-  const { cfg, limit, timing, picked, answeredMs, choose, submitError } = useQuizRound({
+  const { cfg, limit, timing, picked, answeredMs, revealed, choose, submitError } = useQuizRound({
     slide,
     participantId,
     participantToken,
@@ -33,7 +34,13 @@ export function KahootAudienceView({
     startedAt,
   });
 
-  if (timing.phase === "closed") return <StagedLeaderboard />;
+  if (timing.phase === "closed") {
+    return revealed ? (
+      <StagedLeaderboard />
+    ) : (
+      <RevealHold tileIndex={picked} text={picked !== null ? cfg.options[picked] : null} />
+    );
+  }
 
   if (timing.phase === "intro") {
     return <PhoneIntro openAt={timing.openAt} introMs={timing.introMs} />;
@@ -55,7 +62,10 @@ export function KahootAudienceView({
     <div className="space-y-3">
       <div className="flex items-center justify-between gap-3">
         <span className="text-[10px] font-semibold uppercase tracking-[0.18em] muted-text">Tap your answer</span>
-        <TimeLeftPill closeAt={timing.closeAt} />
+        <div className="flex items-center gap-2">
+          <PointsOnTheLine openAt={timing.openAt} limit={limit} />
+          <TimeLeftPill closeAt={timing.closeAt} />
+        </div>
       </div>
       <TimeBar closeAt={timing.closeAt} limit={limit} />
       <div className="grid grid-cols-2 gap-3">
@@ -167,6 +177,8 @@ export function LockedIn({
         <p className="answered-in mt-3 inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-sm font-semibold">
           <Zap className="h-3.5 w-3.5" style={{ color: "#facc15", fill: "#facc15" }} aria-hidden />
           Answered in <span className="mono">{(answeredMs / 1000).toFixed(1)}s</span>
+          <span className="opacity-60">·</span>
+          <span className="mono">+{quizPoints(true, answeredMs, limit).toLocaleString()}</span> if right
         </p>
       )}
       <p key={line} className="wait-line mt-3 text-sm muted-text">
@@ -180,6 +192,60 @@ export function LockedIn({
         <div className="mt-1.5">
           <TimeBar closeAt={closeAt} limit={limit} />
         </div>
+      </div>
+    </div>
+  );
+}
+
+// The points a correct answer would earn right now — draining from 1,000
+// toward 500 as the clock runs, so speed is something you can see.
+function PointsOnTheLine({ openAt, limit }: { openAt: number; limit: number }) {
+  const [now, setNow] = useState(() => serverNow());
+  useEffect(() => {
+    const id = setInterval(() => setNow(serverNow()), 100);
+    return () => clearInterval(id);
+  }, []);
+  const pts = Math.round(quizPoints(true, now - openAt, limit) / 10) * 10;
+  return (
+    <span
+      suppressHydrationWarning
+      className="points-on-line mono inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-bold"
+      title="Points for a correct answer right now — faster is worth more"
+    >
+      <Zap className="h-3 w-3" style={{ color: "#facc15", fill: "#facc15" }} aria-hidden />
+      {pts.toLocaleString()}
+    </span>
+  );
+}
+
+// Time's up, but the big screen is still knocking out wrong answers — hold
+// the result so phones don't spoil it.
+export function RevealHold({ tileIndex, text }: { tileIndex: number | null; text: string | null }) {
+  const tile = tileIndex !== null ? tileFor(tileIndex) : null;
+  return (
+    <div className="anim-fade-up flex flex-col items-center justify-center py-8 text-center" aria-live="polite">
+      <p className="text-[10px] font-semibold uppercase tracking-[0.2em]" style={{ color: "#ef4444" }}>
+        Time&apos;s up!
+      </p>
+      {tile && text ? (
+        <>
+          <div
+            className="locked-badge mt-5"
+            style={{ background: tileGradient(tile), boxShadow: `0 16px 40px -16px ${tile.glow}` }}
+          >
+            <tile.Icon className="h-11 w-11 text-white" fill="currentColor" strokeWidth={2} />
+          </div>
+          <p className="mt-4 text-xs uppercase tracking-[0.18em] muted-text">You said</p>
+          <p className="mt-1 px-4 text-xl font-semibold leading-snug">{text}</p>
+        </>
+      ) : (
+        <p className="mt-5 text-xl font-semibold">No answer this round</p>
+      )}
+      <p className="mt-5 text-sm muted-text">Eyes on the big screen 👀</p>
+      <div className="suspense-bars mt-4" aria-hidden>
+        {Array.from({ length: 5 }, (_, i) => (
+          <span key={i} style={{ animationDelay: `${i * -0.08}s` }} />
+        ))}
       </div>
     </div>
   );

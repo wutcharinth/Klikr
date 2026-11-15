@@ -18,13 +18,14 @@ import { EmbedSlide } from "./EmbedSlide";
 import { KahootPresenterView } from "./KahootPresenterView";
 import { QuizPodium } from "./QuizPodium";
 import { PodiumReveal } from "./PodiumReveal";
+import { correctRevealMs } from "@/lib/quizReveal";
 import { LeaderboardRows, sortByScore, useStagedRows } from "./LeaderboardRows";
 import { QrCode } from "./QrCode";
 import { PresenterMusicProvider, PresenterMusicToggle } from "./PresenterMusicToggle";
 import { SessionStatusPill } from "./SessionStatusPill";
 import { PresenterShortcutsHelp } from "./PresenterShortcutsHelp";
 import { Keyboard, Maximize2, Minimize2, FastForward, Flame, TrendingUp } from "lucide-react";
-import type { EmbedConfig, QAConfig } from "@/lib/types";
+import type { EmbedConfig, QAConfig, QuizConfig } from "@/lib/types";
 import { useBufferedState } from "@/lib/useBufferedState";
 import { pinRealtimeAuth } from "@/lib/realtime";
 import { startedAtFor } from "@/lib/liveTiming";
@@ -630,7 +631,12 @@ function PresenterViewInner({
   // cleared by any manual nav or slide change so it can never fire late.
   function armAutoAdvance(slideId: string) {
     clearAutoTimers();
-    const LEADERBOARD_DELAY_MS = 3000;
+    // Game-mode questions knock out wrong answers before showing the right
+    // one (lib/quizReveal.ts) — give the room the same beat after that.
+    const s = slides.find((x) => x.id === slideId);
+    const knockoutMs =
+      s?.type === "quiz" && s.kahoot_mode ? correctRevealMs(Math.min(4, (s.config as QuizConfig).options.length)) : 0;
+    const LEADERBOARD_DELAY_MS = 3000 + knockoutMs;
     const NEXT_SECONDS = 6;
     autoTimersRef.current.push(
       setTimeout(() => {

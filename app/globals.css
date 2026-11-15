@@ -1207,8 +1207,30 @@
   pointer-events: none;
 }
 .gs-tile--open { animation: gsTileIn 0.6s cubic-bezier(0.34, 1.5, 0.64, 1) both; }
-.gs-tile--wrong { transform: scale(0.97); }
-.gs-tile--wrong::before { opacity: 1; }
+.gs-tile--wrong, .gs-tile--out { transform: scale(0.97); }
+.gs-tile--wrong::before, .gs-tile--out::before { opacity: 1; }
+/* Knockout reveal: the hit, then a big stamped ✕ over the tile. */
+.gs-tile--out { animation: gsKnock 0.5s cubic-bezier(0.36, 0.07, 0.19, 0.97) both; }
+@keyframes gsKnock {
+  0%   { transform: scale(1); }
+  20%  { transform: scale(1.02) translateX(-10px) rotate(-1deg); }
+  40%  { transform: scale(0.99) translateX(8px) rotate(0.8deg); }
+  60%  { transform: scale(0.97) translateX(-5px); }
+  100% { transform: scale(0.97); }
+}
+.gs-ko-stamp {
+  position: absolute; z-index: 6; right: 6%; top: 50%;
+  font-size: clamp(4rem, 9vw, 7.5rem); font-weight: 900; line-height: 1;
+  color: #ff5a5f; text-shadow: 0 6px 24px rgba(0, 0, 0, 0.45);
+  transform: translateY(-50%) rotate(-10deg);
+  animation: koStamp 0.42s cubic-bezier(0.34, 1.7, 0.5, 1) both;
+}
+@keyframes koStamp {
+  from { opacity: 0; transform: translateY(-50%) rotate(-30deg) scale(2.4); }
+  to   { opacity: 1; transform: translateY(-50%) rotate(-10deg) scale(1); }
+}
+.gs-knockout-hint { animation: fadeUp 0.5s cubic-bezier(0.2, 0.8, 0.2, 1) 0.3s both; }
+.gs-shoutout--trick { background: rgba(249, 115, 22, 0.12); border-color: rgba(249, 115, 22, 0.45); }
 .gs-tile--correct { animation: gsCorrect 0.8s cubic-bezier(0.34, 1.6, 0.5, 1) both; z-index: 2; }
 .gs-correct-badge { animation: popIn 0.5s cubic-bezier(0.34, 1.8, 0.5, 1) 0.35s both; }
 @keyframes gsTileIn {
@@ -1296,6 +1318,7 @@
   .answer-line, .tick-wobble, .calc-orbit, .you-card, .lb-row-enter, .lb-row-climb, .medal-drop,
   .lobby-mark-word, .lobby-mark-dot, .gs-intro-pill, .gs-word, .gs-intro-img, .gs-question,
   .gs-label, .gs-tile--open, .gs-tile--correct, .gs-correct-badge, .gs-reveal-footer,
+  .gs-tile--out, .gs-ko-stamp, .gs-knockout-hint,
   .gs-explain, .gs-timer-digit, .gs-timer--urgent, .gs-timesup, .lb-title, .callout-pill,
   .chip-bounce, .urgent-pulse, .rx-float, .reaction-float, .loading-dots::after {
     animation: none !important;
@@ -1568,4 +1591,10 @@
 @keyframes suspenseFill { from { transform: scaleX(0); } to { transform: scaleX(1); } }
 @media (prefers-reduced-motion: reduce) {
   .suspense-drum, .suspense-bars span { animation: none; }
+}
+
+/* Phone: live "points on the line" pill while answering. */
+.points-on-line {
+  background: rgba(250, 204, 21, 0.14); border: 1px solid rgba(250, 204, 21, 0.45);
+  color: var(--fg); font-variant-numeric: tabular-nums;
 }
