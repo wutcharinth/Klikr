@@ -17,13 +17,15 @@ import { ReactionOverlay } from "./ReactionOverlay";
 import { EmbedSlide } from "./EmbedSlide";
 import { KahootPresenterView } from "./KahootPresenterView";
 import { QuizPodium } from "./QuizPodium";
+import { PodiumReveal } from "./PodiumReveal";
+import { correctRevealMs } from "@/lib/quizReveal";
 import { LeaderboardRows, sortByScore, useStagedRows } from "./LeaderboardRows";
 import { QrCode } from "./QrCode";
 import { PresenterMusicProvider, PresenterMusicToggle } from "./PresenterMusicToggle";
 import { SessionStatusPill } from "./SessionStatusPill";
 import { PresenterShortcutsHelp } from "./PresenterShortcutsHelp";
 import { Keyboard, Maximize2, Minimize2, FastForward, Flame, TrendingUp } from "lucide-react";
-import type { EmbedConfig, QAConfig } from "@/lib/types";
+import type { EmbedConfig, QAConfig, QuizConfig } from "@/lib/types";
 import { useBufferedState } from "@/lib/useBufferedState";
 import { pinRealtimeAuth } from "@/lib/realtime";
 import { startedAtFor } from "@/lib/liveTiming";
@@ -73,6 +75,11 @@ function PresenterViewInner({
   // Stable id → nickname lookup for the quiz screen (memoised so the memo'd
   // KahootPresenterView only re-renders when the roster actually changes).
   const nicknames = useMemo(() => new Map(participants.map((p) => [p.id, p.nickname])), [participants]);
+  // Podium reveal: plays when the session ends while this screen is open (not
+  // when opening an already-finished session), and again on "Replay reveal".
+  const [closedAtMount] = useState(presentation.state === "closed");
+  const [revealMode, setRevealMode] = useState<"auto" | "replay" | "done">("auto");
+  const endPendingRef = useRef<Promise<unknown> | null>(null);
   const [modeOverride, setModeOverride] = useState<"light" | "dark" | null>(null);
   const [scoredSlideIds, setScoredSlideIds] = useState<Set<string>>(() => new Set());
   const [expiredQuizSlideIds, setExpiredQuizSlideIds] = useState<Set<string>>(() => new Set());
@@ -169,6 +176,21 @@ function PresenterViewInner({
     [slides, currentSlideId],
   );
   const quizSlides = useMemo(() => slides.filter((s) => s.type === "quiz"), [slides]);
+
+  // Final standings for the reveal, read after end-of-session scoring lands.
+  const loadFinalStandings = useCallback(async () => {
+    try {
+      await endPendingRef.current;
+    } catch {
+      /* ending failed or was already done — read what's there */
+    }
+    const { data } = await supabase
+      .from("participants")
+      .select(PARTICIPANT_COLS)
+      .eq("presentation_id", presentation.id)
+      .returns<Participant[]>();
+    return data ?? [];
+  }, [supabase, presentation.id]);
 
   const stateRef = useRef(presentation.state);
   useEffect(() => {
@@ -501,6 +523,22 @@ function PresenterViewInner({
   const hasAnyQuiz = quizSlides.length > 0;
 
   if (presentation.state === "closed") {
+    const showReveal =
+      hasAnyQuiz &&
+      participants.length > 0 &&
+      (revealMode === "replay" || (revealMode === "auto" && !closedAtMount));
+    if (showReveal) {
+      return (
+        <ThemedShell theme={themeForShell}>
+          <PodiumReveal
+            loadStandings={loadFinalStandings}
+            fallback={participants}
+            questionCount={quizSlides.length}
+            onDone={() => setRevealMode("done")}
+          />
+        </ThemedShell>
+      );
+    }
     const startedAt = new Date(presentation.created_at).getTime();
     const durationMs = Math.max(0, Date.now() - startedAt);
     const durMins = Math.floor(durationMs / 60000);
@@ -511,6 +549,13 @@ function PresenterViewInner({
     return (
       <ThemedShell theme={themeForShell}>
         <div className="flex flex-1 flex-col gap-6">
+          {hasAnyQuiz ? (
+            <QuizPodium
+              participants={participants}
+              presentationId={presentation.id}
+              onReplay={participants.length > 0 ? () => setRevealMode("replay") : undefined}
+            />
+          ) : null}
           <div className="panel anim-scale-in p-12 text-center">
             <div className="pill"><span className="live-dot" /> Session complete</div>
             <h2 className="mt-6 text-3xl font-semibold tracking-tight">Thanks for playing.</h2>
@@ -541,9 +586,6 @@ function PresenterViewInner({
               </a>
             </div>
           </div>
-          {hasAnyQuiz ? (
-            <QuizPodium participants={participants} presentationId={presentation.id} />
-          ) : null}
         </div>
       </ThemedShell>
     );
@@ -589,7 +631,12 @@ function PresenterViewInner({
   // cleared by any manual nav or slide change so it can never fire late.
   function armAutoAdvance(slideId: string) {
     clearAutoTimers();
-    const LEADERBOARD_DELAY_MS = 3000;
+    // Game-mode questions knock out wrong answers before showing the right
+    // one (lib/quizReveal.ts) — give the room the same beat after that.
+    const s = slides.find((x) => x.id === slideId);
+    const knockoutMs =
+      s?.type === "quiz" && s.kahoot_mode ? correctRevealMs(Math.min(4, (s.config as QuizConfig).options.length)) : 0;
+    const LEADERBOARD_DELAY_MS = 3000 + knockoutMs;
     const NEXT_SECONDS = 6;
     autoTimersRef.current.push(
       setTimeout(() => {
@@ -626,7 +673,10 @@ function PresenterViewInner({
     // event takes a moment (or doesn't fire at all).
     setPresentation((p) => ({ ...p, state: "closed" }));
     try {
-      await endPresentation(presentation.id);
+      const pending = endPresentation(presentation.id);
+      endPendingRef.current = pending;
+      setRevealMode("auto");
+      await pending;
     } catch (err) {
       console.error("endPresentation failed", err);
       setPresentation((p) => ({ ...p, state: "active" }));

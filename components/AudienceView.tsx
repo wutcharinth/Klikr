@@ -36,6 +36,9 @@ export function AudienceView({
 }) {
   const supabase = useMemo(() => createClient(), []);
   const [presentation, setPresentation] = useState(initial);
+  // Hold back the final results only if the session ends while the phone is
+  // watching — someone opening a finished session sees them straight away.
+  const [closedAtMount] = useState(initial.state === "closed");
   const [participant, setParticipant] = useState<LocalParticipant | null>(null);
   const [loaded, setLoaded] = useState(false);
 
@@ -133,7 +136,7 @@ export function AudienceView({
   if (presentation.state === "closed") {
     return withStandings(
       <TakeoverProvider>
-        <AudienceFinalResults nickname={participant.nickname} hasAnyQuiz={hasQuiz} />
+        <AudienceFinalResults nickname={participant.nickname} hasAnyQuiz={hasQuiz} suspense={!closedAtMount} />
         <TakeoverLayer />
       </TakeoverProvider>,
       10,

@@ -10,6 +10,7 @@ import { playClip, unlock, vibrate } from "@/lib/audio";
 import { bumpStreak, resetStreak } from "@/lib/streak";
 import { useTakeover } from "./TakeoverContext";
 import { useStandingsOptional } from "./StandingsContext";
+import { correctRevealMs } from "@/lib/quizReveal";
 
 // Give up asking for the result if the server still says "open" after this —
 // only reachable when the phone's idea of server time is far off.
@@ -52,6 +53,9 @@ export function useQuizRound({
   // the "locked in" screen so speed feels like it matters (it does: scoring
   // rewards fast answers).
   const [answeredMs, setAnsweredMs] = useState<number | null>(null);
+  // False from time's up until this player's result is shown. Game-mode
+  // results wait for the big screen's knockout reveal (lib/quizReveal.ts).
+  const [revealed, setRevealed] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [awaitingPoints, setAwaitingPoints] = useState(false);
   const firedRef = useRef(false);
@@ -78,14 +82,27 @@ export function useQuizRound({
     prevPhaseRef.current = timing.phase;
   }, [timing.phase]);
 
-  // Reveal as soon as the server confirms the window closed. Rank arrives via
-  // StandingsContext; points come with the result, or a beat later (below)
-  // when the host's scoring write hasn't landed yet.
+  // Reveal once the server confirms the window closed — for game-mode
+  // questions, held until the big screen's knockout shows the right answer.
+  // Rank arrives via StandingsContext; points come with the result, or a beat
+  // later (below) when the host's scoring write hasn't landed yet.
   useEffect(() => {
     if (timing.phase !== "closed" || firedRef.current) return;
     firedRef.current = true;
     markRoundClosed?.();
+    // Flip on the same beat as the big screen lights up the right answer.
+    const revealAt = slide.kahoot_mode
+      ? Math.min(timing.closeAt, serverNow()) + correctRevealMs(Math.min(4, cfg.options.length))
+      : 0;
     void (async () => {
+      try {
+        await revealRound();
+      } finally {
+        if (aliveRef.current) setRevealed(true);
+      }
+    })();
+
+    async function revealRound() {
       // Let a last-instant tap reach the server so it counts as this
       // player's answer rather than a skip.
       await pendingSubmitRef.current;
@@ -109,6 +126,13 @@ export function useQuizRound({
         if (!aliveRef.current) return;
       }
 
+      const hold = revealAt - serverNow();
+      if (hold > 0) {
+        await sleep(hold);
+        if (!aliveRef.current) return;
+      }
+      setRevealed(true);
+
       const correctText = res.correct_index !== null ? cfg.options[res.correct_index] : undefined;
       if (res.my_answer === null) {
         resetStreak(presentationId);
@@ -121,7 +145,9 @@ export function useQuizRound({
         resetStreak(presentationId);
         trigger({ kind: "quiz-wrong", correctText });
       }
-    })();
+    }
+    // timing.closeAt / slide.kahoot_mode are fixed for this round.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [timing.phase, cfg.options, slide.id, participantId, participantToken, presentationId, trigger, markRoundClosed]);
 
   // Correct, but scoring hadn't landed when the reveal fired. StandingsContext
@@ -172,5 +198,5 @@ export function useQuizRound({
     [picked, timing.phase, timing.openAt, timing.closeAt, slide.id, participantId, participantToken],
   );
 
-  return { cfg, limit, timing, picked, answeredMs, choose, submitError };
+  return { cfg, limit, timing, picked, answeredMs, revealed, choose, submitError };
 }

@@ -8,6 +8,7 @@ import { useQuizPhase, useSecondsLeft } from "@/lib/useQuizPhase";
 import { useElapsed } from "./QuizTimers";
 import { useCountUp } from "@/lib/useCountUp";
 import { playPresenterClip } from "@/lib/audio";
+import { correctRevealMs, knockoutOrder, KNOCKOUT_START_MS, KNOCKOUT_STEP_MS } from "@/lib/quizReveal";
 
 // Big-screen game-show quiz. Three beats, all on the server clock:
 //   intro   — "Question 3 of 10", the question alone, a get-ready bar
@@ -71,6 +72,34 @@ export const KahootPresenterView = memo(function KahootPresenterView({
   const total = counts.reduce((a, b) => a + b, 0);
   const label = questionNumber && questionCount ? `Question ${questionNumber} of ${questionCount}` : "Quiz";
 
+  // Knockout reveal (lib/quizReveal.ts): at time's up the vote split fills
+  // in, wrong answers are knocked out least-picked first, then the survivor
+  // lights up as correct. Phones flip to their result on the same schedule.
+  const countsRef = useRef(counts);
+  useEffect(() => {
+    countsRef.current = counts;
+  });
+  const [knocked, setKnocked] = useState<number[]>([]);
+  const [correctShown, setCorrectShown] = useState(false);
+  const isClosed = timing.phase === "closed";
+  useEffect(() => {
+    if (!isClosed) return;
+    const order = knockoutOrder(countsRef.current, cfg.correct_index);
+    const timers = order.map((idx, k) =>
+      setTimeout(() => {
+        setKnocked((prev) => [...prev, idx]);
+        playPresenterClip("thump");
+      }, KNOCKOUT_START_MS + k * KNOCKOUT_STEP_MS),
+    );
+    timers.push(
+      setTimeout(() => {
+        setCorrectShown(true);
+        playPresenterClip("correct");
+      }, correctRevealMs(optCount)),
+    );
+    return () => timers.forEach(clearTimeout);
+  }, [isClosed, cfg.correct_index, optCount]);
+
   if (timing.phase === "intro") {
     return (
       <PresenterIntro
@@ -127,15 +156,26 @@ export const KahootPresenterView = memo(function KahootPresenterView({
             key={i}
             index={i}
             text={opt}
-            closed={closed}
-            correct={cfg.correct_index === i}
+            state={
+              !closed
+                ? "open"
+                : correctShown && cfg.correct_index === i
+                  ? "correct"
+                  : knocked.includes(i)
+                    ? "out"
+                    : "counting"
+            }
             count={counts[i]}
             total={total}
           />
         ))}
       </div>
 
-      {closed ? (
+      {closed && !correctShown ? (
+        <p className="gs-knockout-hint text-center text-xl font-semibold uppercase tracking-[0.2em] muted-text">
+          Time&apos;s up — which answer survives?
+        </p>
+      ) : closed ? (
         <div className="gs-reveal-footer flex flex-wrap items-center justify-between gap-4 rounded-2xl panel-soft px-8 py-6">
           <div className="flex items-center gap-5">
             <div
@@ -153,7 +193,15 @@ export const KahootPresenterView = memo(function KahootPresenterView({
               <p className="mt-1 text-sm uppercase tracking-[0.18em] muted-text">got it right</p>
             </div>
           </div>
-          <RevealShoutout fastest={fastest} correctCount={correctCount} total={total} />
+          <RevealShoutout
+            fastest={fastest}
+            correctCount={correctCount}
+            total={total}
+            counts={counts}
+            correctIndex={cfg.correct_index}
+            options={cfg.options}
+            loneWolf={correctCount === 1 ? loneWolfName(responses, cfg.correct_index, nicknames) : null}
+          />
           <div className="text-right leading-tight">
             <p className="mono text-3xl font-semibold sm:text-4xl" style={{ fontVariantNumeric: "tabular-nums" }}>
               <CountUpNumber value={total > 0 ? Math.round((correctCount / total) * 100) : 0} delay={500} />%
@@ -230,21 +278,22 @@ function PresenterIntro({
   );
 }
 
+type TileState = "open" | "counting" | "out" | "correct";
+
 const AnswerTile = memo(function AnswerTile({
   index,
   text,
-  closed,
-  correct,
+  state,
   count,
   total,
 }: {
   index: number;
   text: string;
-  closed: boolean;
-  correct: boolean;
+  state: TileState;
   count: number;
   total: number;
 }) {
+  const closed = state !== "open";
   const tile = QUIZ_TILES[index];
   const pct = total > 0 ? (count / total) * 100 : 0;
   // Grow the vote fill from 0 a frame after the reveal starts.
@@ -254,10 +303,11 @@ const AnswerTile = memo(function AnswerTile({
     const r = requestAnimationFrame(() => setGrown(true));
     return () => cancelAnimationFrame(r);
   }, [closed]);
-  const state = !closed ? "open" : correct ? "correct" : "wrong";
   return (
     <div
-      className={`gs-tile gs-tile--${state} relative flex min-h-[170px] items-center gap-6 overflow-hidden rounded-3xl p-7 text-white sm:min-h-[210px] sm:gap-8 sm:p-9`}
+      className={`gs-tile gs-tile--${state} relative flex items-center gap-6 overflow-hidden rounded-3xl text-white sm:gap-8 ${
+        closed ? "min-h-[120px] p-6 sm:min-h-[150px] sm:p-7" : "min-h-[170px] p-7 sm:min-h-[210px] sm:p-9"
+      }`}
       style={{
         background: tileGradient(tile),
         boxShadow: state === "correct" ? `0 0 0 6px rgba(255,255,255,0.85), 0 24px 60px -20px ${tile.glow}` : `0 18px 40px -24px ${tile.glow}`,
@@ -289,6 +339,11 @@ const AnswerTile = memo(function AnswerTile({
           </p>
         )}
       </div>
+      {state === "out" && (
+        <span className="gs-ko-stamp" aria-label="Knocked out">
+          ✕
+        </span>
+      )}
       {state === "correct" && (
         <>
           <span className="gs-correct-badge relative z-10 rounded-full bg-white px-5 py-2 text-base font-bold uppercase tracking-wider sm:text-lg" style={{ color: "#16a34a" }}>
@@ -368,8 +423,47 @@ function fastestCorrect(
 
 // Middle of the reveal footer: celebrate the quickest correct answer, or call
 // out a clean sweep / a question that stumped the whole room.
-function RevealShoutout({ fastest, correctCount, total }: { fastest: Fastest | null; correctCount: number; total: number }) {
+function loneWolfName(responses: ResponseRow[], correctIndex: number, nicknames: ReadonlyMap<string, string> | undefined) {
+  if (!nicknames) return null;
+  const r = responses.find((x) => x.value_index === correctIndex);
+  return r ? (nicknames.get(r.participant_id) ?? null) : null;
+}
+
+function RevealShoutout({
+  fastest,
+  correctCount,
+  total,
+  counts,
+  correctIndex,
+  options,
+  loneWolf,
+}: {
+  fastest: Fastest | null;
+  correctCount: number;
+  total: number;
+  counts: number[];
+  correctIndex: number;
+  options: string[];
+  loneWolf: string | null;
+}) {
   if (total === 0) return null;
+  // Lone wolf: exactly one person in a real crowd got it.
+  if (loneWolf && correctCount === 1 && total >= 3) {
+    return (
+      <p className="gs-shoutout" style={{ animationDelay: "300ms" }}>
+        <span aria-hidden>🐺</span>
+        <span>
+          Lone wolf! Only <strong>{loneWolf}</strong> knew this
+        </span>
+      </p>
+    );
+  }
+  // Trick question: the crowd's favourite answer was wrong.
+  let top = -1;
+  counts.forEach((c, i) => {
+    if (top < 0 || c > counts[top]) top = i;
+  });
+  const trick = total >= 3 && top >= 0 && top !== correctIndex && counts[top] > (counts[correctIndex] ?? 0);
   if (correctCount === 0) {
     return (
       <p className="gs-shoutout" style={{ animationDelay: "900ms" }}>
@@ -379,6 +473,14 @@ function RevealShoutout({ fastest, correctCount, total }: { fastest: Fastest | n
   }
   return (
     <div className="flex flex-col items-center gap-1.5">
+      {trick && (
+        <p className="gs-shoutout gs-shoutout--trick" style={{ animationDelay: "300ms" }}>
+          <span aria-hidden>🪤</span>
+          <span>
+            Trick question — most of you said <strong>“{options[top]}”</strong>
+          </span>
+        </p>
+      )}
       {fastest && (
         <p className="gs-shoutout" style={{ animationDelay: "900ms" }}>
           <Zap className="h-5 w-5" style={{ color: "#facc15", fill: "#facc15" }} aria-hidden />

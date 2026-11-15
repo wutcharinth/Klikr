@@ -1,12 +1,21 @@
 "use client";
 
 import { useState } from "react";
-import { Check, Link2, Trophy } from "lucide-react";
+import { Check, Link2, RotateCcw, Trophy } from "lucide-react";
 import type { Participant } from "@/lib/types";
 import { sortByScore } from "./LeaderboardRows";
 import { Podium } from "./Podium";
 
-export function QuizPodium({ participants, presentationId }: { participants: Participant[]; presentationId: string }) {
+export function QuizPodium({
+  participants,
+  presentationId,
+  onReplay,
+}: {
+  participants: Participant[];
+  presentationId: string;
+  /** Presenter only: replay the big-screen countdown reveal. */
+  onReplay?: () => void;
+}) {
   const sorted = sortByScore(participants);
   const top = sorted.slice(0, 3);
   const rest = sorted.slice(3);
@@ -42,10 +51,17 @@ export function QuizPodium({ participants, presentationId }: { participants: Par
             · {sorted.length} {sorted.length === 1 ? "player" : "players"}
           </span>
         </div>
-        <button onClick={share} className="btn-ghost inline-flex items-center gap-1.5 text-xs" aria-live="polite">
-          {copied ? <Check className="h-3.5 w-3.5" /> : <Link2 className="h-3.5 w-3.5" />}
-          {copied ? "Link copied" : "Share results"}
-        </button>
+        <div className="flex flex-wrap items-center gap-2">
+          {onReplay && (
+            <button onClick={onReplay} className="btn-ghost inline-flex items-center gap-1.5 text-xs">
+              <RotateCcw className="h-3.5 w-3.5" /> Replay reveal
+            </button>
+          )}
+          <button onClick={share} className="btn-ghost inline-flex items-center gap-1.5 text-xs" aria-live="polite">
+            {copied ? <Check className="h-3.5 w-3.5" /> : <Link2 className="h-3.5 w-3.5" />}
+            {copied ? "Link copied" : "Share results"}
+          </button>
+        </div>
       </div>
 
       <div className="mx-auto mt-4 max-w-3xl">

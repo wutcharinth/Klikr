@@ -5,6 +5,7 @@ import NavBar from "@/components/NavBar";
 import { ArrowLeft, KeyRound } from "lucide-react";
 import { createApiKey, revokeApiKey } from "./actions";
 import { CopySecretBanner } from "./CopySecretBanner";
+import { McpConnectGuide } from "@/components/McpConnectGuide";
 
 type SearchParams = Promise<{ new?: string }>;
 
@@ -36,7 +37,11 @@ export default async function ApiKeysPage({ searchParams }: { searchParams?: Sea
           <Link href="/api/openapi.json" className="underline-offset-4 hover:underline" style={{ color: "var(--blue)" }}>
             OpenAPI spec
           </Link>{" "}
-          for the full surface.
+          for the full surface. The same key connects AI assistants through{" "}
+          <a href="#mcp" className="underline-offset-4 hover:underline" style={{ color: "var(--blue)" }}>
+            MCP
+          </a>
+          .
         </p>
       </header>
 
@@ -83,6 +88,17 @@ export default async function ApiKeysPage({ searchParams }: { searchParams?: Sea
             )}
           </div>
         ))}
+      </section>
+
+      <section id="mcp" className="mt-12">
+        <h2 className="text-lg font-semibold tracking-tight">Use Klikr from your AI assistant</h2>
+        <p className="mt-1 text-sm muted-text">
+          Connect over MCP to create and edit quizzes, polls and surveys by asking in plain language. Paste your key in
+          place of <span className="mono">klikr_pk_…</span>.
+        </p>
+        <div className="mt-5">
+          <McpConnectGuide />
+        </div>
       </section>
     </main>
   );

@@ -35,7 +35,7 @@ export function isPresenterSoundOn(): boolean {
   }
 }
 
-type Clip = "submit" | "correct" | "wrong" | "tick" | "reveal" | "whoosh" | "go";
+type Clip = "submit" | "correct" | "wrong" | "tick" | "reveal" | "whoosh" | "go" | "drumroll" | "thump" | "fanfare";
 
 let ctx: AudioContext | null = null;
 
@@ -142,6 +142,36 @@ function play(c: AudioContext, name: Clip) {
       break;
     case "whoosh":
       noise(c, { dur: 0.45, gain: 0.07, from: 300, to: 2400 });
+      break;
+    case "drumroll": {
+      // ~2.6s snare roll: fast, accelerating hits that swell, then a cymbal.
+      let t = 0;
+      let i = 0;
+      while (t < 2.5) {
+        const swell = 0.02 + 0.05 * (t / 2.5);
+        noise(c, { start: t, dur: 0.06, gain: swell, from: 1800, to: 3800 });
+        tone(c, { freq: 180, to: 120, start: t, dur: 0.05, type: "triangle", gain: swell * 0.8 });
+        t += Math.max(0.045, 0.09 - i * 0.0012);
+        i++;
+      }
+      noise(c, { start: 2.55, dur: 0.6, gain: 0.08, from: 5000, to: 9000 });
+      break;
+    }
+    case "thump":
+      // Low hit + bright accent for each podium place.
+      tone(c, { freq: 110, to: 55, dur: 0.35, type: "sine", gain: 0.3 });
+      noise(c, { dur: 0.18, gain: 0.05, from: 2000, to: 6000 });
+      tone(c, { freq: 659.25, start: 0.05, dur: 0.25, type: "triangle", gain: 0.1 });
+      break;
+    case "fanfare":
+      // Triumphant major fanfare: G–C–E–G, then a held C-major chord.
+      [392, 523.25, 659.25, 783.99].forEach((f, i) =>
+        tone(c, { freq: f, start: i * 0.12, dur: 0.18, type: "sawtooth", gain: 0.06 }),
+      );
+      [523.25, 659.25, 783.99, 1046.5].forEach((f) =>
+        tone(c, { freq: f, start: 0.5, dur: 1.1, type: "triangle", gain: 0.09 }),
+      );
+      noise(c, { start: 0.5, dur: 0.8, gain: 0.05, from: 4000, to: 9000 });
       break;
   }
 }

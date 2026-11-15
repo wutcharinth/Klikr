@@ -1,10 +1,10 @@
 "use client";
 
 import { Profiler, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { Participant, ResponseRow, Slide, Standing } from "@/lib/types";
+import type { Participant, QuizConfig, ResponseRow, Slide, Standing } from "@/lib/types";
 import { KahootPresenterView } from "@/components/KahootPresenterView";
 import { QuizLeaderboardScreen } from "@/components/PresenterView";
-import { KahootAudienceView, LockedIn } from "@/components/KahootAudienceView";
+import { KahootAudienceView, LockedIn, RevealHold } from "@/components/KahootAudienceView";
 import { StagedLeaderboard } from "@/components/audience/AudienceLeaderboard";
 import { StandingsStaticProvider } from "@/components/audience/StandingsContext";
 import { TakeoverProvider, useTakeover, type TakeoverPayload } from "@/components/audience/TakeoverContext";
@@ -12,6 +12,7 @@ import { TakeoverLayer } from "@/components/audience/TakeoverLayer";
 import { AudienceFinalResults } from "@/components/AudienceFinalResults";
 import { ResultsBarChart } from "@/components/ResultsBarChart";
 import { QuizPodium } from "@/components/QuizPodium";
+import { PodiumReveal } from "@/components/PodiumReveal";
 import { useBufferedState } from "@/lib/useBufferedState";
 import { createClient } from "@/lib/supabase/client";
 
@@ -19,16 +20,21 @@ const VIEWS = [
   "presenter-intro",
   "presenter-open",
   "presenter-reveal",
+  "presenter-reveal-trick",
+  "presenter-reveal-lonewolf",
   "presenter-leaderboard",
   "presenter-podium",
+  "presenter-countdown",
   "phone-intro",
   "phone-open",
   "phone-locked",
+  "phone-hold",
   "phone-correct",
   "phone-wrong",
   "phone-skipped",
   "phone-leaderboard",
   "phone-final",
+  "phone-suspense",
   "stress",
 ] as const;
 
@@ -142,15 +148,26 @@ function PresenterPreview({ view }: { view: string }) {
     <main className="flex h-screen flex-col overflow-hidden px-4 py-3 lg:px-8 lg:py-4">
       <div className="flex min-h-0 flex-1 flex-col gap-4 rounded-2xl px-2 py-3 sm:px-6 sm:py-5">
         {view === "presenter-podium" ? (
-          <QuizPodium participants={participants} presentationId="p1" />
+          <QuizPodium participants={participants} presentationId="p1" onReplay={() => {}} />
+        ) : view === "presenter-countdown" ? (
+          <PodiumReveal
+            loadStandings={() => new Promise((r) => setTimeout(() => r(participants), 600))}
+            fallback={participants}
+            questionCount={10}
+            onDone={() => {}}
+          />
         ) : view === "presenter-leaderboard" ? (
           <QuizLeaderboardScreen participants={participants} baseline={baseline} quizSlideIds={[]} supabase={supabase} />
         ) : (
           <KahootPresenterView
-            slide={SLIDE}
+            slide={
+              view === "presenter-reveal-trick" || view === "presenter-reveal-lonewolf"
+                ? { ...SLIDE, config: { ...(SLIDE.config as QuizConfig), correct_index: view === "presenter-reveal-trick" ? 1 : 3 } }
+                : SLIDE
+            }
             responses={responses}
             startedAt={startedAt}
-            forceClosed={view === "presenter-reveal"}
+            forceClosed={view.startsWith("presenter-reveal")}
             questionNumber={3}
             questionCount={10}
             playerCount={12}
@@ -175,7 +192,7 @@ function PhoneStage({ children }: { children: React.ReactNode }) {
 
 function PhonePreview({ view }: { view: string }) {
   const { standing, baseline } = useMemo(() => mockStanding(), []);
-  const [settled, setSettled] = useState(view === "phone-leaderboard" || view === "phone-final");
+  const [settled, setSettled] = useState(view === "phone-leaderboard" || view === "phone-final" || view === "phone-suspense");
   useEffect(() => {
     if (!["phone-correct", "phone-wrong", "phone-skipped"].includes(view)) return;
     const t = setTimeout(() => setSettled(true), 700);
@@ -188,14 +205,16 @@ function PhonePreview({ view }: { view: string }) {
   return (
     <StandingsStaticProvider value={value}>
       <TakeoverProvider>
-        {view === "phone-final" ? (
-          <AudienceFinalResults nickname="Chloé" hasAnyQuiz />
+        {view === "phone-final" || view === "phone-suspense" ? (
+          <AudienceFinalResults nickname="Chloé" hasAnyQuiz suspense={view === "phone-suspense"} />
         ) : (
           <PhoneStage>
             <p className="text-[10px] uppercase tracking-[0.18em] muted-text">Question 3 of 10</p>
             <h2 className="mt-1 text-2xl font-semibold tracking-tight">{SLIDE.question}</h2>
             <div className="mt-6">
-              {view === "phone-locked" ? (
+              {view === "phone-hold" ? (
+                <RevealHold tileIndex={0} text="Mercury" />
+              ) : view === "phone-locked" ? (
                 <LockedIn tileIndex={0} text="Mercury" closeAt={Date.now() + 14_000} limit={20} answeredMs={2340} />
               ) : view === "phone-leaderboard" || view.startsWith("phone-c") || view.startsWith("phone-w") || view.startsWith("phone-s") ? (
                 <StagedLeaderboard />
