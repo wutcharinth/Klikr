@@ -24,11 +24,12 @@ const BODY = `# Klikr
 ### MCP server (Model Context Protocol)
 
 - Endpoint: https://klikrapp.com/api/mcp
-- Transport: HTTP + JSON-RPC 2.0 (single endpoint, no separate SSE channel)
-- Tools: list_presentations, create_presentation, get_presentation, update_presentation, delete_presentation, list_slides, add_slide, update_slide, delete_slide, get_responses, control_session
+- Transport: Streamable HTTP, JSON-RPC 2.0, stateless (no server-initiated SSE stream)
+- Build & maintain: klikr_create_presentation (a whole deck with slides in one call), klikr_get_presentation, klikr_list_presentations, klikr_add_slides, klikr_update_slide, klikr_delete_slide, klikr_reorder_slides, klikr_update_presentation, klikr_duplicate_presentation
+- Run & results: klikr_advance_slide, klikr_end_presentation, klikr_get_responses, klikr_get_leaderboard
 - Auth: same \`Authorization: Bearer klikr_pk_...\` header
 
-Connect from Claude Desktop / Cursor / ChatGPT by adding the URL above as a remote MCP server with that header.
+Connect from Claude Code (\`claude mcp add --transport http klikr https://klikrapp.com/api/mcp --header "Authorization: Bearer klikr_pk_..."\`), Cursor or any remote-MCP client with that header; Claude Desktop via the mcp-remote bridge. Setup: https://klikrapp.com/docs/api
 
 ## Important pages
 

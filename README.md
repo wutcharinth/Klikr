@@ -275,7 +275,12 @@ REST endpoints under `/api/v1/*` are auth-gated by API keys (created in `/dashbo
 
 The OpenAPI spec is committed at [app/api/openapi.json](app/api/openapi.json).
 
-There's also an MCP (Model Context Protocol) endpoint at `/api/mcp` for LLM tool use — same auth, exposes `list_presentations`, `add_slide`, `participants_summary`, etc.
+There's also an MCP (Model Context Protocol) server at `/api/mcp` (Streamable HTTP, stateless) so AI assistants can build and maintain decks — same `klikr_pk_` auth. Tools live in [lib/mcp/tools.ts](lib/mcp/tools.ts) and slide validation in [lib/mcp/slideInput.ts](lib/mcp/slideInput.ts):
+
+- Build & maintain: `klikr_create_presentation` (a whole deck, slides included, in one call), `klikr_get_presentation`, `klikr_list_presentations`, `klikr_add_slides`, `klikr_update_slide`, `klikr_delete_slide`, `klikr_reorder_slides`, `klikr_update_presentation`, `klikr_duplicate_presentation`
+- Run & results: `klikr_advance_slide`, `klikr_end_presentation`, `klikr_get_responses`, `klikr_get_leaderboard`
+
+Connection snippets for Claude Code, Cursor and Claude Desktop are on `/docs/api` and `/dashboard/api-keys`. Tests: `e2e/mcp.spec.ts`, `e2e/mcp-slide-input.spec.ts`.
 
 ---
 

@@ -1,387 +1,147 @@
 import { NextRequest } from "next/server";
 import { createServerClient } from "@supabase/ssr";
-import { generateRoomCode } from "@/lib/code";
-import type { SlideType, SlideConfig } from "@/lib/types";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { authenticateRequest } from "@/lib/apiAuth";
 import { createServiceClient } from "@/lib/supabase/service";
-import { startedAtFor } from "@/lib/liveTiming";
+import { callTool, isToolName, SERVER_INSTRUCTIONS, ToolError, TOOLS } from "@/lib/mcp/tools";
+import { SlideInputError } from "@/lib/mcp/slideInput";
 
 /**
- * Klikr Model Context Protocol server.
+ * Klikr Model Context Protocol server — Streamable HTTP transport, stateless.
  *
- * Single endpoint at POST /api/mcp. Implements the JSON-RPC 2.0 subset of MCP
- * required for tool discovery + invocation, with Bearer-token auth backed by
- * the same Supabase access tokens the web app uses. No SSE streaming: each
- * request returns a single JSON response.
+ * POST /api/mcp takes JSON-RPC 2.0 (a single message or a batch) and answers
+ * with plain JSON. There is no server-initiated stream, so GET with
+ * `Accept: text/event-stream` gets 405, as the spec allows.
  *
- * Auth: clients must send `Authorization: Bearer <supabase_access_token>`.
- *       Get one by signing in on the web (Google) and copying the
- *       `sb-<project>-auth-token` cookie value, or via the Supabase JS client.
+ * Auth: `Authorization: Bearer klikr_pk_<key>` (minted at /dashboard/api-keys),
+ * or a Supabase access token. `initialize` and `tools/list` work without auth
+ * so clients can discover the tools; `tools/call` needs it.
  */
 
-const SERVER_INFO = { name: "klikr", version: "0.1.0" };
+const SERVER_INFO = { name: "klikr", title: "Klikr", version: "0.2.0" };
+const SUPPORTED_VERSIONS = ["2025-06-18", "2025-03-26", "2024-11-05"];
 
-const TOOLS = [
-  {
-    name: "klikr_create_presentation",
-    description: "Create a new Klikr presentation. Returns the id, the room code audiences will type, and edit/present URLs.",
-    inputSchema: {
-      type: "object",
-      properties: { title: { type: "string", description: "Title of the presentation." } },
-      required: ["title"],
-    },
-  },
-  {
-    name: "klikr_add_slide",
-    description: "Append a slide to a presentation. type is one of 'mcq' | 'wordcloud' | 'open' | 'quiz' | 'qa' | 'rating' | 'ranking'. Pass type-specific config (options, items, time_limit_s, scale, etc.) or omit it to use sensible defaults.",
-    inputSchema: {
-      type: "object",
-      properties: {
-        presentation_id: { type: "string" },
-        type: { type: "string", enum: ["mcq", "wordcloud", "open", "quiz", "qa", "rating", "ranking"] },
-        question: { type: "string" },
-        config: { type: "object" },
-      },
-      required: ["presentation_id", "type"],
-    },
-  },
-  {
-    name: "klikr_advance_slide",
-    description: "Advance the presentation to the next slide (or the previous one). If the presentation is in the lobby, this starts it on the first slide. Direction defaults to 'next'.",
-    inputSchema: {
-      type: "object",
-      properties: {
-        presentation_id: { type: "string" },
-        direction: { type: "string", enum: ["next", "prev"] },
-      },
-      required: ["presentation_id"],
-    },
-  },
-  {
-    name: "klikr_end_presentation",
-    description: "Close the presentation. Triggers final quiz scoring.",
-    inputSchema: {
-      type: "object",
-      properties: { presentation_id: { type: "string" } },
-      required: ["presentation_id"],
-    },
-  },
-  {
-    name: "klikr_get_responses",
-    description: "Fetch all responses for a slide. For Q&A slides, includes upvote count per response.",
-    inputSchema: {
-      type: "object",
-      properties: { slide_id: { type: "string" } },
-      required: ["slide_id"],
-    },
-  },
-  {
-    name: "klikr_get_leaderboard",
-    description: "Fetch the participant leaderboard for a presentation, sorted by score descending.",
-    inputSchema: {
-      type: "object",
-      properties: { presentation_id: { type: "string" } },
-      required: ["presentation_id"],
-    },
-  },
-  {
-    name: "klikr_list_presentations",
-    description: "List the authenticated user's presentations.",
-    inputSchema: { type: "object", properties: {} },
-  },
-] as const;
+type RpcId = number | string | null;
+type RpcMessage = { jsonrpc?: string; id?: RpcId; method?: unknown; params?: unknown };
+type RpcResponse =
+  | { jsonrpc: "2.0"; id: RpcId; result: unknown }
+  | { jsonrpc: "2.0"; id: RpcId; error: { code: number; message: string; data?: unknown } };
 
-const DEFAULT_CONFIG: Record<SlideType, SlideConfig> = {
-  mcq: { options: ["Option A", "Option B"] },
-  wordcloud: { max_words_per_participant: 3 },
-  open: {},
-  quiz: { options: ["Right", "Wrong"], correct_index: 0, time_limit_s: 20 },
-  qa: { upvotes: true, moderation: "off" },
-  rating: { scale: 5, min_label: "Poor", max_label: "Great" },
-  embed: { url: "", provider: "google-slides" },
-  ranking: { items: ["Item A", "Item B", "Item C"] },
-};
+const ok = (id: RpcId, result: unknown): RpcResponse => ({ jsonrpc: "2.0", id, result });
+const err = (id: RpcId, code: number, message: string): RpcResponse => ({ jsonrpc: "2.0", id, error: { code, message } });
+const toolText = (text: string, isError = false) => ({ content: [{ type: "text", text }], ...(isError ? { isError: true } : {}) });
 
-type RpcRequest = { jsonrpc: "2.0"; id?: number | string | null; method: string; params?: unknown };
+type Auth = { db: SupabaseClient; userId: string } | { error: string };
 
-function rpcResult(id: RpcRequest["id"], result: unknown) {
-  return Response.json({ jsonrpc: "2.0", id: id ?? null, result });
-}
-function rpcError(id: RpcRequest["id"], code: number, message: string, data?: unknown) {
-  return Response.json({ jsonrpc: "2.0", id: id ?? null, error: { code, message, data } });
-}
-function textContent(text: string) {
-  return { content: [{ type: "text", text }] };
-}
-
-function clientFromAuth(req: NextRequest) {
-  const auth = req.headers.get("authorization");
-  const bearer = auth?.startsWith("Bearer ") ? auth.slice(7) : null;
-  return createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      global: bearer ? { headers: { Authorization: `Bearer ${bearer}` } } : {},
+async function resolveAuth(req: NextRequest): Promise<Auth> {
+  const header = req.headers.get("authorization") ?? "";
+  if (/^Bearer\s+klikr_pk_/i.test(header)) {
+    const auth = await authenticateRequest(req);
+    if (!auth.ok) return { error: `${auth.message} Create a key at ${req.nextUrl.origin}/dashboard/api-keys.` };
+    // Service role: tools enforce ownership themselves.
+    return { db: createServiceClient(), userId: auth.userId };
+  }
+  const bearer = header.match(/^Bearer\s+(\S+)$/i)?.[1];
+  if (bearer) {
+    const db = createServerClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, {
+      global: { headers: { Authorization: `Bearer ${bearer}` } },
       cookies: { getAll: () => [], setAll: () => {} },
-    },
-  );
+    });
+    const { data } = await db.auth.getUser(bearer);
+    if (data.user) return { db, userId: data.user.id };
+  }
+  return {
+    error: `Authentication required: connect with the header "Authorization: Bearer klikr_pk_…". Create a key at ${req.nextUrl.origin}/dashboard/api-keys.`,
+  };
+}
+
+async function handle(msg: RpcMessage, req: NextRequest, auth: () => Promise<Auth>): Promise<RpcResponse | null> {
+  if (!msg || typeof msg !== "object" || msg.jsonrpc !== "2.0" || typeof msg.method !== "string") {
+    return err(msg && typeof msg === "object" && "id" in msg ? (msg.id ?? null) : null, -32600, "Invalid Request");
+  }
+  // Notifications (no id) get no response — e.g. notifications/initialized.
+  if (!("id" in msg) || msg.id === undefined) return null;
+  const id = msg.id ?? null;
+  const params = (msg.params && typeof msg.params === "object" ? msg.params : {}) as Record<string, unknown>;
+
+  switch (msg.method) {
+    case "initialize": {
+      const asked = typeof params.protocolVersion === "string" ? params.protocolVersion : "";
+      return ok(id, {
+        protocolVersion: SUPPORTED_VERSIONS.includes(asked) ? asked : SUPPORTED_VERSIONS[0],
+        capabilities: { tools: { listChanged: false } },
+        serverInfo: SERVER_INFO,
+        instructions: SERVER_INSTRUCTIONS,
+      });
+    }
+    case "ping":
+      return ok(id, {});
+    case "tools/list":
+      return ok(id, { tools: TOOLS });
+    case "resources/list":
+      return ok(id, { resources: [] });
+    case "resources/templates/list":
+      return ok(id, { resourceTemplates: [] });
+    case "prompts/list":
+      return ok(id, { prompts: [] });
+    case "tools/call": {
+      const name = params.name;
+      if (typeof name !== "string" || !isToolName(name)) {
+        return err(id, -32602, `Unknown tool: ${String(name)}`);
+      }
+      const a = await auth();
+      if ("error" in a) return ok(id, toolText(a.error, true));
+      try {
+        const result = await callTool(name, params.arguments, { db: a.db, userId: a.userId, origin: req.nextUrl.origin });
+        return ok(id, toolText(JSON.stringify(result, null, 2)));
+      } catch (e) {
+        // Input/permission problems go back as tool errors the model can read
+        // and fix; anything else is logged and reported generically.
+        if (e instanceof ToolError || e instanceof SlideInputError) return ok(id, toolText(e.message, true));
+        console.error(`mcp ${name} failed`, e);
+        return ok(id, toolText(`Klikr couldn't complete ${name}: ${(e as Error).message ?? "unexpected error"}`, true));
+      }
+    }
+    default:
+      return err(id, -32601, `Method not found: ${msg.method}`);
+  }
 }
 
 export async function POST(req: NextRequest) {
-  let body: RpcRequest;
+  let body: unknown;
   try {
     body = await req.json();
   } catch {
-    return rpcError(null, -32700, "Parse error");
-  }
-  if (body.jsonrpc !== "2.0" || typeof body.method !== "string") {
-    return rpcError(body?.id, -32600, "Invalid Request");
+    return Response.json(err(null, -32700, "Parse error"), { status: 400 });
   }
 
-  const { id, method, params } = body;
+  // Resolve auth at most once per HTTP request, and only if a tool runs.
+  let authPromise: Promise<Auth> | null = null;
+  const auth = () => (authPromise ??= resolveAuth(req));
 
-  if (method === "initialize") {
-    return rpcResult(id, {
-      protocolVersion: "2024-11-05",
-      capabilities: { tools: {} },
-      serverInfo: SERVER_INFO,
-    });
+  if (Array.isArray(body)) {
+    if (body.length === 0) return Response.json(err(null, -32600, "Invalid Request"), { status: 400 });
+    const out = (await Promise.all(body.map((m) => handle(m as RpcMessage, req, auth)))).filter(Boolean);
+    return out.length ? Response.json(out) : new Response(null, { status: 202 });
   }
-  if (method === "tools/list") {
-    return rpcResult(id, { tools: TOOLS });
-  }
-  if (method === "ping") {
-    return rpcResult(id, {});
-  }
-
-  if (method !== "tools/call") {
-    return rpcError(id, -32601, `Method not found: ${method}`);
-  }
-
-  const { name, arguments: args } = (params ?? {}) as { name: string; arguments: Record<string, unknown> };
-
-  // Two auth paths: a `klikr_pk_*` API key (minted at /dashboard/api-keys),
-  // or a Supabase access token (still supported for the in-app inspector).
-  // API key wins when present; we resolve to a userId and use the service-role
-  // client for queries (ownership is enforced explicitly per tool below).
-  const authHeader = req.headers.get("authorization") ?? "";
-  const isApiKey = /^Bearer\s+klikr_pk_/i.test(authHeader);
-
-  let supabase;
-  let userId: string | null = null;
-  if (isApiKey) {
-    const auth = await authenticateRequest(req);
-    if (!auth.ok) return rpcError(id, -32001, auth.message);
-    userId = auth.userId;
-    supabase = createServiceClient();
-  } else {
-    supabase = clientFromAuth(req);
-    const { data: userData } = await supabase.auth.getUser();
-    userId = userData?.user?.id ?? null;
-  }
-
-  const requireAuth = () => {
-    if (!userId) {
-      throw new Error("Authentication required: send Authorization: Bearer klikr_pk_<token> or a Supabase access token.");
-    }
-    return { id: userId };
-  };
-  const requirePresentationAccess = async (presentationId: string) => {
-    const u = requireAuth();
-    const { data: pres, error } = await supabase
-      .from("presentations")
-      .select("owner_id")
-      .eq("id", presentationId)
-      .maybeSingle();
-    if (error) throw error;
-    if (!pres) throw new Error("Presentation not found");
-    if (pres.owner_id === u.id) return;
-    const { data: editor } = await supabase
-      .from("presentation_editors")
-      .select("user_id")
-      .eq("presentation_id", presentationId)
-      .eq("user_id", u.id)
-      .maybeSingle();
-    if (!editor) throw new Error("Forbidden");
-  };
-  const requireSlideAccess = async (slideId: string) => {
-    const { data: slide, error } = await supabase
-      .from("slides")
-      .select("presentation_id")
-      .eq("id", slideId)
-      .maybeSingle();
-    if (error) throw error;
-    if (!slide) throw new Error("Slide not found");
-    await requirePresentationAccess(slide.presentation_id);
-  };
-
-  try {
-    switch (name) {
-      case "klikr_list_presentations": {
-        const u = requireAuth();
-        const { data, error } = await supabase
-          .from("presentations")
-          .select("id, title, code, state, created_at")
-          .eq("owner_id", u.id)
-          .order("created_at", { ascending: false });
-        if (error) throw error;
-        return rpcResult(id, textContent(JSON.stringify(data ?? [], null, 2)));
-      }
-
-      case "klikr_create_presentation": {
-        const u = requireAuth();
-        const title = String(args?.title ?? "Untitled").slice(0, 200);
-        for (let i = 0; i < 5; i++) {
-          const code = generateRoomCode();
-          const { data, error } = await supabase
-            .from("presentations")
-            .insert({ owner_id: u.id, title, code })
-            .select("id, code")
-            .single();
-          if (!error && data) {
-            const origin = req.nextUrl.origin;
-            return rpcResult(id, textContent(JSON.stringify({
-              id: data.id,
-              code: data.code,
-              title,
-              edit_url: `${origin}/edit/${data.id}`,
-              present_url: `${origin}/present/${data.id}`,
-              join_url: `${origin}/play/${data.code}`,
-            }, null, 2)));
-          }
-          if (error && error.code !== "23505") throw error;
-        }
-        throw new Error("Could not generate unique room code");
-      }
-
-      case "klikr_add_slide": {
-        requireAuth();
-        const presentationId = String(args.presentation_id);
-        await requirePresentationAccess(presentationId);
-        const type = String(args.type) as SlideType;
-        const question = String(args.question ?? "");
-        const config = (args.config as SlideConfig | undefined) ?? DEFAULT_CONFIG[type];
-
-        const { data: existing } = await supabase
-          .from("slides")
-          .select("position")
-          .eq("presentation_id", presentationId)
-          .order("position", { ascending: false })
-          .limit(1);
-        const nextPos = (existing?.[0]?.position ?? -1) + 1;
-
-        const { data, error } = await supabase
-          .from("slides")
-          .insert({ presentation_id: presentationId, position: nextPos, type, question, config })
-          .select("id, position, type")
-          .single();
-        if (error) throw error;
-        return rpcResult(id, textContent(JSON.stringify(data, null, 2)));
-      }
-
-      case "klikr_advance_slide": {
-        requireAuth();
-        const presentationId = String(args.presentation_id);
-        await requirePresentationAccess(presentationId);
-        const direction = String(args.direction ?? "next") as "next" | "prev";
-
-        const { data: slides } = await supabase
-          .from("slides")
-          .select("id, position, type")
-          .eq("presentation_id", presentationId)
-          .order("position", { ascending: true });
-        if (!slides || slides.length === 0) {
-          throw new Error("Presentation has no slides");
-        }
-        const { data: pres } = await supabase
-          .from("presentations")
-          .select("state, current_slide_id")
-          .eq("id", presentationId)
-          .single();
-        if (!pres) throw new Error("Presentation not found");
-
-        let next: { id: string; type: string } | null = null;
-        if (pres.state === "lobby") {
-          next = slides[0];
-        } else {
-          const idx = slides.findIndex((s) => s.id === pres.current_slide_id);
-          const nextIdx = direction === "next" ? idx + 1 : idx - 1;
-          if (nextIdx < 0 || nextIdx >= slides.length) {
-            throw new Error(`No ${direction} slide available`);
-          }
-          next = slides[nextIdx];
-        }
-        const nextId = next.id;
-        const { error } = await supabase
-          .from("presentations")
-          .update({
-            state: "active",
-            current_slide_id: nextId,
-            current_slide_started_at: startedAtFor(next.type),
-          })
-          .eq("id", presentationId);
-        if (error) throw error;
-        return rpcResult(id, textContent(JSON.stringify({ current_slide_id: nextId }, null, 2)));
-      }
-
-      case "klikr_end_presentation": {
-        requireAuth();
-        const presentationId = String(args.presentation_id);
-        await requirePresentationAccess(presentationId);
-        const { error } = await supabase
-          .from("presentations")
-          .update({ state: "closed" })
-          .eq("id", presentationId);
-        if (error) throw error;
-        return rpcResult(id, textContent(JSON.stringify({ state: "closed" })));
-      }
-
-      case "klikr_get_responses": {
-        const slideId = String(args.slide_id);
-        await requireSlideAccess(slideId);
-        const { data: responses, error } = await supabase
-          .from("responses")
-          .select("id, value_text, value_index, response_ms, created_at, participant_id")
-          .eq("slide_id", slideId)
-          .order("created_at", { ascending: true });
-        if (error) throw error;
-
-        // upvote counts (Q&A)
-        const ids = (responses ?? []).map((r) => r.id);
-        const { data: votes } = ids.length
-          ? await supabase.from("question_votes").select("response_id").in("response_id", ids)
-          : { data: [] as { response_id: string }[] };
-        const counts = new Map<string, number>();
-        for (const v of votes ?? []) counts.set(v.response_id, (counts.get(v.response_id) ?? 0) + 1);
-
-        const out = (responses ?? []).map((r) => ({ ...r, upvotes: counts.get(r.id) ?? 0 }));
-        return rpcResult(id, textContent(JSON.stringify(out, null, 2)));
-      }
-
-      case "klikr_get_leaderboard": {
-        const presentationId = String(args.presentation_id);
-        await requirePresentationAccess(presentationId);
-        const { data, error } = await supabase
-          .from("participants")
-          .select("nickname, score, created_at")
-          .eq("presentation_id", presentationId)
-          .order("score", { ascending: false });
-        if (error) throw error;
-        return rpcResult(id, textContent(JSON.stringify(data ?? [], null, 2)));
-      }
-
-      default:
-        return rpcError(id, -32601, `Unknown tool: ${name}`);
-    }
-  } catch (e) {
-    return rpcError(id, -32000, (e as Error).message ?? "Tool execution failed");
-  }
+  const res = await handle(body as RpcMessage, req, auth);
+  return res ? Response.json(res) : new Response(null, { status: 202 });
 }
 
-export async function GET() {
+export async function GET(req: NextRequest) {
+  // No server-initiated SSE stream on this stateless endpoint.
+  if ((req.headers.get("accept") ?? "").includes("text/event-stream")) {
+    return new Response(null, { status: 405, headers: { Allow: "POST" } });
+  }
   return Response.json({
     ...SERVER_INFO,
-    description: "Klikr MCP server. POST JSON-RPC 2.0 to this URL with a Supabase Bearer token.",
+    description: "Klikr MCP server (Streamable HTTP). POST JSON-RPC 2.0 here with Authorization: Bearer klikr_pk_<key>.",
+    docs: `${req.nextUrl.origin}/docs/api`,
     tools: TOOLS.map((t) => ({ name: t.name, description: t.description })),
   });
+}
+
+export async function DELETE() {
+  // Stateless: there's no session to terminate.
+  return new Response(null, { status: 405, headers: { Allow: "POST" } });
 }
